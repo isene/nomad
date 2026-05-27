@@ -1,0 +1,28 @@
+[package]
+name = "fe2o3-mobile-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Shared Rust core for the nomad mobile suite. Pure logic, exposed to Kotlin via UniFFI."
+
+[lib]
+name = "fe2o3_mobile_core"
+# cdylib for Android JNI loading, staticlib for iOS later, rlib for host tests.
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+uniffi = { version = "0.28", features = [] }
+
+[build-dependencies]
+uniffi = { version = "0.28", features = ["build"] }
+
+[features]
+default = []
+cli = ["uniffi/cli"]
+
+[[bin]]
+name = "uniffi-bindgen"
+path = "src/bin/uniffi-bindgen.rs"
+required-features = ["cli"]

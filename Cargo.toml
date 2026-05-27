@@ -1,0 +1,24 @@
+[workspace]
+members = ["core"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Geir Isene <g@isene.com>"]
+license = "Unlicense"
+repository = "https://github.com/isene/nomad"
+
+[profile.release]
+# Mobile-friendly: smaller .so, fewer pages to fault in on launch.
+# Do NOT enable `strip = true`: it removes the UniFFI metadata symbols
+# (`UNIFFI_META_*`) that uniffi-bindgen reads from the .so to emit Kotlin
+# bindings. The cost of keeping them is a few KB; the cost of removing
+# them is a broken build pipeline.
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.dev]
+opt-level = 1
