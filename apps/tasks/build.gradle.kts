@@ -21,7 +21,10 @@ plugins {
 // `cargoEnv` below.
 
 val coreDir = rootProject.file("core")
-val rustTargetDir = rootProject.file("core/target") // shared workspace target
+// Cargo workspace lives at nomad/Cargo.toml, so the per-target build
+// artifacts land in nomad/target/<triple>/ regardless of where in the
+// workspace cargo was invoked from.
+val rustTargetDir = rootProject.file("target")
 
 val androidAbis = mapOf(
     "arm64-v8a" to "aarch64-linux-android",
@@ -40,9 +43,10 @@ fun cargoEnv(): Map<String, String> {
     val out = mutableMapOf<String, String>()
     out.putAll(current)
     out["PATH"] = cleanPath
-    if (ndkHome != null) {
-        out["ANDROID_NDK_HOME"] = ndkHome!!
-        out["ANDROID_NDK_ROOT"] = ndkHome!!
+    val ndk = ndkHome
+    if (ndk != null) {
+        out["ANDROID_NDK_HOME"] = ndk
+        out["ANDROID_NDK_ROOT"] = ndk
     }
     return out
 }
@@ -52,9 +56,14 @@ val cargoBuildAll by tasks.registering {
     description = "Build fe2o3-mobile-core for every Android ABI."
 }
 
-androidAbis.forEach { (abi, rustTriple) ->
-    val taskName = "cargoBuild" + abi.replace("-", "_").replace("v", "V")
-    val sub = tasks.register<Exec>(taskName) {
+// Hold task providers so downstream tasks can reference them directly
+// rather than by name (which Gradle's name munging mangles for ABIs
+// like "arm64-v8a" → "cargoBuildarm64_V8a", easy to typo).
+val cargoBuildByAbi: Map<String, TaskProvider<Exec>> = androidAbis.mapValues { (abi, rustTriple) ->
+    val safeName = "cargoBuild" + abi
+        .split("-", "_")
+        .joinToString("") { it.replaceFirstChar { c -> c.uppercase() } }
+    tasks.register<Exec>(safeName) {
         group = "rust"
         description = "cargo-ndk build for $abi ($rustTriple)"
         workingDir = coreDir
@@ -66,7 +75,9 @@ androidAbis.forEach { (abi, rustTriple) ->
         )
         outputs.file(rustTargetDir.resolve("$rustTriple/release/libfe2o3_mobile_core.so"))
     }
-    cargoBuildAll.configure { dependsOn(sub) }
+}
+cargoBuildByAbi.values.forEach { provider ->
+    cargoBuildAll.configure { dependsOn(provider) }
 }
 
 val jniLibsOutputDir = layout.projectDirectory.dir("src/main/jniLibs")
@@ -89,7 +100,7 @@ val uniffiOutDir = layout.buildDirectory.dir("generated/source/uniffi")
 val generateUniffiBindings by tasks.registering(Exec::class) {
     group = "rust"
     description = "Generate Kotlin bindings from the aarch64 .so."
-    dependsOn("cargoBuildArm64_V8a")
+    dependsOn(cargoBuildByAbi["arm64-v8a"]!!)
     workingDir = coreDir
     environment(cargoEnv())
     val libPath = rustTargetDir.resolve("aarch64-linux-android/release/libfe2o3_mobile_core.so")
@@ -124,6 +135,7 @@ val keyProps = Properties().apply {
 android {
     namespace = "com.isene.tasks"
     compileSdk = 35
+    ndkVersion = "27.2.12479018"
 
     defaultConfig {
         applicationId = "com.isene.tasks"
