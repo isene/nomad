@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">tasks</string>
+    <string name="pick_file">Pick todo.hl</string>
+    <string name="no_file_picked">No todo.hl picked yet, tap to choose your synced file.</string>
+    <string name="add_category">Add category</string>
+    <string name="add_item">Add item</string>
+    <string name="rename">Rename</string>
+    <string name="delete">Delete</string>
+    <string name="reload">Reload</string>
+    <string name="pick_new">Pick different file</string>
+    <string name="save_failed">Save failed</string>
+    <string name="external_changed">File changed on disk, reloaded</string>
+    <string name="widget_label">tasks</string>
+    <string name="widget_empty">No todo.hl picked yet. Open the app to choose your synced file.</string>
+    <string name="widget_no_items">No items</string>
+</resources>
