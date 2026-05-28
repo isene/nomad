@@ -382,7 +382,7 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable {
-                        uri.openUri("https://github.com/isene/hyperlist")
+                        uri.openUri("https://isene.org/hyperlist/")
                     },
                 )
             }
