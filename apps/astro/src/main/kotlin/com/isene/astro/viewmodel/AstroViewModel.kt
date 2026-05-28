@@ -20,6 +20,7 @@ import kotlinx.coroutines.withContext
 import uniffi.fe2o3_mobile_core.BodyObs
 import uniffi.fe2o3_mobile_core.DayForecast
 import uniffi.fe2o3_mobile_core.Event
+import uniffi.fe2o3_mobile_core.HourPoint
 import uniffi.fe2o3_mobile_core.MoonPhase
 import uniffi.fe2o3_mobile_core.RiseSet
 import uniffi.fe2o3_mobile_core.Store
@@ -137,6 +138,12 @@ class AstroViewModel(app: Application) : AndroidViewModel(app) {
     /** Observing-condition level for a forecast day (midday values). */
     fun conditionLevelFor(day: DayForecast): ConditionLevel {
         val pts = conditionPoints(day.cloud, day.humidity, day.tempMid, day.wind, settings.conditionLimits())
+        return conditionLevel(pts)
+    }
+
+    /** Observing-condition level for a single forecast hour. */
+    fun conditionLevelForHour(h: HourPoint): ConditionLevel {
+        val pts = conditionPoints(h.cloud, h.humidity, h.temp, h.wind, settings.conditionLimits())
         return conditionLevel(pts)
     }
 

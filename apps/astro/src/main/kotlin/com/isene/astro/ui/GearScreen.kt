@@ -78,19 +78,25 @@ fun GearScreen(vm: AstroViewModel, modifier: Modifier = Modifier) {
         }
         store.telescopes.forEachIndexed { i, t ->
             Card(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    FilterChip(
-                        selected = i == sel,
-                        onClick = { vm.selectScope(i) },
-                        label = { Text(t.name.ifBlank { "scope ${i + 1}" }) },
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text("${t.app.toInt()}mm f/${"%.1f".format(if (t.app != 0.0) t.tfl / t.app else 0.0)}", fontSize = 12.sp)
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { editing = Editing.Scope(i, t) }) { Icon(Icons.Filled.Edit, "Edit") }
-                    IconButton(onClick = { vm.updateStore(store.copy(telescopes = store.telescopes.without(i))) }) {
-                        Icon(Icons.Filled.Delete, "Delete")
+                Column(Modifier.padding(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        FilterChip(
+                            selected = i == sel,
+                            onClick = { vm.selectScope(i) },
+                            label = { Text(t.name.ifBlank { "scope ${i + 1}" }, maxLines = 2) },
+                            modifier = Modifier.weight(1f),
+                        )
+                        IconButton(onClick = { editing = Editing.Scope(i, t) }) { Icon(Icons.Filled.Edit, "Edit") }
+                        IconButton(onClick = { vm.updateStore(store.copy(telescopes = store.telescopes.without(i))) }) {
+                            Icon(Icons.Filled.Delete, "Delete")
+                        }
                     }
+                    Text(
+                        "${t.app.toInt()}mm · f/${"%.1f".format(if (t.app != 0.0) t.tfl / t.app else 0.0)} · ${t.tfl.toInt()}mm FL",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
                 }
             }
         }
@@ -143,21 +149,26 @@ fun GearScreen(vm: AstroViewModel, modifier: Modifier = Modifier) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(e.name.ifBlank { "${e.fl.toInt()}mm" }, fontWeight = FontWeight.SemiBold)
-                        Spacer(Modifier.width(8.dp))
-                        Text("${e.fl.toInt()}mm · ${e.afov.toInt()}°", fontSize = 12.sp)
-                        Spacer(Modifier.weight(1f))
+                        Text(
+                            e.name.ifBlank { "${e.fl.toInt()}mm" },
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 15.sp,
+                            maxLines = 2,
+                            modifier = Modifier.weight(1f),
+                        )
                         IconButton(onClick = { editing = Editing.Eye(i, e) }) { Icon(Icons.Filled.Edit, "Edit") }
                         IconButton(onClick = { vm.updateStore(store.copy(eyepieces = store.eyepieces.without(i))) }) {
                             Icon(Icons.Filled.Delete, "Delete")
                         }
                     }
+                    Text("${e.fl.toInt()}mm · ${e.afov.toInt()}° AFOV", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
                     scope?.let { sc ->
                         val ec = eyepieceCalcs(sc.app, sc.tfl, e.fl, e.afov)
-                        Row(Modifier.padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${ec.magnification.toInt()}×", modifier = Modifier.width(56.dp), fontSize = 12.sp)
-                            Text("FOV ${"%.2f".format(ec.trueFov)}°", modifier = Modifier.width(84.dp), fontSize = 12.sp)
-                            Text("exit ${"%.1f".format(ec.exitPupil)}mm", modifier = Modifier.width(92.dp), fontSize = 12.sp)
+                        Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text("${ec.magnification.toInt()}×", modifier = Modifier.width(52.dp), fontSize = 12.sp)
+                            Text("FOV ${"%.2f".format(ec.trueFov)}°", modifier = Modifier.width(80.dp), fontSize = 12.sp)
+                            Text("exit ${"%.1f".format(ec.exitPupil)}mm", modifier = Modifier.width(88.dp), fontSize = 12.sp)
+                            Spacer(Modifier.weight(1f))
                             BandChip(ec)
                         }
                     }
@@ -175,15 +186,15 @@ fun GearScreen(vm: AstroViewModel, modifier: Modifier = Modifier) {
         }
         store.misc.forEachIndexed { i, m ->
             Card(Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(m.name.ifBlank { m.kind }, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.width(8.dp))
-                    Text("${m.kind}${if (m.factor != 0.0) " ×${"%.1f".format(m.factor)}" else ""}", fontSize = 12.sp)
-                    Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { editing = Editing.Misc(i, m) }) { Icon(Icons.Filled.Edit, "Edit") }
-                    IconButton(onClick = { vm.updateStore(store.copy(misc = store.misc.without(i))) }) {
-                        Icon(Icons.Filled.Delete, "Delete")
+                Column(Modifier.padding(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(m.name.ifBlank { m.kind }, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 2, modifier = Modifier.weight(1f))
+                        IconButton(onClick = { editing = Editing.Misc(i, m) }) { Icon(Icons.Filled.Edit, "Edit") }
+                        IconButton(onClick = { vm.updateStore(store.copy(misc = store.misc.without(i))) }) {
+                            Icon(Icons.Filled.Delete, "Delete")
+                        }
                     }
+                    Text("${m.kind}${if (m.factor != 0.0) " · ×${"%.1f".format(m.factor)}" else ""}", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
                 }
             }
         }

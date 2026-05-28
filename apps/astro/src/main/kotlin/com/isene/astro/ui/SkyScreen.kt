@@ -1,5 +1,6 @@
 package com.isene.astro.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +19,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,6 +37,7 @@ import uniffi.fe2o3_mobile_core.BodyObs
 import uniffi.fe2o3_mobile_core.ConditionLevel
 import uniffi.fe2o3_mobile_core.DayForecast
 import uniffi.fe2o3_mobile_core.Event
+import uniffi.fe2o3_mobile_core.HourPoint
 
 @Composable
 fun SkyScreen(vm: AstroViewModel, modifier: Modifier = Modifier) {
@@ -90,13 +94,23 @@ fun SkyScreen(vm: AstroViewModel, modifier: Modifier = Modifier) {
             }
         }
 
-        // Weather + conditions
+        // Weather + conditions (tap a day to expand its 24 hours)
         SectionHeader("Weather & observing conditions")
+        val expandedDays = remember { mutableStateListOf<String>() }
         SectionCard {
             if (s.weather.isEmpty()) {
                 Text(if (s.loadingNet) "Loading…" else "No forecast", style = MaterialTheme.typography.bodySmall)
             } else {
-                s.weather.take(9).forEach { d -> WeatherRow(d, vm.conditionLevelFor(d)) }
+                s.weather.take(9).forEach { d ->
+                    val isExp = d.date in expandedDays
+                    WeatherRow(d, vm.conditionLevelFor(d), isExp) {
+                        if (isExp) expandedDays.remove(d.date) else expandedDays.add(d.date)
+                    }
+                    if (isExp) {
+                        HourHeaderRow()
+                        d.hours.forEach { h -> HourRow(h, vm.conditionLevelForHour(h)) }
+                    }
+                }
             }
         }
 
@@ -175,25 +189,63 @@ private fun EphemRow(b: BodyObs, up: Boolean) {
     }
 }
 
+private fun levelColor(level: ConditionLevel): Color = when (level) {
+    ConditionLevel.GOOD -> Color(0xFF7CFF9B)
+    ConditionLevel.FAIR -> Color(0xFFFFE08A)
+    ConditionLevel.POOR -> Color(0xFFFF8A80)
+}
+
 @Composable
-private fun WeatherRow(d: DayForecast, level: ConditionLevel) {
-    val (c, label) = when (level) {
-        ConditionLevel.GOOD -> Color(0xFF7CFF9B) to "good"
-        ConditionLevel.FAIR -> Color(0xFFFFE08A) to "fair"
-        ConditionLevel.POOR -> Color(0xFFFF8A80) to "poor"
-    }
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
-        Box(Modifier.width(12.dp)) {
+private fun WeatherRow(d: DayForecast, level: ConditionLevel, expanded: Boolean, onClick: () -> Unit) {
+    val c = levelColor(level)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+    ) {
+        Text(if (expanded) "▾" else "▸", modifier = Modifier.width(16.dp), color = c, fontSize = 12.sp)
+        Box(Modifier.width(10.dp)) {
             Surface(color = c, shape = CircleShape, modifier = Modifier.width(10.dp)) { Text(" ") }
         }
         Spacer(Modifier.width(8.dp))
-        Text(d.date.substring(5), modifier = Modifier.width(56.dp), fontSize = 13.sp)
-        Text(d.symbol, modifier = Modifier.width(28.dp))
-        Text("${d.cloud.toInt()}%☁", modifier = Modifier.width(56.dp), fontSize = 12.sp)
-        Text("${d.tempLow.toInt()}/${d.tempHigh.toInt()}°", modifier = Modifier.width(56.dp), fontSize = 12.sp)
-        Text("${d.wind.toInt()}m/s", modifier = Modifier.width(52.dp), fontSize = 12.sp)
-        Text(label, color = c, fontSize = 12.sp)
+        Text(d.date.substring(5), modifier = Modifier.width(52.dp), fontSize = 13.sp)
+        Text(d.symbol, modifier = Modifier.width(26.dp))
+        Text("${d.cloud.toInt()}%☁", modifier = Modifier.width(52.dp), fontSize = 12.sp)
+        Text("${d.tempLow.toInt()}/${d.tempHigh.toInt()}°", modifier = Modifier.width(52.dp), fontSize = 12.sp)
+        Text("${d.wind.toInt()}m/s", modifier = Modifier.width(48.dp), fontSize = 12.sp)
     }
+}
+
+@Composable
+private fun HourHeaderRow() {
+    Row(Modifier.padding(start = 24.dp, top = 4.dp, bottom = 2.dp)) {
+        hcell("h", 30.dp); hcell("cloud", 48.dp); hcell("hum", 44.dp); hcell("temp", 48.dp); hcell("wind", 56.dp)
+    }
+}
+
+@Composable
+private fun HourRow(h: HourPoint, level: ConditionLevel) {
+    val c = levelColor(level)
+    Row(Modifier.padding(start = 24.dp, top = 1.dp, bottom = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+        mono("${h.hourStr}", 30.dp, c)
+        mono("${h.cloud}%", 48.dp, c)
+        mono("${h.humidity.toInt()}%", 44.dp, c)
+        mono("${h.temp.toInt()}°", 48.dp, c)
+        mono("${h.wind.toInt()}${h.windDirName}", 56.dp, c)
+        if (h.precip > 0.0) Text("${"%.1f".format(h.precip)}mm", fontSize = 11.sp, color = Color(0xFF8FB7FF))
+    }
+}
+
+@Composable
+private fun hcell(text: String, w: androidx.compose.ui.unit.Dp) {
+    Text(text, modifier = Modifier.width(w), fontSize = 10.sp, color = MaterialTheme.colorScheme.secondary)
+}
+
+@Composable
+private fun mono(text: String, w: androidx.compose.ui.unit.Dp, color: Color) {
+    Text(text, modifier = Modifier.width(w), fontFamily = FontFamily.Monospace, fontSize = 11.sp, color = color)
 }
 
 @Composable
