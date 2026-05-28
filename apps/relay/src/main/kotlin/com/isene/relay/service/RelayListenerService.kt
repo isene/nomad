@@ -50,6 +50,11 @@ class RelayListenerService : NotificationListenerService() {
 
     private fun hasStorage(): Boolean = Environment.isExternalStorageManager()
 
+    companion object {
+        // " (7 messages)", " (2 chats)" — digits then a word, anchored at end.
+        private val COUNT_SUFFIX = Regex(" \\(\\d+ [^)]*\\)$")
+    }
+
     override fun onListenerConnected() {
         super.onListenerConnected()
         startWatcher()
@@ -75,14 +80,22 @@ class RelayListenerService : NotificationListenerService() {
         val platform = Gateway.PLATFORMS[pkg] ?: return
         val n = sbn.notification ?: return
 
+        // Drop group-summary rollups ("N messages from M chats") — they aren't
+        // real messages, just Android's grouping placeholder. Locale-independent.
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+
         val style = NotificationCompat.MessagingStyle
             .extractMessagingStyleFromNotification(n)
         val extras = n.extras
 
-        val title = style?.conversationTitle?.toString()
+        val rawTitle = style?.conversationTitle?.toString()
             ?: extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
             ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
             ?: return
+        // WhatsApp appends a per-notification count like " (7 messages)" to the
+        // title; it changes on every repost and would split one conversation
+        // into many thread_keys. Strip it so the thread stays whole.
+        val title = stripCountSuffix(rawTitle)
         val isGroup = style?.isGroupConversation ?: false
 
         val sender: String
@@ -123,13 +136,18 @@ class RelayListenerService : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         val platform = Gateway.PLATFORMS[sbn.packageName] ?: return
         val n = sbn.notification ?: return
-        val title = NotificationCompat.MessagingStyle
+        val rawTitle = NotificationCompat.MessagingStyle
             .extractMessagingStyleFromNotification(n)?.conversationTitle?.toString()
             ?: n.extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
             ?: n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
             ?: return
-        replyCache.remove(key(platform, title))
+        replyCache.remove(key(platform, stripCountSuffix(rawTitle)))
     }
+
+    /** Strip a trailing per-notification count like " (7 messages)" or
+     *  " (2 chats)". Requires "(<digits> <word…>)" so legitimate parenthetical
+     *  titles ("(2024)") are left intact. */
+    private fun stripCountSuffix(s: String): String = COUNT_SUFFIX.replace(s, "")
 
     private fun cacheReplyAction(platform: String, title: String, n: Notification) {
         val actions = n.actions ?: return
