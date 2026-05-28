@@ -1,4 +1,4 @@
 # Copy to local.properties (gitignored) before running ./gradlew.
 # AGP needs sdk.dir to locate platforms / build-tools / NDK.
-sdk.dir=/home/geir/Android/Sdk
-ndk.dir=/home/geir/Android/Sdk/ndk/27.2.12479018
+sdk.dir=/home/geir/.android-sdk
+ndk.dir=/home/geir/.android-sdk/ndk/27.2.12479018

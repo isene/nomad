@@ -64,8 +64,8 @@ These come from the original mobile-architecture artifact. Do not drift.
 
 - **JDK 17** (apt: `openjdk-17-jdk-headless`). System default JDK may be
   newer; gradle invokes JDK 17 explicitly via `JAVA_HOME`.
-- **Android SDK** at `~/Android/Sdk/`. Platform 35, build-tools 35.0.0.
-- **Android NDK** 27.2.12479018 under `~/Android/Sdk/ndk/`.
+- **Android SDK** at `~/.android-sdk/` (hidden). Platform 35, build-tools 35.0.0.
+- **Android NDK** 27.2.12479018 under `~/.android-sdk/ndk/`.
 - **Rust** stable, 2021 edition. Targets: `aarch64-linux-android`,
   `armv7-linux-androideabi`, `x86_64-linux-android`, `i686-linux-android`.
 - **cargo-ndk** 4.x for the cross-compile.
@@ -74,8 +74,9 @@ These come from the original mobile-architecture artifact. Do not drift.
 ### Required env
 
 ```bash
-export ANDROID_HOME="$HOME/Android/Sdk"
-export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
+export ANDROID_HOME="$HOME/.android-sdk"
+export ANDROID_SDK_ROOT="$HOME/.android-sdk"
+export ANDROID_NDK_HOME="$HOME/.android-sdk/ndk/27.2.12479018"
 export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ```
