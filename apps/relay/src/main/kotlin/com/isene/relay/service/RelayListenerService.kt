@@ -36,6 +36,14 @@ class RelayListenerService : NotificationListenerService() {
     // is active). Refreshed on each post, evicted on removal.
     private val replyCache = ConcurrentHashMap<String, ReplyAction>()
 
+    // Recently-written message keys, to suppress duplicate inbound files when
+    // an app re-posts the same notification (UI/read-state updates). Bounded
+    // LRU; kastrup's external_id is the cross-restart backstop.
+    private val recent = object : LinkedHashMap<String, Unit>(64, 0.75f, false) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Unit>?): Boolean =
+            size > 256
+    }
+
     private var watcher: OutboxWatcher? = null
 
     private fun key(platform: String, threadKey: String) = "$platform$threadKey"
@@ -79,10 +87,14 @@ class RelayListenerService : NotificationListenerService() {
 
         val sender: String
         val text: String
+        // Prefer the message's own timestamp (stable across re-posts) over the
+        // notification post time, so dedup keys don't drift.
+        var msgTs = sbn.postTime
         if (style != null && style.messages.isNotEmpty()) {
             val last = style.messages.last()
             sender = last.person?.name?.toString() ?: title
             text = last.text?.toString() ?: ""
+            if (last.timestamp > 0) msgTs = last.timestamp
         } else {
             // No MessagingStyle: only accept if it's explicitly a message, to
             // filter out IG likes/follows and other non-DM notifications.
@@ -93,8 +105,19 @@ class RelayListenerService : NotificationListenerService() {
         }
         if (text.isBlank()) return
 
+        // Skip if we've already written this exact message (re-posted notif).
+        val dkey = "$platform$title$msgTs${text.hashCode()}"
+        synchronized(recent) {
+            if (recent.put(dkey, Unit) != null) {
+                // Still refresh the reply action — the live PendingIntent may
+                // have changed even though the message is the same.
+                cacheReplyAction(platform, title, n)
+                return
+            }
+        }
+
         cacheReplyAction(platform, title, n)
-        writeInbound(platform, title, sender, text, sbn.postTime, isGroup)
+        writeInbound(platform, title, sender, text, msgTs, isGroup)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
@@ -125,7 +148,7 @@ class RelayListenerService : NotificationListenerService() {
         title: String,
         sender: String,
         text: String,
-        postTimeMs: Long,
+        tsMs: Long,
         group: Boolean,
     ) {
         if (!hasStorage()) return
@@ -135,11 +158,11 @@ class RelayListenerService : NotificationListenerService() {
                 put("thread_key", title)
                 put("sender", sender)
                 put("text", text)
-                put("timestamp", postTimeMs / 1000)
+                put("timestamp", tsMs / 1000)
                 put("group", group)
             }
             val dir = Gateway.inboundDir(applicationContext)
-            val name = "$platform-$postTimeMs-${UUID.randomUUID().toString().take(8)}.json"
+            val name = "$platform-$tsMs-${UUID.randomUUID().toString().take(8)}.json"
             File(dir, name).writeText(obj.toString())
         } catch (_: Exception) {
             // Storage may be momentarily unavailable; drop this one rather
