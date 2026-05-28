@@ -6,3 +6,4 @@
 // the core free of C/TLS deps so it cross-compiles cleanly.
 
 pub mod ephem;
+pub mod gear;
