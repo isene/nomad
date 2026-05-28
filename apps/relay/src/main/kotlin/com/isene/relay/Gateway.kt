@@ -24,16 +24,18 @@ object Gateway {
         "com.instagram.android" to "instagram",
         "com.facebook.orca" to "messenger",
         "com.whatsapp" to "whatsapp",
+        "com.discord" to "discord",
         "org.telegram.messenger" to "telegram",
         "org.thoughtcrime.securesms" to "signal",
     )
 
     /** Enabled out of the box: Instagram + Messenger (the Marionette
-     *  replacement) + WhatsApp. */
+     *  replacement) + WhatsApp + Discord. */
     val DEFAULT_ALLOW = setOf(
         "com.instagram.android",
         "com.facebook.orca",
         "com.whatsapp",
+        "com.discord",
     )
 
     fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
