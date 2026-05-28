@@ -211,8 +211,15 @@ checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
 name = "fe2o3-mobile-core"
 version = "0.1.0"
 dependencies = [
+ "fe2o3-orbit",
+ "serde",
+ "serde_json",
  "uniffi",
 ]
+
+[[package]]
+name = "fe2o3-orbit"
+version = "0.1.2"
 
 [[package]]
 name = "fs-err"

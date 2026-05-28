@@ -14,6 +14,11 @@ crate-type = ["cdylib", "staticlib", "rlib"]
 
 [dependencies]
 uniffi = { version = "0.28", features = [] }
+# Ephemeris for the astro app. Zero-dependency pure-Rust crate (local clone),
+# so it cross-compiles to Android trivially.
+orbit = { path = "../../orbit", package = "fe2o3-orbit" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 
 [build-dependencies]
 uniffi = { version = "0.28", features = ["build"] }
