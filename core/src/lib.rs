@@ -8,3 +8,5 @@
 uniffi::setup_scaffolding!();
 
 pub mod hyperlist;
+pub mod hyperlist_doc;
+pub mod hyperlist_hl;
