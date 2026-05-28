@@ -18,9 +18,12 @@ import uniffi.fe2o3_mobile_core.deleteSubtree
 import uniffi.fe2o3_mobile_core.highlightDoc
 import uniffi.fe2o3_mobile_core.indentSubtree
 import uniffi.fe2o3_mobile_core.insertLine
+import uniffi.fe2o3_mobile_core.moveSubtreeBefore
 import uniffi.fe2o3_mobile_core.moveSubtreeDown
 import uniffi.fe2o3_mobile_core.moveSubtreeUp
 import uniffi.fe2o3_mobile_core.outdentSubtree
+import uniffi.fe2o3_mobile_core.renumber
+import uniffi.fe2o3_mobile_core.resolveReference
 import uniffi.fe2o3_mobile_core.setLineText
 import uniffi.fe2o3_mobile_core.toggleCheckbox
 
@@ -114,15 +117,54 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- structural edits: delegate to Rust, recompute spans, persist ----
 
-    private fun applyDoc(next: HlDoc, foldShift: (Set<Int>) -> Set<Int> = { it }, newSelected: Int? = _state.value.selected) {
-        val spans = highlightDoc(next.lines.map { it.text })
+    private fun applyDoc(
+        next: HlDoc,
+        foldShift: (Set<Int>) -> Set<Int> = { it },
+        newSelected: Int? = _state.value.selected,
+        autoRenumber: Boolean = false,
+    ) {
+        // Auto-renumber on structural edits: numbered lists fix themselves;
+        // no-op on lists without numeric identifiers.
+        val finalDoc = if (autoRenumber) renumber(next) else next
+        val spans = highlightDoc(finalDoc.lines.map { it.text })
         _state.value = _state.value.copy(
-            doc = next,
+            doc = finalDoc,
             spans = spans,
-            folded = foldShift(_state.value.folded).filter { it < next.lines.size }.toSet(),
-            selected = newSelected?.coerceIn(0, (next.lines.size - 1).coerceAtLeast(0))?.takeIf { next.lines.isNotEmpty() },
+            folded = foldShift(_state.value.folded).filter { it < finalDoc.lines.size }.toSet(),
+            selected = newSelected?.coerceIn(0, (finalDoc.lines.size - 1).coerceAtLeast(0))?.takeIf { finalDoc.lines.isNotEmpty() },
         )
         persist()
+    }
+
+    /** Resolve a reference, reveal + select its target, and return the index. */
+    fun resolveRef(target: String): Int? {
+        val idx = resolveReference(_state.value.doc, target)?.toInt() ?: return null
+        revealAndSelect(idx)
+        return idx
+    }
+
+    /** Manual renumber action (overflow menu). */
+    fun renumberDoc() {
+        applyDoc(renumber(_state.value.doc))
+    }
+
+    /**
+     * Move the subtree rooted at `fromLine` to before `beforeLine` (doc index,
+     * or doc.lines.size to append), adopting `newIndent`. Drag-reorder entry
+     * point; auto-renumbers after.
+     */
+    fun moveSubtree(fromLine: Int, beforeLine: Int, newIndent: Int) {
+        applyDoc(
+            moveSubtreeBefore(
+                _state.value.doc,
+                fromLine.toUInt(),
+                beforeLine.toUInt(),
+                newIndent.toUInt(),
+            ),
+            foldShift = { emptySet() },
+            newSelected = null,
+            autoRenumber = true,
+        )
     }
 
     fun setLineText(idx: Int, text: String) {
@@ -151,6 +193,7 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
             insertLine(doc, insertAt.toUInt(), indent, text),
             foldShift = { folds -> folds.map { if (it >= insertAt) it + 1 else it }.toSet() },
             newSelected = insertAt,
+            autoRenumber = true,
         )
     }
 
@@ -185,30 +228,28 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
                     .map { if (it >= end) it - span else it }.toSet()
             },
             newSelected = sel.coerceAtMost((doc.lines.size - span - 1).coerceAtLeast(0)),
+            autoRenumber = true,
         )
     }
 
     fun indentSelected() {
         val sel = _state.value.selected ?: return
-        applyDoc(indentSubtree(_state.value.doc, sel.toUInt()))
+        applyDoc(indentSubtree(_state.value.doc, sel.toUInt()), autoRenumber = true)
     }
 
     fun outdentSelected() {
         val sel = _state.value.selected ?: return
-        applyDoc(outdentSubtree(_state.value.doc, sel.toUInt()))
+        applyDoc(outdentSubtree(_state.value.doc, sel.toUInt()), autoRenumber = true)
     }
 
     fun moveSelectedUp() {
         val sel = _state.value.selected ?: return
-        // Positions change; clear folds (move is infrequent). Re-select the
-        // moved subtree root by locating it after the move would need its new
-        // index; approximate by clearing selection-follow (keep sel index).
-        applyDoc(moveSubtreeUp(_state.value.doc, sel.toUInt()), foldShift = { emptySet() })
+        applyDoc(moveSubtreeUp(_state.value.doc, sel.toUInt()), foldShift = { emptySet() }, autoRenumber = true)
     }
 
     fun moveSelectedDown() {
         val sel = _state.value.selected ?: return
-        applyDoc(moveSubtreeDown(_state.value.doc, sel.toUInt()), foldShift = { emptySet() })
+        applyDoc(moveSubtreeDown(_state.value.doc, sel.toUInt()), foldShift = { emptySet() }, autoRenumber = true)
     }
 
     fun clearToast() {

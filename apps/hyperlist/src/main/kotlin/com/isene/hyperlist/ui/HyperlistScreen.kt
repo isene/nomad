@@ -18,7 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
@@ -27,10 +27,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
@@ -55,6 +57,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -64,6 +67,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -72,6 +76,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.isene.hyperlist.BuildConfig
 import com.isene.hyperlist.viewmodel.HyperlistViewModel
 import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import uniffi.fe2o3_mobile_core.HlDoc
 
 /** Visible line indices honouring the folded set. */
@@ -105,13 +111,6 @@ private fun directChildCount(doc: HlDoc, i: Int): Int {
         j++
     }
     return count
-}
-
-private fun findRefTarget(doc: HlDoc, target: String): Int? {
-    val exact = doc.lines.indexOfFirst { it.text.trim() == target }
-    if (exact >= 0) return exact
-    val contains = doc.lines.indexOfFirst { it.text.contains(target) }
-    return if (contains >= 0) contains else null
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -149,13 +148,27 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
     var showAbout by remember { mutableStateOf(false) }
     var overflowOpen by remember { mutableStateOf(false) }
     var pendingScroll by remember { mutableStateOf<Int?>(null) }
+    var draggedLine by remember { mutableStateOf<Int?>(null) }
 
-    val visible = computeVisible(state.doc, state.folded)
+    // `order` is the live, drag-reorderable list of visible doc-line indices.
+    // It is rebuilt from (doc, folded) whenever those change (i.e. NOT during a
+    // drag, when neither changes); the reorderable callback permutes it live.
+    val order = remember { mutableStateListOf<Int>() }
+    LaunchedEffect(state.doc, state.folded) {
+        order.clear()
+        order.addAll(computeVisible(state.doc, state.folded))
+    }
+
+    val reorderState = rememberReorderableLazyListState(listState) { from, to ->
+        if (from.index < order.size && to.index < order.size) {
+            order.add(to.index, order.removeAt(from.index))
+        }
+    }
 
     // Scroll to a freshly-jumped line once it's in the visible list.
-    LaunchedEffect(pendingScroll, visible) {
+    LaunchedEffect(pendingScroll, order.toList()) {
         val target = pendingScroll ?: return@LaunchedEffect
-        val pos = visible.indexOf(target)
+        val pos = order.indexOf(target)
         if (pos >= 0) {
             listState.animateScrollToItem(pos)
             pendingScroll = null
@@ -183,6 +196,12 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
                         Icon(Icons.Filled.MoreVert, contentDescription = "More")
                     }
                     DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Renumber") },
+                            leadingIcon = { Icon(Icons.Filled.FormatListNumbered, null) },
+                            enabled = state.pickedUri != null,
+                            onClick = { overflowOpen = false; vm.renumberDoc() },
+                        )
                         DropdownMenuItem(
                             text = { Text("About") },
                             leadingIcon = { Icon(Icons.Filled.Info, null) },
@@ -221,31 +240,52 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
                     .padding(inner),
                 contentPadding = PaddingValues(vertical = 4.dp),
             ) {
-                itemsIndexed(visible, key = { _, lineIdx -> lineIdx }) { _, lineIdx ->
-                    val line = state.doc.lines[lineIdx]
-                    val spans = state.spans.getOrNull(lineIdx)
-                    LineRow(
-                        indent = line.indent.toInt(),
-                        annotated = spans?.let { spansToAnnotatedString(it, dark) },
-                        rawText = line.text,
-                        isParent = hasChildren(state.doc, lineIdx),
-                        isFolded = state.folded.contains(lineIdx),
-                        childCount = if (state.folded.contains(lineIdx)) directChildCount(state.doc, lineIdx) else 0,
-                        selected = state.selected == lineIdx,
-                        onSelect = { vm.select(lineIdx) },
-                        onToggleFold = { vm.toggleFold(lineIdx) },
-                        onToggleCheckbox = { vm.toggleCheckboxAt(lineIdx) },
-                        onRefTap = { target ->
-                            val t = findRefTarget(state.doc, target)
-                            if (t != null) {
-                                vm.revealAndSelect(t)
-                                pendingScroll = t
-                            } else {
-                                scope.launch { snackbarHostState.showSnackbar("Reference not found: $target") }
-                            }
-                        },
-                    )
+                items(order, key = { it }) { lineIdx ->
+                    ReorderableItem(reorderState, key = lineIdx) { _ ->
+                        val line = state.doc.lines.getOrNull(lineIdx)
+                        if (line != null) {
+                            val spans = state.spans.getOrNull(lineIdx)
+                            LineRow(
+                                indent = line.indent.toInt(),
+                                annotated = spans?.let { spansToAnnotatedString(it, dark) },
+                                rawText = line.text,
+                                isParent = hasChildren(state.doc, lineIdx),
+                                isFolded = state.folded.contains(lineIdx),
+                                childCount = if (state.folded.contains(lineIdx)) directChildCount(state.doc, lineIdx) else 0,
+                                selected = state.selected == lineIdx,
+                                onSelect = { vm.select(lineIdx) },
+                                onToggleFold = { vm.toggleFold(lineIdx) },
+                                onToggleCheckbox = { vm.toggleCheckboxAt(lineIdx) },
+                                onRefTap = { target ->
+                                    val t = vm.resolveRef(target)
+                                    if (t != null) pendingScroll = t
+                                    else scope.launch { snackbarHostState.showSnackbar("Reference not found: $target") }
+                                },
+                                dragHandle = Modifier.draggableHandle(
+                                    onDragStarted = { draggedLine = lineIdx },
+                                    onDragStopped = {
+                                        val dl = draggedLine
+                                        if (dl != null) {
+                                            val pos = order.indexOf(dl)
+                                            if (pos >= 0) {
+                                                val beforeLine =
+                                                    if (pos + 1 < order.size) order[pos + 1] else state.doc.lines.size
+                                                val newIndent = when {
+                                                    pos + 1 < order.size -> state.doc.lines[order[pos + 1]].indent.toInt()
+                                                    pos > 0 -> state.doc.lines[order[pos - 1]].indent.toInt()
+                                                    else -> 0
+                                                }
+                                                if (beforeLine != dl) vm.moveSubtree(dl, beforeLine, newIndent)
+                                            }
+                                        }
+                                        draggedLine = null
+                                    },
+                                ),
+                            )
+                        }
+                    }
                 }
+                item { Spacer(Modifier.size(64.dp)) }
             }
         }
     }
@@ -282,7 +322,7 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
 @Composable
 private fun LineRow(
     indent: Int,
-    annotated: androidx.compose.ui.text.AnnotatedString?,
+    annotated: AnnotatedString?,
     rawText: String,
     isParent: Boolean,
     isFolded: Boolean,
@@ -292,20 +332,19 @@ private fun LineRow(
     onToggleFold: () -> Unit,
     onToggleCheckbox: () -> Unit,
     onRefTap: (String) -> Unit,
+    dragHandle: Modifier,
 ) {
     val bg = if (selected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surface
     val hasCheckbox = rawText.length >= 3 && rawText[0] == '[' && rawText[2] == ']'
-
     var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(bg)
-            .padding(start = (4 + indent * 16).dp, end = 8.dp, top = 6.dp, bottom = 6.dp),
+            .padding(start = (4 + indent * 16).dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Fold chevron (or a spacer to keep text aligned).
         if (isParent) {
             Icon(
                 imageVector = if (isFolded) Icons.Filled.ExpandMore else Icons.Filled.ExpandLess,
@@ -331,7 +370,6 @@ private fun LineRow(
                             val lr = layout
                             if (lr != null) {
                                 val off = lr.getOffsetForPosition(pos)
-                                // Checkbox tap: first 3 chars of the body.
                                 if (hasCheckbox && off <= 2) {
                                     onToggleCheckbox()
                                     return@detectTapGestures
@@ -356,9 +394,16 @@ private fun LineRow(
                 text = "$childCount",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 6.dp),
+                modifier = Modifier.padding(horizontal = 4.dp),
             )
         }
+
+        Icon(
+            imageVector = Icons.Filled.DragHandle,
+            contentDescription = "Drag to reorder",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = dragHandle.size(24.dp),
+        )
     }
 }
 
@@ -470,7 +515,8 @@ private fun AboutDialog(onDismiss: () -> Unit) {
             Column {
                 Text(
                     "A full HyperList editor: every syntax element coloured, " +
-                        "arbitrary nesting, folding, checkboxes, references.",
+                        "arbitrary nesting, folding, checkboxes, references, " +
+                        "drag-reorder, renumber.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.size(12.dp))

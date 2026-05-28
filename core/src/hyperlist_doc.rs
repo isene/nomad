@@ -264,6 +264,219 @@ pub fn toggle_checkbox(doc: HlDoc, idx: u32) -> HlDoc {
     d
 }
 
+// -------------------- reference resolution --------------------
+
+/// Resolve a HyperList reference to a line index. Handles slash-paths
+/// (`a/b/c`) by walking the hierarchy: each component is matched (case-
+/// insensitive substring, tolerating qualifier/operator/comment prefixes
+/// like `[1+] `, `S: `, `(...)`) against a descendant of the previous match.
+/// Lands on the leaf component. A single component (no `/`) matches by
+/// trimmed-equality first, then substring.
+#[uniffi::export]
+pub fn resolve_reference(doc: HlDoc, target: String) -> Option<u32> {
+    let t = target
+        .trim()
+        .trim_start_matches('<')
+        .trim_end_matches('>')
+        .trim()
+        .to_string();
+    if t.is_empty() {
+        return None;
+    }
+    let lines = &doc.lines;
+    let parts: Vec<String> = t
+        .split('/')
+        .map(|p| p.trim().to_lowercase())
+        .filter(|p| !p.is_empty())
+        .collect();
+    if parts.is_empty() {
+        return None;
+    }
+
+    if parts.len() == 1 {
+        let p = &parts[0];
+        // Exact item match (trimmed, case-insensitive) wins.
+        for (i, l) in lines.iter().enumerate() {
+            if l.text.trim().to_lowercase() == *p {
+                return Some(i as u32);
+            }
+        }
+        // Fallback: first substring match.
+        for (i, l) in lines.iter().enumerate() {
+            if l.text.to_lowercase().contains(p.as_str()) {
+                return Some(i as u32);
+            }
+        }
+        return None;
+    }
+
+    // Path walk: each component must be a descendant of the previous match.
+    let mut search_start = 0usize;
+    let mut search_end = lines.len();
+    let mut parent_indent: i64 = -1;
+    let mut found: Option<usize> = None;
+    for part in &parts {
+        let mut hit: Option<usize> = None;
+        let mut j = search_start;
+        while j < search_end {
+            let l = &lines[j];
+            if (l.indent as i64) > parent_indent && l.text.to_lowercase().contains(part.as_str()) {
+                hit = Some(j);
+                break;
+            }
+            j += 1;
+        }
+        let h = hit?;
+        found = Some(h);
+        parent_indent = lines[h].indent as i64;
+        search_start = h + 1;
+        let mut e = h + 1;
+        while e < lines.len() && (lines[e].indent as i64) > parent_indent {
+            e += 1;
+        }
+        search_end = e;
+    }
+    found.map(|i| i as u32)
+}
+
+// -------------------- renumbering --------------------
+
+/// If `text` starts with a numeric identifier (`1`, `1.`, `1.2.3`, `1.2.3.`)
+/// terminated by a space or end-of-line, return (byte index just past the
+/// identifier and its trailing space, had_trailing_period). All identifier
+/// chars are ASCII, so byte indexing is safe.
+fn numeric_identifier(text: &str) -> Option<(usize, bool)> {
+    let b = text.as_bytes();
+    let mut i = 0;
+    let mut saw_digit = false;
+    while i < b.len() && (b[i].is_ascii_digit() || b[i] == b'.') {
+        if b[i].is_ascii_digit() {
+            saw_digit = true;
+        }
+        i += 1;
+    }
+    if !saw_digit || i == 0 {
+        return None;
+    }
+    if i < b.len() && b[i] != b' ' {
+        return None; // identifier must be space- or EOL-terminated
+    }
+    let trailing = b[i - 1] == b'.';
+    let end = if i < b.len() && b[i] == b' ' { i + 1 } else { i };
+    Some((end, trailing))
+}
+
+/// Renumber items that carry numeric identifiers, by hierarchy position.
+/// Within each sibling group, only the children that already have a numeric
+/// identifier are renumbered (sequentially); unnumbered siblings keep their
+/// text and do not consume a number. Numbers are hierarchical (parent number
+/// dotted prefix); a top-level group preserves the trailing-period style of
+/// its first numbered item (`1.` vs `1`). Leaves non-numbered lists alone.
+#[uniffi::export]
+pub fn renumber(doc: HlDoc) -> HlDoc {
+    let mut d = doc;
+    if !d.lines.is_empty() {
+        let min_indent = d.lines.iter().map(|l| l.indent).min().unwrap_or(0);
+        let n = d.lines.len();
+        renumber_group(&mut d.lines, 0, n, min_indent, "");
+    }
+    d
+}
+
+fn renumber_group(lines: &mut [HlLine], start: usize, end: usize, level: u32, prefix: &str) {
+    // Trailing-period style for this group: from its first numbered child.
+    let mut trailing = false;
+    {
+        let mut j = start;
+        while j < end {
+            if lines[j].indent == level {
+                if let Some((_, tp)) = numeric_identifier(&lines[j].text) {
+                    trailing = tp;
+                    break;
+                }
+            }
+            j += 1;
+        }
+    }
+
+    let mut counter: u32 = 0;
+    let mut i = start;
+    while i < end {
+        if lines[i].indent != level {
+            i += 1;
+            continue;
+        }
+        // subtree end for this child
+        let mut se = i + 1;
+        while se < end && lines[se].indent > level {
+            se += 1;
+        }
+        if let Some((id_end, _)) = numeric_identifier(&lines[i].text) {
+            counter += 1;
+            let num = if prefix.is_empty() {
+                counter.to_string()
+            } else {
+                format!("{prefix}.{counter}")
+            };
+            let display = if prefix.is_empty() && trailing {
+                format!("{num}.")
+            } else {
+                num.clone()
+            };
+            let content = lines[i].text[id_end..].trim_start().to_string();
+            lines[i].text = if content.is_empty() {
+                display
+            } else {
+                format!("{display} {content}")
+            };
+            renumber_group(lines, i + 1, se, level + 1, &num);
+        } else {
+            // Unnumbered item: its numbered children renumber afresh.
+            renumber_group(lines, i + 1, se, level + 1, "");
+        }
+        i = se;
+    }
+}
+
+// -------------------- subtree relocation (drag-reorder) --------------------
+
+/// Move the subtree rooted at `from_idx` to sit immediately before
+/// `before_idx` (an index into the ORIGINAL doc; use lines.len() to append),
+/// re-indenting the whole subtree so its root becomes `new_indent` (clamped
+/// to >= 0) and descendants keep their relative depth. No-op if `before_idx`
+/// falls inside the moved subtree.
+#[uniffi::export]
+pub fn move_subtree_before(doc: HlDoc, from_idx: u32, before_idx: u32, new_indent: u32) -> HlDoc {
+    let mut d = doc;
+    let n = d.lines.len();
+    let from = from_idx as usize;
+    if from >= n {
+        return d;
+    }
+    let LineRange { start, end } = subtree_range(d.clone(), from_idx);
+    let (s, e) = (start as usize, end as usize);
+    let before = (before_idx as usize).min(n);
+    // Can't drop a subtree into itself.
+    if before > s && before < e {
+        return d;
+    }
+    let root_indent = d.lines[s].indent as i64;
+    let delta = new_indent as i64 - root_indent;
+    let mut block: Vec<HlLine> = d.lines[s..e].to_vec();
+    for l in block.iter_mut() {
+        l.indent = ((l.indent as i64) + delta).max(0) as u32;
+    }
+    // Remove the block.
+    d.lines.drain(s..e);
+    // Map the insertion point past the removal.
+    let insert_at = if before <= s { before } else { before - (e - s) };
+    let insert_at = insert_at.min(d.lines.len());
+    for (k, l) in block.into_iter().enumerate() {
+        d.lines.insert(insert_at + k, l);
+    }
+    d
+}
+
 // -------------------- tests --------------------
 
 #[cfg(test)]
@@ -404,5 +617,116 @@ mod tests {
         let src = "Familie\n\tKjøre Pål til skolen\n\t\t[x] Håndtere æøå\n";
         let d = doc(src);
         assert_eq!(serialize_doc(d), src);
+    }
+
+    // ---- reference resolution ----
+
+    #[test]
+    fn resolve_path_reference_from_bug_report() {
+        // Mirrors HyperList.hl: the reported failing reference
+        // <Hyperlist item/Starter/Identifier>. Lines carry qualifier /
+        // operator / comment prefixes the path components must tolerate.
+        let d = doc(
+            "HyperList\n\
+             \t[1+] HyperList Item\n\
+             \t\t[?] Starter; OR: \n\
+             \t\t\tIdentifier (Numbers: Format = \"1.1.1.1\")\n\
+             \t\t\tMulti-line Indicator = \"+\"\n\
+             \t\t[?] Type\n",
+        );
+        let idx = resolve_reference(d.clone(), "Hyperlist item/Starter/Identifier".into());
+        assert_eq!(idx, Some(3)); // the Identifier line
+        // Absolute path including the root also works.
+        let idx2 = resolve_reference(d.clone(), "<HyperList/HyperList Item/Type>".into());
+        assert_eq!(idx2, Some(5));
+    }
+
+    #[test]
+    fn resolve_single_component_reference() {
+        let d = doc("Root\n\tAlpha\n\tBeta\n");
+        assert_eq!(resolve_reference(d.clone(), "Beta".into()), Some(2));
+        assert_eq!(resolve_reference(d.clone(), "<Alpha>".into()), Some(1));
+        assert_eq!(resolve_reference(d, "Nonexistent".into()), None);
+    }
+
+    // ---- renumber ----
+
+    #[test]
+    fn renumber_hierarchical() {
+        let d = doc(
+            "List\n\
+             \t3. first\n\
+             \t\t9. sub a\n\
+             \t\t9. sub b\n\
+             \t7. second\n",
+        );
+        let r = renumber(d);
+        // Top-level group used the `N.` style (trailing period), preserved;
+        // nested levels use dotted ids without a trailing period.
+        assert_eq!(serialize_doc(r), "List\n\t1. first\n\t\t1.1 sub a\n\t\t1.2 sub b\n\t2. second\n");
+    }
+
+    #[test]
+    fn renumber_preserves_trailing_period_at_top() {
+        let d = doc("1. a\n2. b\n5. c\n");
+        let r = renumber(d);
+        assert_eq!(serialize_doc(r), "1. a\n2. b\n3. c\n");
+    }
+
+    #[test]
+    fn renumber_leaves_unnumbered_alone_and_skips_them() {
+        let d = doc(
+            "Root\n\
+             \t5. step one\n\
+             \ta header\n\
+             \t5. step two\n",
+        );
+        let r = renumber(d);
+        // header keeps its text; numbered steps become 1, 2 (header doesn't
+        // consume a number). The `N.` trailing-period style is preserved.
+        assert_eq!(serialize_doc(r), "Root\n\t1. step one\n\ta header\n\t2. step two\n");
+    }
+
+    #[test]
+    fn renumber_noop_on_unnumbered_list() {
+        let src = "Root\n\tAlpha\n\tBeta\n";
+        let d = doc(src);
+        assert_eq!(serialize_doc(renumber(d)), src);
+    }
+
+    // ---- subtree relocation ----
+
+    #[test]
+    fn move_subtree_before_forward_with_reindent() {
+        let d = doc("Root\n\tA\n\t\tA1\n\tB\n");
+        // Move A (idx 1, subtree A+A1) to before B's position... actually move
+        // it to the very end as a child of Root (indent 1). before_idx = 4 (len).
+        let r = move_subtree_before(d, 1, 4, 1);
+        assert_eq!(serialize_doc(r), "Root\n\tB\n\tA\n\t\tA1\n");
+    }
+
+    #[test]
+    fn move_subtree_changes_depth() {
+        let d = doc("Root\n\tA\n\tB\n\t\tB1\n");
+        // Move B (idx 2, subtree B+B1) to before A (idx 1) at indent 1.
+        // B root indent 1 -> new 1 (delta 0), B1 stays 2.
+        let r = move_subtree_before(d, 2, 1, 1);
+        assert_eq!(serialize_doc(r), "Root\n\tB\n\t\tB1\n\tA\n");
+    }
+
+    #[test]
+    fn move_subtree_promote_to_root() {
+        let d = doc("Root\n\tA\n\t\tA1\n\t\t\tA1x\n");
+        // Promote A1 (idx 2, with child A1x) to top level (indent 0), before Root.
+        let r = move_subtree_before(d, 2, 0, 0);
+        assert_eq!(serialize_doc(r), "A1\n\tA1x\nRoot\n\tA\n");
+    }
+
+    #[test]
+    fn move_subtree_into_itself_is_noop() {
+        let d = doc("Root\n\tA\n\t\tA1\n");
+        // before_idx inside A's subtree (2) -> no-op.
+        let r = move_subtree_before(d.clone(), 1, 2, 1);
+        assert_eq!(r, d);
     }
 }

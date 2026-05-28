@@ -54,6 +54,13 @@ val cargoBuildByAbi: Map<String, TaskProvider<Exec>> = androidAbis.mapValues { (
         workingDir = coreDir
         environment(cargoEnv())
         commandLine("cargo", "ndk", "-t", abi, "build", "--release")
+        // Declare the Rust sources as inputs so Gradle re-runs cargo when the
+        // core changes (without this, an Exec task with only outputs is
+        // considered up-to-date whenever the .so exists, and stale bindings
+        // result).
+        inputs.dir(coreDir.resolve("src"))
+        inputs.file(coreDir.resolve("Cargo.toml"))
+        inputs.file(rootProject.file("Cargo.toml"))
         outputs.file(rustTargetDir.resolve("$rustTriple/release/libfe2o3_mobile_core.so"))
     }
 }
@@ -114,8 +121,8 @@ android {
         applicationId = "com.isene.hyperlist"
         minSdk = 33
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         ndk { abiFilters += androidAbis.keys }
     }
 
@@ -177,6 +184,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.documentfile)
+    implementation(libs.reorderable)
 
     // JNA — generated UniFFI bindings depend on com.sun.jna.*.
     implementation("net.java.dev.jna:jna:5.15.0@aar")

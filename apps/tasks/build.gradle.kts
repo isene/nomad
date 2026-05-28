@@ -73,6 +73,10 @@ val cargoBuildByAbi: Map<String, TaskProvider<Exec>> = androidAbis.mapValues { (
             "-t", abi,
             "build", "--release",
         )
+        // Rust sources as inputs so Gradle re-runs cargo on core changes.
+        inputs.dir(coreDir.resolve("src"))
+        inputs.file(coreDir.resolve("Cargo.toml"))
+        inputs.file(rootProject.file("Cargo.toml"))
         outputs.file(rustTargetDir.resolve("$rustTriple/release/libfe2o3_mobile_core.so"))
     }
 }
