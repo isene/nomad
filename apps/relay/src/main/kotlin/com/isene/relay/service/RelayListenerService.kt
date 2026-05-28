@@ -4,10 +4,12 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.telephony.SmsManager
 import androidx.core.app.NotificationCompat
 import com.isene.relay.Gateway
 import java.io.File
@@ -142,6 +144,29 @@ class RelayListenerService : NotificationListenerService() {
         } catch (_: Exception) {
             // Storage may be momentarily unavailable; drop this one rather
             // than crash the listener.
+        }
+    }
+
+    /** Send an SMS to `number` (the thread_key). Native — works for any
+     *  number, no active notification needed. Called by the OutboxWatcher for
+     *  platform == "sms". */
+    fun sendSms(number: String, text: String): Boolean {
+        return try {
+            @Suppress("DEPRECATION")
+            val sms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                getSystemService(SmsManager::class.java)
+            } else {
+                SmsManager.getDefault()
+            }
+            val parts = sms.divideMessage(text)
+            if (parts.size > 1) {
+                sms.sendMultipartTextMessage(number, null, parts, null, null)
+            } else {
+                sms.sendTextMessage(number, null, text, null, null)
+            }
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 

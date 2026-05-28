@@ -31,10 +31,12 @@ class OutboxWatcher(
             val platform = o.optString("platform")
             val threadKey = o.optString("thread_key")
             val text = o.optString("text")
-            val ok = if (platform.isNotEmpty() && threadKey.isNotEmpty() && text.isNotEmpty()) {
-                service.fireReply(platform, threadKey, text)
-            } else {
-                false
+            val ok = when {
+                platform.isEmpty() || threadKey.isEmpty() || text.isEmpty() -> false
+                // SMS sends natively to any number; everything else fires the
+                // cached notification reply action (active thread only).
+                platform == "sms" -> service.sendSms(threadKey, text)
+                else -> service.fireReply(platform, threadKey, text)
             }
             writeAck(name, ok)
             f.delete()

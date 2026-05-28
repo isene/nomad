@@ -15,6 +15,7 @@ object Gateway {
     const val PREFS = "relay_prefs"
     const val KEY_DIR = "gateway_dir"
     const val KEY_ALLOW = "allowlist"
+    const val KEY_SMS = "sms_enabled"
 
     val DEFAULT_DIR = "/storage/emulated/0/Documents/kastrup-gw"
 
@@ -27,8 +28,13 @@ object Gateway {
         "org.thoughtcrime.securesms" to "signal",
     )
 
-    /** Enabled out of the box: Instagram + Messenger (the Marionette replacement). */
-    val DEFAULT_ALLOW = setOf("com.instagram.android", "com.facebook.orca")
+    /** Enabled out of the box: Instagram + Messenger (the Marionette
+     *  replacement) + WhatsApp. */
+    val DEFAULT_ALLOW = setOf(
+        "com.instagram.android",
+        "com.facebook.orca",
+        "com.whatsapp",
+    )
 
     fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -42,6 +48,13 @@ object Gateway {
 
     fun setAllow(c: Context, pkgs: Set<String>) =
         prefs(c).edit().putStringSet(KEY_ALLOW, pkgs).apply()
+
+    /** Native SMS (RECEIVE_SMS broadcast + SmsManager send), separate from the
+     *  notification allowlist. Off until the user toggles it + grants perms. */
+    fun smsEnabled(c: Context): Boolean = prefs(c).getBoolean(KEY_SMS, false)
+
+    fun setSmsEnabled(c: Context, on: Boolean) =
+        prefs(c).edit().putBoolean(KEY_SMS, on).apply()
 
     fun inboundDir(c: Context) = File(dir(c), "inbound").apply { mkdirs() }
     fun outboxDir(c: Context) = File(dir(c), "outbox").apply { mkdirs() }

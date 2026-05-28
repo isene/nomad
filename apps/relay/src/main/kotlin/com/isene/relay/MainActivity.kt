@@ -1,15 +1,20 @@
 package com.isene.relay
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -73,6 +78,10 @@ private fun notifAccessGranted(ctx: android.content.Context): Boolean {
 private fun storageGranted(): Boolean =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
 
+private fun smsPermsGranted(ctx: android.content.Context): Boolean =
+    ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED &&
+        ContextCompat.checkSelfPermission(ctx, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RelayScreen() {
@@ -92,7 +101,16 @@ private fun RelayScreen() {
     val notifOk = remember(refresh) { notifAccessGranted(ctx) }
     val storageOk = remember(refresh) { storageGranted() }
     var allow by remember(refresh) { mutableStateOf(Gateway.allow(ctx)) }
+    var smsOn by remember(refresh) { mutableStateOf(Gateway.smsEnabled(ctx) && smsPermsGranted(ctx)) }
     var showAbout by remember { mutableStateOf(false) }
+
+    val smsPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions(),
+    ) { res ->
+        val granted = res.values.all { it }
+        Gateway.setSmsEnabled(ctx, granted)
+        smsOn = granted
+    }
 
     Scaffold(
         topBar = {
@@ -187,6 +205,39 @@ private fun RelayScreen() {
                         },
                     )
                 }
+            }
+            // SMS is a native source (broadcast + SmsManager), not a
+            // notification app — its own toggle, gated on the SMS permissions.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "SMS",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyLarge,
+                )
+                Switch(
+                    checked = smsOn,
+                    onCheckedChange = { on ->
+                        if (on) {
+                            if (smsPermsGranted(ctx)) {
+                                Gateway.setSmsEnabled(ctx, true); smsOn = true
+                            } else {
+                                smsPermLauncher.launch(
+                                    arrayOf(
+                                        Manifest.permission.RECEIVE_SMS,
+                                        Manifest.permission.SEND_SMS,
+                                    )
+                                )
+                            }
+                        } else {
+                            Gateway.setSmsEnabled(ctx, false); smsOn = false
+                        }
+                    },
+                )
             }
 
             Spacer(Modifier.size(24.dp))
