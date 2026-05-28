@@ -141,8 +141,8 @@ android {
         applicationId = "com.isene.tasks"
         minSdk = 33
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.4.0"
+        versionCode = 5
+        versionName = "0.4.1"
         ndk { abiFilters += androidAbis.keys }
     }
 
@@ -159,7 +159,13 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 code + resource shrinking. This is how material-icons-extended
+            // is meant to be slimmed: only the ~12 icons actually referenced
+            // survive, the rest of the icon set + dead Compose/Glance code is
+            // stripped. Keep rules for the reflection users (JNA + UniFFI) are
+            // in proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -208,11 +214,6 @@ dependencies {
     // Glance home-screen widget.
     implementation(libs.glance.appwidget)
     implementation(libs.glance.material3)
-
-    // WorkManager (currently unused; pulled in so widget-poke +
-    // background mtime checks can be added without re-touching the
-    // module config).
-    implementation(libs.work.runtime.ktx)
 
     // JNA — generated UniFFI bindings depend on com.sun.jna.*. The
     // @aar variant ships the per-ABI native dispatch libs so they

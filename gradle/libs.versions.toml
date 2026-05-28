@@ -11,9 +11,6 @@ reorderable = "2.4.0"
 # Glance (home-screen widgets via RemoteViews).
 glance = "1.1.1"
 
-# WorkManager (battery-aware background work).
-workManager = "2.10.0"
-
 # UniFFI Kotlin runtime helpers — the generated binding imports
 # com.sun.jna.*; declared as a direct @aar coordinate in
 # apps/tasks/build.gradle.kts (the catalog doesn't carry the @aar suffix).
@@ -36,9 +33,6 @@ androidx-material-icons-extended = { group = "androidx.compose.material", name =
 # Glance widget surface.
 glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
-
-# WorkManager.
-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
