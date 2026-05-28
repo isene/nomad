@@ -11,6 +11,10 @@ reorderable = "2.4.0"
 # Glance (home-screen widgets via RemoteViews).
 glance = "1.1.1"
 
+# astro: image loading (APOD/starchart) + HTTP.
+coil = "2.7.0"
+okhttp = "4.12.0"
+
 # UniFFI Kotlin runtime helpers — the generated binding imports
 # com.sun.jna.*; declared as a direct @aar coordinate in
 # apps/tasks/build.gradle.kts (the catalog doesn't carry the @aar suffix).
@@ -33,6 +37,10 @@ androidx-material-icons-extended = { group = "androidx.compose.material", name =
 # Glance widget surface.
 glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
+
+# astro image loading + HTTP.
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

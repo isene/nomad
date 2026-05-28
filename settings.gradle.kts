@@ -25,3 +25,4 @@ rootProject.name = "nomad"
 include(":apps:tasks")
 include(":apps:hyperlist")
 include(":apps:relay")
+include(":apps:astro")
