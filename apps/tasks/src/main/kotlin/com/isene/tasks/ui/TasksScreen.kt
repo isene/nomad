@@ -29,6 +29,7 @@ import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -60,11 +61,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.isene.tasks.BuildConfig
 import com.isene.tasks.data.Row as TaskRow
 import com.isene.tasks.data.flatRows
 import com.isene.tasks.viewmodel.TasksViewModel
@@ -109,6 +112,8 @@ fun TasksScreen(vm: TasksViewModel) {
     var editItem by remember { mutableStateOf<Triple<Int, Int, String>?>(null) }
     var moveItemTo by remember { mutableStateOf<Pair<Int, Int>?>(null) }
     var categoryMenuIdx by remember { mutableStateOf<Int?>(null) }
+    var overflowOpen by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
 
     val cats = state.hyperlist.categories
     val rows = state.hyperlist.flatRows(state.collapsed)
@@ -133,6 +138,19 @@ fun TasksScreen(vm: TasksViewModel) {
                     }
                     IconButton(onClick = { picker.launch(arrayOf("*/*")) }) {
                         Icon(Icons.Filled.FolderOpen, contentDescription = "Pick file")
+                    }
+                    IconButton(onClick = { overflowOpen = true }) {
+                        Icon(Icons.Filled.MoreVert, contentDescription = "More")
+                    }
+                    DropdownMenu(
+                        expanded = overflowOpen,
+                        onDismissRequest = { overflowOpen = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("About") },
+                            leadingIcon = { Icon(Icons.Filled.Info, null) },
+                            onClick = { overflowOpen = false; showAbout = true },
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -328,6 +346,48 @@ fun TasksScreen(vm: TasksViewModel) {
             confirmButton = { TextButton(onClick = { moveItemTo = null }) { Text("Cancel") } },
         )
     }
+    if (showAbout) {
+        AboutDialog(onDismiss = { showAbout = false })
+    }
+}
+
+@Composable
+private fun AboutDialog(onDismiss: () -> Unit) {
+    val uri = LocalUriHandler.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        title = { Text("tasks  ${BuildConfig.VERSION_NAME}") },
+        text = {
+            Column {
+                Text(
+                    "A hyperlist editor for your todo.hl, synced from your " +
+                        "laptop via Syncthing.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.size(12.dp))
+                Text(
+                    "Part of the nomad mobile suite: a Rust core (parsing, " +
+                        "serialization, transforms) under a thin Kotlin shell.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    "Built on the Fe2O3 tools by Geir Isene.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.size(16.dp))
+                Text(
+                    "The hyperlist format",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.clickable {
+                        uri.openUri("https://github.com/isene/hyperlist")
+                    },
+                )
+            }
+        },
+    )
 }
 
 private fun rowKey(row: TaskRow, cats: List<RustCategory>): String = when (row) {
