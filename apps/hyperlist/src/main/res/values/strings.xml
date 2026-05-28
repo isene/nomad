@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">hyperlist</string>
+    <string name="no_file_picked">No .hl picked yet, tap to choose a HyperList file.</string>
+    <string name="pick_file">Pick .hl</string>
+    <string name="reload">Reload</string>
+    <string name="save_failed">Save failed</string>
+    <string name="external_changed">File changed on disk, reloaded</string>
+</resources>

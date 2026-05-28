@@ -8,6 +8,9 @@ core/generated/
 core/src/uniffi/
 apps/*/src/main/kotlin/uniffi/
 
+# cargo-ndk native output copied in by the Gradle build (regenerated)
+apps/*/src/main/jniLibs/
+
 # Gradle
 .gradle/
 build/

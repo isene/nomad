@@ -23,3 +23,4 @@ dependencyResolutionManagement {
 rootProject.name = "nomad"
 
 include(":apps:tasks")
+include(":apps:hyperlist")
