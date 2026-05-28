@@ -239,30 +239,19 @@ fn hl_line(body: &str) -> Vec<HlSpan> {
             sb.push(s, TokenRole::Substitution);
             continue;
         }
-        // Reference `<…>` / `<<…>>`.
+        // Reference `<…>` / `<<…>>`. Restricted char class (hl_ref_match,
+        // mirroring vim's HLref) so a `<` used as a less-than/time-relation
+        // operator, or one crossing a `]`/`"`/`)` etc., isn't mistaken for a
+        // reference. Matches highlight crate v0.1.5 (commit f24a491).
         if ch == '<' {
-            let start = i;
-            i += 1;
-            if i < len && work[i] == '<' {
-                i += 1;
-            }
-            while i < len && work[i] != '>' {
-                i += 1;
-            }
-            if i < len {
-                i += 1;
-            }
-            if i < len && work[i] == '>' {
-                i += 1;
-            }
-            let s: String = work[start..i].iter().collect();
-            if s.chars().count() >= 3 {
+            if let Some(end) = hl_ref_match(&work, i) {
+                let s: String = work[i..end].iter().collect();
                 sb.push(s, TokenRole::Reference);
-            } else {
-                for &c in &work[start..i] {
-                    sb.norm(c);
-                }
+                i = end;
+                continue;
             }
+            sb.norm('<');
+            i += 1;
             continue;
         }
         // Comment `(…)` (nested-aware), inner refs/hashtags/TODO keep colour.
@@ -453,29 +442,15 @@ fn emit_inner(sb: &mut SpanBuf, full: &str, outer: TokenRole) {
     while i < n {
         let c = chars[i];
         if c == '<' {
-            let start = i;
-            i += 1;
-            if i < n && chars[i] == '<' {
-                i += 1;
-            }
-            while i < n && chars[i] != '>' {
-                i += 1;
-            }
-            if i < n {
-                i += 1;
-            }
-            if i < n && chars[i] == '>' {
-                i += 1;
-            }
-            if i - start >= 3 {
+            if let Some(end) = hl_ref_match(&chars, i) {
                 flush_outer!();
-                let s: String = chars[start..i].iter().collect();
+                let s: String = chars[i..end].iter().collect();
                 sb.push(s, TokenRole::Reference);
-            } else {
-                for &x in &chars[start..i] {
-                    buf.push(x);
-                }
+                i = end;
+                continue;
             }
+            buf.push('<');
+            i += 1;
             continue;
         }
         if c == '#' && i + 1 < n && hl_hash_char(chars[i + 1]) {
@@ -506,6 +481,49 @@ fn emit_inner(sb: &mut SpanBuf, full: &str, outer: TokenRole) {
         i += 1;
     }
     flush_outer!();
+}
+
+/// Char class for HyperList reference bodies (vim's HLref). Notably EXCLUDES
+/// `[ ] " ( ) { }`, so a `<` inside/crossing those is not a reference.
+fn hl_ref_char(c: char) -> bool {
+    c.is_ascii_alphanumeric()
+        || matches!(
+            c,
+            ',' | '.' | ':' | '/' | ' ' | '_' | '~' | '&' | '@' | '?' | '%' | '=' | '+' | '-'
+                | '*' | '#'
+        )
+        || matches!(
+            c,
+            'æ' | 'ø' | 'å' | 'Æ' | 'Ø' | 'Å' | 'á' | 'é' | 'ó' | 'ú' | 'ã' | 'õ' | 'â' | 'ê'
+                | 'ô' | 'ç' | 'à' | 'Á' | 'É' | 'Ó' | 'Ú' | 'Ã' | 'Õ' | 'Â' | 'Ê' | 'Ô' | 'Ç'
+                | 'À' | 'ü'
+        )
+}
+
+/// If a valid reference starts at `start` (`chars[start] == '<'`), return the
+/// index just past it; else None. Requires a non-empty body of `hl_ref_char`
+/// and a closing `>` (optional doubled `<<`/`>>`). Mirrors highlight v0.1.5.
+fn hl_ref_match(chars: &[char], start: usize) -> Option<usize> {
+    let n = chars.len();
+    let mut j = start + 1;
+    if j < n && chars[j] == '<' {
+        j += 1; // optional second '<'
+    }
+    let body_start = j;
+    while j < n && hl_ref_char(chars[j]) {
+        j += 1;
+    }
+    if j == body_start {
+        return None; // empty body
+    }
+    if j >= n || chars[j] != '>' {
+        return None; // must close with '>'
+    }
+    j += 1;
+    if j < n && chars[j] == '>' {
+        j += 1; // optional second '>'
+    }
+    Some(j)
 }
 
 /// Char class for hashtag content (matches vim's regex).
@@ -635,6 +653,25 @@ mod tests {
     fn reference_and_identifier_magenta() {
         assert_eq!(role_of("see <target>", "<target>"), Some(TokenRole::Reference));
         assert_eq!(role_of("1.2 item", "1.2 "), Some(TokenRole::Identifier));
+    }
+
+    #[test]
+    fn restricted_reference_class_v0_1_5() {
+        // Real refs (incl. paths and doubled brackets) still highlight.
+        assert_eq!(role_of("see <a/b/c>", "<a/b/c>"), Some(TokenRole::Reference));
+        assert_eq!(role_of("see <<Item>>", "<<Item>>"), Some(TokenRole::Reference));
+        // `<` with no closing `>` is NOT a reference (was eaten to EOL before).
+        let spans = hl_line("compare a < b then c");
+        assert!(spans.iter().all(|s| s.role != TokenRole::Reference));
+        assert_eq!(concat("compare a < b then c"), "compare a < b then c");
+        // `<` crossing a `]` (excluded char, no close) is NOT a reference.
+        let spans2 = hl_line("see <item] foo");
+        assert!(spans2.iter().all(|s| s.role != TokenRole::Reference));
+        // A time-relation operator inside a qualifier stays inside the
+        // qualifier span (the `[` handler consumes it), never a reference.
+        assert_eq!(role_of("[<+2026-05-28] do", "[<+2026-05-28]"), Some(TokenRole::Qualifier));
+        let spans3 = hl_line("[<+2026-05-28] do");
+        assert!(spans3.iter().all(|s| s.role != TokenRole::Reference));
     }
 
     #[test]
