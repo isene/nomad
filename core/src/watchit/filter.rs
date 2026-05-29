@@ -61,8 +61,21 @@ pub fn genres_of(items: Vec<ListItem>) -> Vec<String> {
 /// preserving existing order then new arrivals.
 #[uniffi::export]
 pub fn merge_items(existing: Vec<ListItem>, fetched: Vec<ListItem>) -> Vec<ListItem> {
-    let mut seen: HashSet<String> = existing.iter().map(|i| i.id.clone()).collect();
+    // Index the freshly fetched rows so we can both append new ones AND backfill
+    // a poster onto a pre-existing row that predates poster capture (so an
+    // already-loaded catalog gets thumbnails on the next re-fetch, not just new
+    // titles).
+    use std::collections::HashMap;
+    let fresh: HashMap<&String, &ListItem> = fetched.iter().map(|i| (&i.id, i)).collect();
     let mut out = existing;
+    for it in out.iter_mut() {
+        if it.poster_url.is_empty() {
+            if let Some(f) = fresh.get(&it.id) {
+                if !f.poster_url.is_empty() { it.poster_url = f.poster_url.clone(); }
+            }
+        }
+    }
+    let mut seen: HashSet<String> = out.iter().map(|i| i.id.clone()).collect();
     for it in fetched {
         if seen.insert(it.id.clone()) { out.push(it); }
     }
@@ -78,6 +91,7 @@ mod tests {
             id: id.into(), title: title.into(), rating, year,
             genres: genres.iter().map(|s| s.to_string()).collect(),
             kind: "movie".into(),
+            poster_url: String::new(),
         }
     }
 

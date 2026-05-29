@@ -18,6 +18,10 @@ pub struct ListItem {
     /// "movie" or "tv" — which TMDB endpoint owns this id.
     #[serde(default)]
     pub kind: String,
+    /// Poster URL straight from the chart/search response, so list thumbnails
+    /// render without a per-title details fetch. Empty if TMDB had no poster.
+    #[serde(default)]
+    pub poster_url: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize, uniffi::Record)]
@@ -98,8 +102,8 @@ mod tests {
     #[test]
     fn items_round_trip() {
         let items = vec![
-            ListItem { id: "550".into(), title: "Fight Club".into(), rating: 8.4, year: 1999, genres: vec!["Drama".into()], kind: "movie".into() },
-            ListItem { id: "1396".into(), title: "Breaking Bad".into(), rating: 8.9, year: 2008, genres: vec!["Drama".into(), "Crime".into()], kind: "tv".into() },
+            ListItem { id: "550".into(), title: "Fight Club".into(), rating: 8.4, year: 1999, genres: vec!["Drama".into()], kind: "movie".into(), poster_url: "https://image.tmdb.org/t/p/w500/p.jpg".into() },
+            ListItem { id: "1396".into(), title: "Breaking Bad".into(), rating: 8.9, year: 2008, genres: vec!["Drama".into(), "Crime".into()], kind: "tv".into(), poster_url: String::new() },
         ];
         let json = serialize_items(items.clone());
         assert_eq!(parse_items(json), items);

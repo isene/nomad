@@ -76,7 +76,9 @@ fun MovieRow(item: ListItem, details: Details?, wished: Boolean, dumped: Boolean
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        PosterThumb(details?.posterUrl, Modifier.width(46.dp).height(69.dp))
+        // Poster from the list row (captured at list-load) or details once fetched.
+        val poster = item.posterUrl.ifEmpty { details?.posterUrl.orEmpty() }
+        PosterThumb(poster, Modifier.width(46.dp).height(69.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(item.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, maxLines = 2)
@@ -171,7 +173,7 @@ fun DetailScreen(vm: WatchitViewModel, item: ListItem, onBack: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Row {
-                PosterThumb(d?.posterUrl, Modifier.width(120.dp).aspectRatio(2f / 3f))
+                PosterThumb(d?.posterUrl?.ifEmpty { item.posterUrl } ?: item.posterUrl, Modifier.width(120.dp).aspectRatio(2f / 3f))
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(d?.title ?: item.title, fontWeight = FontWeight.Bold, fontSize = 18.sp)

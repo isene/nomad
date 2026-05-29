@@ -152,7 +152,7 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
     private fun itemsFor(ids: List<String>): List<ListItem> = ids.mapNotNull { id ->
         catalog().firstOrNull { it.id == id }
             ?: details[id]?.let { d ->
-                ListItem(d.id, d.title, d.rating, d.year, d.genres, if (d.kind == "TVSeries") "tv" else "movie")
+                ListItem(d.id, d.title, d.rating, d.year, d.genres, if (d.kind == "TVSeries") "tv" else "movie", d.posterUrl)
             }
     }
 

@@ -67,10 +67,15 @@ pub fn parse_chart(json: String, kind: String) -> Vec<ListItem> {
         let date_field = if is_movie { "release_date" } else { "first_air_date" };
         let year = r.get(date_field).and_then(|x| x.as_str())
             .and_then(|s| s.get(..4)).and_then(|s| s.parse().ok()).unwrap_or(0);
+        let poster_url = r.get("poster_path").and_then(|x| x.as_str())
+            .filter(|s| !s.is_empty())
+            .map(|p| format!("{}{}", POSTER_BASE, p))
+            .unwrap_or_default();
         Some(ListItem {
             id: id.to_string(), title, rating, year,
             genres: Vec::new(),
             kind: if is_movie { "movie".into() } else { "tv".into() },
+            poster_url,
         })
     }).collect()
 }
@@ -91,7 +96,11 @@ pub fn parse_search(json: String) -> Vec<ListItem> {
         let year = r.get(date_field).and_then(|x| x.as_str())
             .and_then(|s| s.get(..4)).and_then(|s| s.parse().ok()).unwrap_or(0);
         let rating = r.get("vote_average").and_then(|x| x.as_f64()).unwrap_or(0.0);
-        Some(ListItem { id: id.to_string(), title, rating, year, genres: Vec::new(), kind: mt.to_string() })
+        let poster_url = r.get("poster_path").and_then(|x| x.as_str())
+            .filter(|s| !s.is_empty())
+            .map(|p| format!("{}{}", POSTER_BASE, p))
+            .unwrap_or_default();
+        Some(ListItem { id: id.to_string(), title, rating, year, genres: Vec::new(), kind: mt.to_string(), poster_url })
     }).collect()
 }
 
@@ -275,7 +284,7 @@ mod tests {
     #[test]
     fn parse_chart_movie() {
         let json = r#"{"results":[
-            {"id":550,"title":"Fight Club","vote_average":8.4,"release_date":"1999-10-15"},
+            {"id":550,"title":"Fight Club","vote_average":8.4,"release_date":"1999-10-15","poster_path":"/fc.jpg"},
             {"id":13,"title":"Forrest Gump","vote_average":8.5,"release_date":"1994-07-06"}
         ]}"#;
         let items = parse_chart(json.into(), "movie".into());
@@ -284,6 +293,8 @@ mod tests {
         assert_eq!(items[0].title, "Fight Club");
         assert_eq!(items[0].year, 1999);
         assert_eq!(items[0].kind, "movie");
+        assert_eq!(items[0].poster_url, "https://image.tmdb.org/t/p/w500/fc.jpg");
+        assert_eq!(items[1].poster_url, ""); // missing poster_path -> empty
     }
 
     #[test]
