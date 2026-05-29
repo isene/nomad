@@ -31,6 +31,9 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -75,15 +78,7 @@ fun WatchitApp(vm: WatchitViewModel) {
         topBar = {
             Column {
                 TopAppBar(
-                    title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("watchit", fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.width(14.dp))
-                            FilterChip(selected = ui.view == "movies", onClick = { if (ui.view != "movies") vm.toggleView() }, label = { Text("Movies") })
-                            Spacer(Modifier.width(6.dp))
-                            FilterChip(selected = ui.view == "series", onClick = { if (ui.view != "series") vm.toggleView() }, label = { Text("Series") })
-                        }
-                    },
+                    title = { Text("watchit", fontWeight = FontWeight.Bold) },
                     actions = {
                         if (ui.busy) CircularProgressIndicator(Modifier.width(20.dp).padding(end = 8.dp), strokeWidth = 2.dp)
                         IconButton(onClick = { showSearch = true }) { Icon(Icons.Filled.Search, "Search") }
@@ -97,6 +92,22 @@ fun WatchitApp(vm: WatchitViewModel) {
                         }
                     },
                 )
+                // Movies/Series as a full-width segmented control — its own row so
+                // the labels never get squeezed into a wrap by the app-bar icons.
+                SingleChoiceSegmentedButtonRow(
+                    Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                ) {
+                    SegmentedButton(
+                        selected = ui.view == "movies",
+                        onClick = { if (ui.view != "movies") vm.toggleView() },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    ) { Text("Movies") }
+                    SegmentedButton(
+                        selected = ui.view == "series",
+                        onClick = { if (ui.view != "series") vm.toggleView() },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) { Text("Series") }
+                }
                 ui.status?.let { s ->
                     Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth().clickable { vm.clearStatus() }) {
                         Text(s, Modifier.padding(horizontal = 14.dp, vertical = 4.dp), fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
