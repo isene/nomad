@@ -59,6 +59,9 @@ object Gateway {
         prefs(c).edit().putBoolean(KEY_SMS, on).apply()
 
     fun inboundDir(c: Context) = File(dir(c), "inbound").apply { mkdirs() }
+    /** Still-image attachments referenced by inbound JSON, relative to the
+     *  Syncthing root as "media/<name>". Kastrup drains these like the JSON. */
+    fun mediaDir(c: Context) = File(inboundDir(c), "media").apply { mkdirs() }
     fun outboxDir(c: Context) = File(dir(c), "outbox").apply { mkdirs() }
     fun sentDir(c: Context) = File(dir(c), "sent").apply { mkdirs() }
 }

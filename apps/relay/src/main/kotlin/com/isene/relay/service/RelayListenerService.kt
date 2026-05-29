@@ -4,6 +4,10 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -13,8 +17,10 @@ import android.telephony.SmsManager
 import androidx.core.app.NotificationCompat
 import com.isene.relay.Gateway
 import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -116,10 +122,16 @@ class RelayListenerService : NotificationListenerService() {
             text = (extras.getCharSequence(Notification.EXTRA_TEXT)
                 ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT))?.toString() ?: ""
         }
-        if (text.isBlank()) return
+        // Still-image preview, if the notification carries one (BigPictureStyle).
+        // Pulled from extras (already materialised, so cheap); only compressed +
+        // written for genuinely new messages, after the dedup gate below.
+        val picture = extractPicture(extras)
+
+        // Nothing to relay: no caption and no image.
+        if (text.isBlank() && picture == null) return
 
         // Skip if we've already written this exact message (re-posted notif).
-        val dkey = "$platform$title$msgTs${text.hashCode()}"
+        val dkey = "$platform$title$msgTs${text.hashCode()}${if (picture != null) "img" else ""}"
         synchronized(recent) {
             if (recent.put(dkey, Unit) != null) {
                 // Still refresh the reply action — the live PendingIntent may
@@ -130,7 +142,9 @@ class RelayListenerService : NotificationListenerService() {
         }
 
         cacheReplyAction(platform, title, n)
-        writeInbound(platform, title, sender, text, msgTs, isGroup)
+        // Media-only message (no caption): give it a short label so the row reads.
+        val outText = if (text.isBlank()) "📷 Photo" else text
+        writeInbound(platform, title, sender, outText, msgTs, isGroup, picture)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
@@ -168,9 +182,41 @@ class RelayListenerService : NotificationListenerService() {
         text: String,
         tsMs: Long,
         group: Boolean,
+        picture: Bitmap?,
     ) {
         if (!hasStorage()) return
         try {
+            val ctx = applicationContext
+            val base = "$platform-$tsMs-${UUID.randomUUID().toString().take(8)}"
+
+            // Write the bitmap FIRST (tmp + rename) so the file is fully present
+            // before the JSON that references it. Kastrup won't consume a JSON
+            // whose media hasn't synced, but we don't rely on ordering luck.
+            val mediaRel: String?
+            val mediaMime: String?
+            if (picture != null) {
+                val alpha = picture.hasAlpha()
+                val ext = if (alpha) "png" else "jpg"
+                mediaMime = if (alpha) "image/png" else "image/jpeg"
+                val mediaName = "$base.$ext"
+                val mediaDir = Gateway.mediaDir(ctx)
+                val tmp = File(mediaDir, "$mediaName.tmp")
+                FileOutputStream(tmp).use { out ->
+                    if (alpha) picture.compress(Bitmap.CompressFormat.PNG, 100, out)
+                    else picture.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                    out.flush()
+                }
+                if (tmp.renameTo(File(mediaDir, mediaName))) {
+                    mediaRel = "media/$mediaName"
+                } else {
+                    tmp.delete()
+                    mediaRel = null
+                }
+            } else {
+                mediaRel = null
+                mediaMime = null
+            }
+
             val obj = JSONObject().apply {
                 put("platform", platform)
                 put("thread_key", title)
@@ -178,14 +224,55 @@ class RelayListenerService : NotificationListenerService() {
                 put("text", text)
                 put("timestamp", tsMs / 1000)
                 put("group", group)
+                if (mediaRel != null) {
+                    put("media", JSONArray().put(JSONObject().apply {
+                        put("file", mediaRel)
+                        put("mime", mediaMime)
+                    }))
+                }
             }
-            val dir = Gateway.inboundDir(applicationContext)
-            val name = "$platform-$tsMs-${UUID.randomUUID().toString().take(8)}.json"
-            File(dir, name).writeText(obj.toString())
+            // JSON tmp + rename too, so a half-written file is never drained.
+            val dir = Gateway.inboundDir(ctx)
+            val jsonTmp = File(dir, "$base.json.tmp")
+            jsonTmp.writeText(obj.toString())
+            jsonTmp.renameTo(File(dir, "$base.json"))
         } catch (_: Exception) {
             // Storage may be momentarily unavailable; drop this one rather
             // than crash the listener.
         }
+    }
+
+    /** Pull a still-image preview off the notification, if present. The
+     *  BigPictureStyle bitmap (EXTRA_PICTURE) is the real photo; on newer
+     *  styles it may arrive as an Icon (EXTRA_PICTURE_ICON). We deliberately do
+     *  NOT fall back to the large icon / person icon: for messaging apps that's
+     *  the contact avatar, present on every message, so it would attach an
+     *  avatar to ordinary texts. Video/reel/doc media isn't in the notification
+     *  and is out of scope. */
+    private fun extractPicture(extras: Bundle): Bitmap? {
+        extras.getParcelable(Notification.EXTRA_PICTURE, Bitmap::class.java)?.let { return it }
+        extras.getParcelable(Notification.EXTRA_PICTURE_ICON, Icon::class.java)?.let { ic ->
+            iconToBitmap(ic)?.let { return it }
+        }
+        return null
+    }
+
+    private fun iconToBitmap(icon: Icon): Bitmap? = try {
+        val d = icon.loadDrawable(applicationContext)
+        when {
+            d == null -> null
+            d is BitmapDrawable && d.bitmap != null -> d.bitmap
+            else -> {
+                val w = d.intrinsicWidth.takeIf { it > 0 } ?: 512
+                val h = d.intrinsicHeight.takeIf { it > 0 } ?: 512
+                val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+                d.setBounds(0, 0, w, h)
+                d.draw(Canvas(bmp))
+                bmp
+            }
+        }
+    } catch (_: Exception) {
+        null
     }
 
     /** Send an SMS to `number` (the thread_key). Native — works for any
