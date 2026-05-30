@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -90,8 +91,8 @@ fun CalcScreen(vm: CalcViewModel) {
 
     Scaffold { pad ->
         Column(
-            Modifier.padding(pad).fillMaxSize().padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(5.dp),
+            Modifier.padding(pad).fillMaxSize().imePadding().padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             // Stack display.
             Card(
@@ -135,7 +136,7 @@ fun CalcScreen(vm: CalcViewModel) {
             KeyRow {
                 Button(
                     onClick = { vm.cycleShift() },
-                    modifier = Modifier.weight(3f).fillMaxSize(),
+                    modifier = Modifier.weight(2f).fillMaxSize(),
                     colors = ButtonDefaults.buttonColors(containerColor = page.color, contentColor = Color(0xFF0E141A)),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
@@ -144,7 +145,7 @@ fun CalcScreen(vm: CalcViewModel) {
                 }
                 Button(
                     onClick = { showSheet = true },
-                    modifier = Modifier.weight(1f).fillMaxSize(),
+                    modifier = Modifier.weight(2f).fillMaxSize(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.secondary),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
@@ -298,9 +299,9 @@ private fun CommandLine(vm: CalcViewModel) {
     OutlinedTextField(
         value = text,
         onValueChange = { text = it },
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().height(64.dp),
         singleLine = true,
-        textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+        textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = 15.sp),
         placeholder = { Text("command  (sto 25, fix 2, dechex…)", fontSize = 12.sp) },
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
         keyboardActions = KeyboardActions(onGo = {
@@ -314,7 +315,7 @@ private enum class Role { NUM, OP, ENTER }
 
 @Composable
 private fun KeyRow(content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
-    Row(Modifier.fillMaxWidth().height(52.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), content = content)
+    Row(Modifier.fillMaxWidth().height(46.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), content = content)
 }
 
 @Composable
