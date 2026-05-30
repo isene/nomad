@@ -12,3 +12,4 @@ pub mod hyperlist_doc;
 pub mod hyperlist_hl;
 pub mod astro;
 pub mod watchit;
+pub mod amardice;
