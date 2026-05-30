@@ -9,16 +9,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -35,6 +44,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.isene.xrpn.viewmodel.CalcViewModel
+import com.isene.xrpn.viewmodel.ProgUi
 
 // One function-grid key: label shown, command sent, and whether it needs a
 // follow-up digit (STO/RCL/FIX/…).
@@ -73,6 +83,8 @@ fun CalcScreen(vm: CalcViewModel) {
     val err by vm.error.collectAsState()
     val shiftPage by vm.shiftPage.collectAsState()
     val pending by vm.pending.collectAsState()
+    val prog by vm.prog.collectAsState()
+    var showSheet by remember { mutableStateOf(false) }
     vm.pageCount = PAGES.size
     val page = PAGES[shiftPage]
 
@@ -104,6 +116,9 @@ fun CalcScreen(vm: CalcViewModel) {
                 }
             }
 
+            // Program strip (only when a program is loaded).
+            if (prog.loaded) ProgramStrip(vm, prog)
+
             // Function grid (3 rows x 4), coloured + relabelled by shift page.
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 for (r in 0 until 3) {
@@ -116,16 +131,25 @@ fun CalcScreen(vm: CalcViewModel) {
                 }
             }
 
-            // SHIFT row: cycles pages; shows current page tag in its colour.
+            // SHIFT (cycles colour pages) + PRGM (open program sheet).
             KeyRow {
                 Button(
                     onClick = { vm.cycleShift() },
-                    modifier = Modifier.weight(1f).fillMaxSize(),
+                    modifier = Modifier.weight(3f).fillMaxSize(),
                     colors = ButtonDefaults.buttonColors(containerColor = page.color, contentColor = Color(0xFF0E141A)),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
                 ) {
                     Text(if (page.tag.isEmpty()) "SHIFT" else "SHIFT ▸ ${page.tag}", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                }
+                Button(
+                    onClick = { showSheet = true },
+                    modifier = Modifier.weight(1f).fillMaxSize(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.secondary),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                ) {
+                    Text("PRGM", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
                 }
             }
 
@@ -164,6 +188,84 @@ fun CalcScreen(vm: CalcViewModel) {
 
             CommandLine(vm)
         }
+    }
+
+    if (showSheet) ProgramSheet(vm, prog) { showSheet = false }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ProgramSheet(vm: CalcViewModel, prog: ProgUi, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    var files by remember { mutableStateOf(if (prog.folderSet) vm.listFiles() else emptyList()) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) { vm.setFolder(uri); files = vm.listFiles() }
+    }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Programs", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(
+                "Pick the Syncthing folder holding your .xrpn / .txt programs, then tap one to load.",
+                fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary,
+            )
+            OutlinedButton(onClick = { picker.launch(null) }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (prog.folderSet) "Change programs folder" else "Pick programs folder")
+            }
+            if (files.isEmpty()) {
+                Text(if (prog.folderSet) "No .xrpn / .txt files in that folder." else "No folder chosen yet.", fontSize = 13.sp, color = MaterialTheme.colorScheme.secondary)
+            } else {
+                files.forEach { (name, uri) ->
+                    TextButton(onClick = { vm.loadProgram(name, uri); onDismiss() }, modifier = Modifier.fillMaxWidth()) {
+                        Text(name, fontFamily = FontFamily.Monospace, modifier = Modifier.fillMaxWidth())
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgramStrip(vm: CalcViewModel, prog: ProgUi) {
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            val cur = prog.lines.getOrNull(prog.pc)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("▸ ${prog.name}", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.weight(1f), maxLines = 1)
+                Text("L${prog.pc + 1}/${prog.lines.size}", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
+            }
+            Text(
+                if (cur != null) "→ $cur" else "(end)",
+                fontSize = 13.sp, fontFamily = FontFamily.Monospace, maxLines = 1, color = MaterialTheme.colorScheme.onSurface,
+            )
+            if (prog.output.isNotEmpty()) {
+                Column(Modifier.fillMaxWidth().height(40.dp).verticalScroll(rememberScrollState())) {
+                    prog.output.forEach { Text(it, fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.tertiary, maxLines = 1) }
+                }
+            }
+            Text(prog.status, fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary, maxLines = 1)
+            Row(Modifier.fillMaxWidth().height(40.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                ProgBtn("▶ RUN", MaterialTheme.colorScheme.secondary, Modifier.weight(2f)) { vm.run() }
+                ProgBtn("SST", MaterialTheme.colorScheme.surfaceVariant, Modifier.weight(1f)) { vm.step() }
+                ProgBtn("⟲", MaterialTheme.colorScheme.surfaceVariant, Modifier.weight(1f)) { vm.resetProgram() }
+                ProgBtn("✕", MaterialTheme.colorScheme.surfaceVariant, Modifier.weight(1f)) { vm.closeProgram() }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProgBtn(label: String, container: Color, modifier: Modifier, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.fillMaxSize(),
+        colors = ButtonDefaults.buttonColors(containerColor = container, contentColor = MaterialTheme.colorScheme.onSurface),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, fontFamily = FontFamily.Monospace)
     }
 }
 

@@ -112,8 +112,8 @@ android {
         applicationId = "com.isene.xrpn"
         minSdk = 33
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = 3
+        versionName = "0.3.0"
         ndk { abiFilters += androidAbis.keys }
     }
 
@@ -172,6 +172,9 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
+
+    // SAF directory enumeration for the synced programs folder.
+    implementation("androidx.documentfile:documentfile:1.0.1")
 
     // JNA — generated UniFFI bindings depend on com.sun.jna.*.
     implementation("net.java.dev.jna:jna:5.15.0@aar")

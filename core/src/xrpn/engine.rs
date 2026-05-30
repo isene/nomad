@@ -86,6 +86,14 @@ fn fmt(s: &CalcState, v: f64) -> String {
     to_num(v, s.decimals, s.threshold, s.grouping, comma(s), sep(s))
 }
 
+/// Crate-internal helpers reused by the program engine (not FFI-exported).
+pub fn format_value(s: &CalcState, v: f64) -> String {
+    fmt(s, v)
+}
+pub fn lift_stack(s: &mut CalcState) {
+    lift(s);
+}
+
 #[uniffi::export]
 pub fn display(state: CalcState) -> CalcDisplay {
     let entering = !state.entering.is_empty();
