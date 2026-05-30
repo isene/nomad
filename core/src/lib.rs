@@ -13,3 +13,4 @@ pub mod hyperlist_hl;
 pub mod astro;
 pub mod watchit;
 pub mod amardice;
+pub mod xrpn;
