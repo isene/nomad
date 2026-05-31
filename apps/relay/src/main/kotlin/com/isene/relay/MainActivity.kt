@@ -82,6 +82,9 @@ private fun smsPermsGranted(ctx: android.content.Context): Boolean =
     ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED &&
         ContextCompat.checkSelfPermission(ctx, Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
 
+private fun contactsGranted(ctx: android.content.Context): Boolean =
+    ContextCompat.checkSelfPermission(ctx, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RelayScreen() {
@@ -227,7 +230,10 @@ private fun RelayScreen() {
                     checked = smsOn,
                     onCheckedChange = { on ->
                         if (on) {
-                            if (smsPermsGranted(ctx)) {
+                            // Request whatever's still missing. If SMS is already
+                            // granted but Contacts isn't, this still fires so the
+                            // Contacts dialog (the only ungranted one) appears.
+                            if (smsPermsGranted(ctx) && contactsGranted(ctx)) {
                                 Gateway.setSmsEnabled(ctx, true); smsOn = true
                             } else {
                                 smsPermLauncher.launch(
