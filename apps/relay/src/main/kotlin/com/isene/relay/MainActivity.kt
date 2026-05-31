@@ -264,13 +264,34 @@ private fun RelayScreen() {
             },
             title = { Text("relay  ${BuildConfig.VERSION_NAME}") },
             text = {
-                Text(
-                    "Part of the nomad mobile suite. Relays Instagram/Messenger " +
-                        "(and more) message notifications to kastrup and fires " +
-                        "replies, replacing the laptop's Firefox/Marionette. " +
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(
+                        "Part of the nomad mobile suite. Relays Instagram / " +
+                            "Messenger / WhatsApp / SMS / Discord notifications to " +
+                            "kastrup and fires replies, replacing the laptop's " +
+                            "Firefox/Marionette bridge.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Spacer(Modifier.size(12.dp))
+                    Text("How to use", style = MaterialTheme.typography.titleSmall)
+                    Spacer(Modifier.size(4.dp))
+                    Text(
+                        "1. Grant Notification access and All-files access (the " +
+                            "two rows above).\n" +
+                            "2. Toggle the apps to relay; toggle SMS to grant " +
+                            "SMS + Contacts.\n" +
+                            "3. Point Syncthing-Fork at the sync folder shown " +
+                            "above, shared with the laptop's ~/.kastrup/gateway/.\n" +
+                            "Messages then flow to kastrup; replies sent there " +
+                            "fire back automatically.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.size(8.dp))
+                    Text(
                         "Built on the Fe2O3 tools by Geir Isene.",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             },
         )
     }

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -96,6 +97,7 @@ fun ScribeScreen(vm: ScribeViewModel) {
 @Composable
 private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
     var showNew by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -116,6 +118,9 @@ private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
                     }
                     IconButton(onClick = onPickFolder) {
                         Icon(Icons.Filled.FolderOpen, contentDescription = "Choose folder")
+                    }
+                    IconButton(onClick = { showAbout = true }) {
+                        Icon(Icons.Outlined.Info, contentDescription = "About")
                     }
                 },
             )
@@ -157,6 +162,39 @@ private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
             onCreate = { name ->
                 showNew = false
                 vm.createNote(name)
+            },
+        )
+    }
+
+    if (showAbout) {
+        AlertDialog(
+            onDismissRequest = { showAbout = false },
+            confirmButton = { TextButton(onClick = { showAbout = false }) { Text("Close") } },
+            title = { Text("scribe  ${com.isene.scribe.BuildConfig.VERSION_NAME}") },
+            text = {
+                Column {
+                    Text(
+                        "A distraction-free notes pad — the touch companion to " +
+                            "the Fe2O3 scribe editor.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    androidx.compose.foundation.layout.Spacer(Modifier.size(12.dp))
+                    Text("How to use", style = MaterialTheme.typography.titleSmall)
+                    androidx.compose.foundation.layout.Spacer(Modifier.size(4.dp))
+                    Text(
+                        "• Tap the folder icon and pick your synced notes folder.\n" +
+                            "• Tap a file to edit; + creates a new note (add .md/.hl " +
+                            "or it defaults to .md).\n" +
+                            "• Edits auto-save on back and when you leave the app.\n" +
+                            "• Shows .md / .hl / .txt files, newest first.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    androidx.compose.foundation.layout.Spacer(Modifier.size(8.dp))
+                    Text(
+                        "Built on the Fe2O3 tools by Geir Isene.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             },
         )
     }

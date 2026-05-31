@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -28,6 +30,10 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -87,6 +93,7 @@ fun CalcScreen(vm: CalcViewModel) {
     val pending by vm.pending.collectAsState()
     val prog by vm.prog.collectAsState()
     var showSheet by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
     vm.pageCount = PAGES.size
     val page = PAGES[shiftPage]
 
@@ -126,6 +133,15 @@ fun CalcScreen(vm: CalcViewModel) {
                             else -> ""
                         }
                         if (right.isNotEmpty()) Text(right, fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary, fontFamily = FontFamily.Monospace, maxLines = 1)
+                        Icon(
+                            Icons.Outlined.Info,
+                            contentDescription = "About",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .size(16.dp)
+                                .clickable { showAbout = true },
+                        )
                     }
                 }
             }
@@ -209,6 +225,41 @@ fun CalcScreen(vm: CalcViewModel) {
     }
 
     if (showSheet) ProgramSheet(vm, prog) { showSheet = false }
+
+    if (showAbout) {
+        AlertDialog(
+            onDismissRequest = { showAbout = false },
+            confirmButton = { TextButton(onClick = { showAbout = false }) { Text("Close") } },
+            title = { Text("xrpn  ${com.isene.xrpn.BuildConfig.VERSION_NAME}") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text("A pocket HP-41 RPN scientific calculator.", fontSize = 14.sp)
+                    Spacer(Modifier.height(12.dp))
+                    Text("How to use", fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "• RPN: type a number, ENTER to push it, then the operator " +
+                            "(e.g. 2 ENTER 3 +).\n" +
+                            "• SHIFT cycles the coloured command pages (f / g / modes); " +
+                            "the tag shows the active page.\n" +
+                            "• Two-key commands (STO, RCL, FIX…) prompt for a digit.\n" +
+                            "• The command line (bottom) takes any XRPN command by name.\n" +
+                            "• PRGM: pick your synced .xrpn folder and load a program; " +
+                            "R/S runs or resumes it.\n" +
+                            "• Stack, registers, flags and mode persist between launches.",
+                        fontSize = 13.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Number formatting and the engine match desktop XRPN. " +
+                            "Built on the Fe2O3 tools by Geir Isene.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+            },
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

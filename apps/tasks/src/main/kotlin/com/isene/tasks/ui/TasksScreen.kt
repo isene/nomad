@@ -3,6 +3,8 @@ package com.isene.tasks.ui
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -359,11 +361,23 @@ private fun AboutDialog(onDismiss: () -> Unit) {
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
         title = { Text("tasks  ${BuildConfig.VERSION_NAME}") },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     "A hyperlist editor for your todo.hl, synced from your " +
                         "laptop via Syncthing.",
                     style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.size(12.dp))
+                Text("How to use", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    "• Tap the file icon to pick your synced todo.hl.\n" +
+                        "• + on a category adds an item; the ⋮ menu adds a " +
+                        "category, renames, or deletes.\n" +
+                        "• Long-press and drag to reorder. Edits save back to " +
+                        "the file automatically.\n" +
+                        "• Add the home-screen widget for a glance at your items.",
+                    style = MaterialTheme.typography.bodySmall,
                 )
                 Spacer(Modifier.size(12.dp))
                 Text(

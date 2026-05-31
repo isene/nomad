@@ -249,8 +249,13 @@ private fun AboutDialog(onDismiss: () -> Unit) {
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
         title = { Text("watchit") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 Text("Discover and track movies & series. Top-rated and popular lists from TMDB, your own wish and dump lists, posters and full details.")
+                Text("How to use", style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
+                Text("• Settings: paste a free TMDB v3 key, then fetch the lists (⋮ menu).\n• Toggle Movies / Series. Tap a poster for full detail.\n• Add to Wish; Dump hides a title from Browse.\n• Filter sheet: rating, year, genre, sort. Search to add titles not in the charts.")
                 Text("Data by The Movie Database (TMDB). Mobile port of the Fe₂O₃ watchit TUI. Created by Geir Isene.")
             }
         },

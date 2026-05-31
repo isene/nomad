@@ -12,17 +12,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -40,16 +47,21 @@ import uniffi.fe2o3_mobile_core.Outcome
 @Composable
 fun DiceScreen(vm: DiceViewModel) {
     val result by vm.result.collectAsState()
+    var showAbout by remember { mutableStateOf(false) }
     Scaffold { pad ->
         Column(
             Modifier.padding(pad).fillMaxSize().padding(horizontal = 12.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Compact header.
-            Row(verticalAlignment = Alignment.Bottom) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Text("amardice", fontWeight = FontWeight.Bold, fontSize = 20.sp, color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(10.dp))
                 Text("Amar O6 roller", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
+                Spacer(Modifier.weight(1f))
+                IconButton(onClick = { showAbout = true }) {
+                    Icon(Icons.Outlined.Info, contentDescription = "About")
+                }
             }
 
             // Result fills all free space and is always on screen.
@@ -68,6 +80,39 @@ fun DiceScreen(vm: DiceViewModel) {
                 PadButton("Fear", "MF + O6 vs DR", Modifier.weight(1f)) { vm.fear() }
             }
         }
+    }
+
+    if (showAbout) {
+        AlertDialog(
+            onDismissRequest = { showAbout = false },
+            confirmButton = { TextButton(onClick = { showAbout = false }) { Text("Close") } },
+            title = { Text("amardice  ${com.isene.amardice.BuildConfig.VERSION_NAME}") },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    Text("An O6 dice roller for the Amar RPG.", fontWeight = FontWeight.Normal)
+                    Spacer(Modifier.height(12.dp))
+                    Text("How to use", fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "• D6 — a plain six-sided die.\n" +
+                            "• Skill — open-ended O6 with the skill crit/fumble tables.\n" +
+                            "• Combat — O6 with the combat crit/fumble tables.\n" +
+                            "• Fear — set Mental Fortitude and a Fear DR (the row above), " +
+                            "then roll for the graded fear effect.\n\n" +
+                            "Open rolls (a 6 rolls again, a 1 subtracts) are shown as the " +
+                            "die trail; the card colours Critical / Fumble / success.",
+                        fontSize = 13.sp,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Engine shared with the desktop amar TUI and the d6gaming.org wiki. " +
+                            "Built on the Fe2O3 tools by Geir Isene.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                }
+            },
+        )
     }
 }
 

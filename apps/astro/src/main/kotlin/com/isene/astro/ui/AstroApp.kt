@@ -191,8 +191,13 @@ private fun AboutDialog(onDismiss: () -> Unit) {
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
         title = { Text("astro") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
                 Text("Amateur-astronomy companion: ephemeris, observing conditions, events, APOD, starchart, and a telescope/eyepiece gear catalog.")
+                Text("How to use", style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
+                Text("• Grant location, or set it manually in Settings, for ephemeris and weather.\n• Sky tab: scroll through the ephemeris table, observing conditions, events, APOD, and the starchart.\n• Gear tab: your telescope/eyepiece catalog with live optics — pick the synced gear.json in Settings.")
                 Text("Sky data: orbit ephemeris, met.no weather, in-the-sky.org events, NASA APOD.")
                 Text("Mobile port of the Fe₂O₃ astro TUI. Created by Geir Isene.")
                 Text("isene.org", style = androidx.compose.material3.MaterialTheme.typography.labelMedium)

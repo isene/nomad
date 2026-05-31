@@ -4,6 +4,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -512,12 +514,24 @@ private fun AboutDialog(onDismiss: () -> Unit) {
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
         title = { Text("hyperlist  ${BuildConfig.VERSION_NAME}") },
         text = {
-            Column {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
                     "A full HyperList editor: every syntax element coloured, " +
                         "arbitrary nesting, folding, checkboxes, references, " +
                         "drag-reorder, renumber.",
                     style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.size(12.dp))
+                Text("How to use", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    "• Tap the file icon to open a .hl file from your synced folder.\n" +
+                        "• Tap a line to edit it; the toolbar indents/outdents, " +
+                        "folds, toggles checkboxes, and reorders.\n" +
+                        "• Drag to move a line (a collapsed item moves its whole " +
+                        "subtree). Numbered lists auto-renumber.\n" +
+                        "• Edits save back to the file automatically.",
+                    style = MaterialTheme.typography.bodySmall,
                 )
                 Spacer(Modifier.size(12.dp))
                 Text(

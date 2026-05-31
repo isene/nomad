@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -65,6 +67,7 @@ fun VoxScreen(vm: VoxViewModel) {
     val ctx = LocalContext.current
     val state by vm.state.collectAsState()
     var showSettings by remember { mutableStateOf(false) }
+    var showAbout by remember { mutableStateOf(false) }
     var ready by remember { mutableStateOf(Prefs.ready(ctx)) }
 
     var micGranted by remember {
@@ -97,6 +100,9 @@ fun VoxScreen(vm: VoxViewModel) {
             TopAppBar(
                 title = { Text("vox") },
                 actions = {
+                    IconButton(onClick = { showAbout = true }) {
+                        Icon(Icons.Outlined.Info, contentDescription = "About")
+                    }
                     IconButton(onClick = { showSettings = !showSettings }) {
                         Icon(Icons.Filled.Settings, contentDescription = "Settings")
                     }
@@ -129,6 +135,38 @@ fun VoxScreen(vm: VoxViewModel) {
             )
         }
     }
+
+    if (showAbout) AboutDialog { showAbout = false }
+}
+
+@Composable
+private fun AboutDialog(onClose: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onClose,
+        confirmButton = { TextButton(onClick = onClose) { Text("Close") } },
+        title = { Text("vox  ${com.isene.vox.BuildConfig.VERSION_NAME}") },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    "Voice quick-capture for the nomad suite. Records, transcribes " +
+                        "with OpenAI Whisper, and files the text to your tasks or notes.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.size(12.dp))
+                Text("How to use", fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    "1. Settings (gear): set your OpenAI key — point \"Key file\" at " +
+                        "a synced openai.key, or paste the key.\n" +
+                        "2. Settings: pick your todo.hl and a notes file.\n" +
+                        "3. Open the app — it starts recording. Tap the square to stop.\n" +
+                        "4. Edit the transcript if needed, then tap → Tasks or → Notes.\n\n" +
+                        "Tasks captures land under an \"Inbox\" category in todo.hl.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        },
+    )
 }
 
 @Composable
@@ -288,9 +326,19 @@ private fun ReviewBlock(
 private fun SettingsContent(modifier: Modifier, onClose: () -> Unit) {
     val ctx = LocalContext.current
     var apiKey by remember { mutableStateOf(Prefs.apiKey(ctx)) }
+    var keyFileName by remember { mutableStateOf(docName(ctx, Prefs.keyFileUri(ctx))) }
     var tasksName by remember { mutableStateOf(docName(ctx, Prefs.tasksUri(ctx))) }
     var notesName by remember { mutableStateOf(docName(ctx, Prefs.notesUri(ctx))) }
 
+    val pickKey = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            persist(ctx, uri)
+            Prefs.setKeyFileUri(ctx, uri.toString())
+            keyFileName = docName(ctx, uri.toString())
+        }
+    }
     val pickTasks = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument(),
     ) { uri ->
@@ -319,6 +367,17 @@ private fun SettingsContent(modifier: Modifier, onClose: () -> Unit) {
         Text("Settings", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.size(16.dp))
 
+        Text("OpenAI key", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.size(8.dp))
+        TargetRow("Key file", keyFileName, "synced openai.key") { pickKey.launch(arrayOf("*/*")) }
+        Text(
+            "Recommended: point at a Syncthing-synced openai.key. It's read " +
+                "when transcribing and never copied in, so rotating it on the " +
+                "laptop just propagates. Takes precedence over the field below.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.size(12.dp))
         OutlinedTextField(
             value = apiKey,
             onValueChange = {
@@ -326,11 +385,11 @@ private fun SettingsContent(modifier: Modifier, onClose: () -> Unit) {
                 Prefs.setApiKey(ctx, it)
             },
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("OpenAI API key") },
+            label = { Text("…or paste the key") },
             singleLine = true,
         )
         Text(
-            "Used for Whisper transcription. Stored on this device only.",
+            "Stored on this device only (excluded from backup).",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

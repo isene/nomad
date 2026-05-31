@@ -56,7 +56,7 @@ class VoxViewModel(app: Application) : AndroidViewModel(app) {
         }
         _state.value = UiState.Transcribing
         val ctx = getApplication<Application>()
-        val key = Prefs.apiKey(ctx)
+        val key = Prefs.resolveKey(ctx)
         val lang = Prefs.lang(ctx)
         viewModelScope.launch(Dispatchers.IO) {
             val res = Whisper.transcribe(key, file, lang)
