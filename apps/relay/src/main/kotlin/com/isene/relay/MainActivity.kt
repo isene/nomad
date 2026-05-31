@@ -107,7 +107,11 @@ private fun RelayScreen() {
     val smsPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { res ->
-        val granted = res.values.all { it }
+        // READ_CONTACTS is requested alongside but optional — SMS relaying
+        // works without it (falls back to the bare number), so gate enabling
+        // on the SMS perms only.
+        val granted = res[Manifest.permission.RECEIVE_SMS] == true &&
+            res[Manifest.permission.SEND_SMS] == true
         Gateway.setSmsEnabled(ctx, granted)
         smsOn = granted
     }
@@ -230,6 +234,7 @@ private fun RelayScreen() {
                                     arrayOf(
                                         Manifest.permission.RECEIVE_SMS,
                                         Manifest.permission.SEND_SMS,
+                                        Manifest.permission.READ_CONTACTS,
                                     )
                                 )
                             }

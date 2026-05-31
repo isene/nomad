@@ -275,10 +275,13 @@ class RelayListenerService : NotificationListenerService() {
         null
     }
 
-    /** Send an SMS to `number` (the thread_key). Native — works for any
-     *  number, no active notification needed. Called by the OutboxWatcher for
-     *  platform == "sms". */
-    fun sendSms(number: String, text: String): Boolean {
+    /** Send an SMS to a reply target (the thread_key). For contact threads the
+     *  thread_key is the contact name, so map it back to the number that
+     *  messaged; no-contact threads key by the number itself and pass through.
+     *  Native — works for any number, no active notification needed. Called by
+     *  the OutboxWatcher for platform == "sms". */
+    fun sendSms(target: String, text: String): Boolean {
+        val number = Gateway.smsNumberFor(applicationContext, target)
         return try {
             @Suppress("DEPRECATION")
             val sms = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

@@ -58,6 +58,20 @@ object Gateway {
     fun setSmsEnabled(c: Context, on: Boolean) =
         prefs(c).edit().putBoolean(KEY_SMS, on).apply()
 
+    /** When an SMS sender resolves to a contact, the inbound thread_key becomes
+     *  the contact name (parity with the notification platforms). Remember the
+     *  name -> number mapping so an outbound reply, which kastrup keys by that
+     *  same thread_key, still sends to the right number. */
+    private const val SMS_NUM_PREFIX = "smsnum_"
+
+    fun rememberSmsContact(c: Context, name: String, number: String) =
+        prefs(c).edit().putString(SMS_NUM_PREFIX + name, number).apply()
+
+    /** Resolve a reply target back to a dialable number. No-contact threads key
+     *  by the number itself, so the map miss returns the target unchanged. */
+    fun smsNumberFor(c: Context, target: String): String =
+        prefs(c).getString(SMS_NUM_PREFIX + target, target) ?: target
+
     fun inboundDir(c: Context) = File(dir(c), "inbound").apply { mkdirs() }
     /** Still-image attachments referenced by inbound JSON, relative to the
      *  Syncthing root as "media/<name>". Kastrup drains these like the JSON. */
