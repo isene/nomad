@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>nomad — Fe2O3 on the phone</title>
+  <meta name="description" content="nomad is the mobile half of the Fe2O3 suite: an Android monorepo with a shared Rust core (UniFFI) under thin Kotlin/Compose shells. Seven apps — tasks, hyperlist, relay, astro, watchit, amardice, xrpn — synced over Syncthing.">
+  <link rel="icon" href="img/nomad.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <meta property="og:title" content="nomad — Fe2O3 on the phone">
+  <meta property="og:description" content="The mobile half of Fe2O3: one Rust core, seven Kotlin/Compose apps, synced over Syncthing. No Google account, no cloud.">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="img/nomad.svg">
+</head>
+<body>
+
+  <header class="hero">
+    <div class="container">
+      <img src="img/nomad.svg" alt="nomad logo" class="hero-logo">
+      <h1>nomad</h1>
+      <p class="tagline">
+        The mobile half of the <a href="https://github.com/isene/fe2o3" style="color:var(--accent-glow)">Fe<sub>2</sub>O<sub>3</sub></a>
+        suite. One Rust core, seven Kotlin&nbsp;/&nbsp;Compose apps,
+        synced over Syncthing — no Google account, no cloud middleman.
+      </p>
+      <div class="badges">
+        <img src="https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff" alt="Kotlin / Compose">
+        <img src="https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00" alt="Rust / UniFFI">
+        <img src="https://img.shields.io/badge/platform-Android-3ddc84" alt="Android">
+        <img src="https://img.shields.io/badge/license-Unlicense-green" alt="Unlicense">
+        <img src="https://img.shields.io/badge/Stay-Amazing-important" alt="Stay Amazing">
+      </div>
+      <div class="cta">
+        <a href="#apps" class="primary">Browse the apps</a>
+        <a href="https://github.com/isene/nomad" class="secondary">GitHub</a>
+      </div>
+    </div>
+  </header>
+
+  <section id="how">
+    <div class="container">
+      <h2>How it works</h2>
+      <p class="section-intro">
+        Each app carries one Fe<sub>2</sub>O<sub>3</sub> workflow off the
+        laptop and onto an Android phone. The interesting code lives in
+        Rust and is shared with the desktop tools, so the phone and the
+        terminal compute identically — the Kotlin side stays a thin shell.
+      </p>
+      <div class="features">
+        <div class="feature">
+          <h3>Shared Rust core</h3>
+          <p>
+            One crate (<code>fe2o3-mobile-core</code>) holds the models,
+            parsers, transforms and engines — the same logic as the desktop
+            tools. Exposed to Kotlin through
+            <a href="https://mozilla.github.io/uniffi-rs/" style="color:var(--rust-glow)">UniFFI</a>,
+            which generates the bindings. Never hand-rolled JNI.
+          </p>
+        </div>
+        <div class="feature">
+          <h3>Thin Compose shells</h3>
+          <p>
+            Compose for screens, Glance for home-screen widgets,
+            WorkManager for background work that respects Doze and App
+            Standby. No business logic that could live in the core.
+          </p>
+        </div>
+        <div class="feature">
+          <h3>Syncthing, not cloud</h3>
+          <p>
+            Data rides the same <a href="https://syncthing.net" style="color:var(--green)">Syncthing</a>
+            channel the desktop already uses — <code>todo.hl</code>,
+            <code>gear.json</code>, the relay gateway, <code>.xrpn</code>
+            programs. One source of truth, no account, no middleman.
+          </p>
+        </div>
+        <div class="feature">
+          <h3>One monorepo</h3>
+          <p>
+            A single Cargo workspace and Gradle multi-project. Each app
+            ships as its own signed APK with its own launcher icon,
+            sideloaded from the synced folder. minSdk 33, Material 3.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="apps">
+    <div class="container">
+      <h2>The apps</h2>
+      <p class="section-intro">
+        Seven phone apps, each pairing with a tool from the
+        Fe<sub>2</sub>O<sub>3</sub> family.
+      </p>
+      <div class="grid">
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/tasks">tasks</a></h3>
+            <div class="card-kind">HyperList todo</div>
+            <div class="card-pairs">Pairs with <a href="https://github.com/isene/scribe">scribe</a> &amp; <a href="https://github.com/isene/kastrup">kastrup</a></div>
+          </div></div>
+          <p class="card-desc">
+            Editor + Glance home-screen widget for the same
+            <code>~/.tasks/todo.hl</code> hyperlist that scribe edits and
+            kastrup's <code>z</code> triage appends to.
+          </p>
+          <div class="card-meta"><span class="repo">apps/tasks</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/hyperlist">hyperlist</a></h3>
+            <div class="card-kind">HyperList editor</div>
+            <div class="card-pairs">Pairs with <a href="https://github.com/isene/scribe">scribe</a></div>
+          </div></div>
+          <p class="card-desc">
+            A general <a href="https://isene.org/hyperlist/" style="position:relative;z-index:2;color:var(--rust-glow)">HyperList</a>
+            editor: full syntax highlighting, fold, drag-reorder across
+            depth (collapsed items move as one), and auto-renumber.
+          </p>
+          <div class="card-meta"><span class="repo">apps/hyperlist</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/relay">relay</a></h3>
+            <div class="card-kind">Notification gateway</div>
+            <div class="card-pairs">Pairs with <a href="https://github.com/isene/kastrup">kastrup</a></div>
+          </div></div>
+          <p class="card-desc">
+            Relays WhatsApp / Messenger / Instagram / SMS / Discord (and
+            photo previews) into kastrup and fires replies — replacing the
+            laptop's Firefox/Marionette bridge with an on-device listener.
+          </p>
+          <div class="card-meta"><span class="repo">apps/relay</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/astro">astro</a></h3>
+            <div class="card-kind">Astronomy companion</div>
+            <div class="card-pairs">Pairs with <a href="https://github.com/isene/astro">astro</a></div>
+          </div></div>
+          <p class="card-desc">
+            Ephemeris, met.no weather + observing conditions, in-the-sky
+            events, APOD, starchart, and a telescope/eyepiece gear catalog —
+            the <code>gear.json</code> shared with desktop astro.
+          </p>
+          <div class="card-meta"><span class="repo">apps/astro</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/watchit">watchit</a></h3>
+            <div class="card-kind">Movie / series browser</div>
+            <div class="card-pairs">Pairs with <a href="https://github.com/isene/watchit">watchit</a></div>
+          </div></div>
+          <p class="card-desc">
+            TMDB browser — top-rated &amp; popular lists, your own wish and
+            dump lists, posters, full detail (cast, plot, streaming), and
+            search-to-add.
+          </p>
+          <div class="card-meta"><span class="repo">apps/watchit</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/amardice">amardice</a></h3>
+            <div class="card-kind">RPG dice roller</div>
+            <div class="card-pairs">Pairs with <a href="https://github.com/isene/amar">amar</a></div>
+          </div></div>
+          <p class="card-desc">
+            Amar RPG O6 roller: D6, skill, and combat rolls with the full
+            crit/fumble tables, plus fear rolls with mental-fortitude vs a
+            fear DR. Engine shared with the desktop and the d6gaming wiki.
+          </p>
+          <div class="card-meta"><span class="repo">apps/amardice</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/xrpn">xrpn</a></h3>
+            <div class="card-kind">RPN calculator</div>
+            <div class="card-pairs">Pairs with <a href="https://github.com/isene/xrpn">xrpn</a></div>
+          </div></div>
+          <p class="card-desc">
+            Pocket HP-41 RPN scientific calculator — full stack, registers,
+            modes and the XRPN command set, an HP-41-style multi-shift
+            keypad, persistent state, and a FOCAL program runner that loads
+            <code>.xrpn</code> files from the synced folder.
+          </p>
+          <div class="card-meta"><span class="repo">apps/xrpn</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <section id="build" class="install">
+    <div class="container">
+      <h2>Build &amp; sideload</h2>
+      <p class="section-intro">
+        Clone the monorepo, build the app you want, drop the signed APK in
+        a Syncthing-shared folder, and sideload it on the phone:
+      </p>
+      <pre><span class="comment"># host tests for the shared Rust core (no emulator needed)</span>
+<span class="cmd">PATH="/usr/bin:$PATH" cargo test -p fe2o3-mobile-core</span>
+
+<span class="comment"># a signed release APK (cargo-ndk + uniffi-bindgen run from Gradle)</span>
+<span class="cmd">export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export ANDROID_NDK_HOME="$HOME/.android-sdk/ndk/27.2.12479018"
+./gradlew :apps:xrpn:assembleRelease</span>
+
+<span class="comment"># APK lands in apps/&lt;name&gt;/build/outputs/apk/release/ — sync &amp; sideload</span></pre>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>
+        nomad is maintained by <a href="https://isene.com">Geir Isene</a>.
+        Public domain (Unlicense).
+      </p>
+      <p style="margin-top: 0.5rem;">
+        Source &amp; this page:
+        <a href="https://github.com/isene/nomad">github.com/isene/nomad</a>
+        &middot; Desktop suite:
+        <a href="https://github.com/isene/fe2o3">Fe<sub>2</sub>O<sub>3</sub></a>
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>
