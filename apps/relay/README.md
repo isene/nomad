@@ -1,4 +1,6 @@
-<img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" align="left" width="110" height="110">
+<div align="center">
+
+<img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="100" height="100">
 
 # relay
 
@@ -6,7 +8,7 @@
 
 A phone-side notification gateway that feeds [kastrup](https://github.com/isene/kastrup) — part of the [nomad](../../) mobile suite.
 
-<br clear="left"/>
+</div>
 
 `com.isene.relay` · pairs with [kastrup](https://github.com/isene/kastrup)
 

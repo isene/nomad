@@ -1,4 +1,6 @@
-<img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" align="left" width="110" height="110">
+<div align="center">
+
+<img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="100" height="100">
 
 # xrpn
 
@@ -6,7 +8,7 @@
 
 A pocket HP-41 RPN scientific calculator — mobile companion to [XRPN](https://github.com/isene/xrpn). Part of the [nomad](../../) mobile suite.
 
-<br clear="left"/>
+</div>
 
 `com.isene.xrpn` · pairs with [xrpn](https://github.com/isene/xrpn)
 

@@ -1,4 +1,6 @@
-<img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" align="left" width="110" height="110">
+<div align="center">
+
+<img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="100" height="100">
 
 # astro
 
@@ -6,7 +8,7 @@
 
 Amateur-astronomy companion — full parity with the Fe₂O₃ [astro](https://github.com/isene/astro) TUI. Part of the [nomad](../../) mobile suite.
 
-<br clear="left"/>
+</div>
 
 `com.isene.astro` · pairs with [astro](https://github.com/isene/astro)
 

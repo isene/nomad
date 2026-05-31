@@ -1,4 +1,6 @@
-<img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" align="left" width="110" height="110">
+<div align="center">
+
+<img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="100" height="100">
 
 # watchit
 
@@ -6,7 +8,7 @@
 
 A TMDB movie & series browser — mobile companion to the Fe₂O₃ [watchit](https://github.com/isene/watchit) TUI. Part of the [nomad](../../) mobile suite.
 
-<br clear="left"/>
+</div>
 
 `com.isene.watchit` · pairs with [watchit](https://github.com/isene/watchit)
 

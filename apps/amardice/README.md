@@ -1,4 +1,6 @@
-<img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" align="left" width="110" height="110">
+<div align="center">
+
+<img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="100" height="100">
 
 # amardice
 
@@ -6,7 +8,7 @@
 
 An O6 dice roller for the [Amar RPG](https://d6gaming.org) — part of the [nomad](../../) mobile suite.
 
-<br clear="left"/>
+</div>
 
 `com.isene.amardice` · pairs with [amar](https://github.com/isene/amar)
 
