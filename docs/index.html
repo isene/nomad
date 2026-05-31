@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>nomad — Fe2O3 on the phone</title>
-  <meta name="description" content="nomad is the mobile half of the Fe2O3 suite: an Android monorepo with a shared Rust core (UniFFI) under thin Kotlin/Compose shells. Seven apps — tasks, hyperlist, relay, astro, watchit, amardice, xrpn — synced over Syncthing.">
+  <meta name="description" content="nomad is the mobile half of the Fe2O3 suite: an Android monorepo with a shared Rust core (UniFFI) under thin Kotlin/Compose shells. Nine apps — tasks, hyperlist, relay, astro, watchit, amardice, xrpn, vox, scribe — synced over Syncthing.">
   <link rel="icon" href="img/nomad.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <meta property="og:title" content="nomad — Fe2O3 on the phone">
-  <meta property="og:description" content="The mobile half of Fe2O3: one Rust core, seven Kotlin/Compose apps, synced over Syncthing. No Google account, no cloud.">
+  <meta property="og:description" content="The mobile half of Fe2O3: one Rust core, nine Kotlin/Compose apps, synced over Syncthing. No Google account, no cloud.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="img/nomad.svg">
 </head>
@@ -20,7 +20,7 @@
       <h1>nomad</h1>
       <p class="tagline">
         The mobile half of the <a href="https://github.com/isene/fe2o3" style="color:var(--accent-glow)">Fe<sub>2</sub>O<sub>3</sub></a>
-        suite. One Rust core, seven Kotlin&nbsp;/&nbsp;Compose apps,
+        suite. One Rust core, nine Kotlin&nbsp;/&nbsp;Compose apps,
         synced over Syncthing — no Google account, no cloud middleman.
       </p>
       <div class="badges">
@@ -90,7 +90,7 @@
     <div class="container">
       <h2>The apps</h2>
       <p class="section-intro">
-        Seven phone apps, each pairing with a tool from the
+        Nine phone apps, each pairing with a tool from the
         Fe<sub>2</sub>O<sub>3</sub> family.
       </p>
       <div class="grid">
@@ -192,6 +192,36 @@
             <code>.xrpn</code> files from the synced folder.
           </p>
           <div class="card-meta"><span class="repo">apps/xrpn</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/vox">vox</a></h3>
+            <div class="card-kind">Voice quick-capture</div>
+            <div class="card-pairs">Pairs with the laptop VTT</div>
+          </div></div>
+          <p class="card-desc">
+            Records on launch, transcribes through Whisper, then files the
+            text where you choose — under an <code>Inbox</code> in your synced
+            <code>todo.hl</code> or appended to a notes file. The pocket
+            version of the laptop's <code>Win+a</code> dictation.
+          </p>
+          <div class="card-meta"><span class="repo">apps/vox</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/scribe">scribe</a></h3>
+            <div class="card-kind">Notes editor</div>
+            <div class="card-pairs">Pairs with <a href="https://github.com/isene/scribe">scribe</a></div>
+          </div></div>
+          <p class="card-desc">
+            Distraction-free pad for the <code>.md</code>/<code>.hl</code>/<code>.txt</code>
+            files in your synced writing folder — newest first, full-screen
+            monospace editor, auto-save. The same files open in desktop
+            scribe over Syncthing.
+          </p>
+          <div class="card-meta"><span class="repo">apps/scribe</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
         </div>
 
       </div>

@@ -31,6 +31,8 @@ prompt the changes that fit *your* phone.
 | <img src="apps/watchit/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**watchit**](apps/watchit/) | TMDB movie / series browser — top-rated & popular lists, wish/dump lists, posters, full detail, search-to-add | [watchit](https://github.com/isene/watchit) |
 | <img src="apps/amardice/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**amardice**](apps/amardice/) | Amar RPG O6 dice roller: D6, skill, combat (crit/fumble tables), and fear rolls | [amar](https://github.com/isene/amar) |
 | <img src="apps/xrpn/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**xrpn**](apps/xrpn/) | Pocket HP-41 RPN scientific calculator — full stack/registers/modes, multi-shift keypad, and a FOCAL program runner | [xrpn](https://github.com/isene/xrpn) |
+| <img src="apps/vox/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**vox**](apps/vox/) | Voice quick-capture: records on launch, Whisper-transcribes, files the text to your `todo.hl` Inbox or a notes file | laptop VTT |
+| <img src="apps/scribe/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**scribe**](apps/scribe/) | Distraction-free notes pad — edit the `.md`/`.hl`/`.txt` files in your synced writing folder, monospace, no chrome | [scribe](https://github.com/isene/scribe) |
 
 Each ships as its own signed APK with its own launcher icon, sideloaded from a
 Syncthing-synced folder.
