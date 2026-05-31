@@ -7,7 +7,7 @@ carries one Fe₂O₃ workflow off the laptop and onto an Android phone, sharing
 single Rust core and syncing data over [Syncthing](https://syncthing.net) — no
 Google account, no cloud middleman.
 
-**Landing page:** [isene.github.io/nomad](https://isene.github.io/nomad/)
+**Landing page:** [isene.org/nomad](https://isene.org/nomad/)
 
 One Cargo workspace and one Gradle multi-project in a single monorepo. The
 interesting code lives in **Rust** (`core/`, crate `fe2o3-mobile-core`),
