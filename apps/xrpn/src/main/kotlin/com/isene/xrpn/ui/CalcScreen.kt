@@ -153,9 +153,9 @@ fun CalcScreen(vm: CalcViewModel) {
                 ) {
                     Text(if (page.tag.isEmpty()) "SHIFT" else "SH ${page.tag}", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
                 }
+                FuncKey("x≷y", page.color, Modifier.weight(1f)) { vm.cmd("swap") }
                 FuncKey("PRGM", MaterialTheme.colorScheme.secondary, Modifier.weight(1f)) { showSheet = true }
                 FuncKey("R/S", MaterialTheme.colorScheme.secondary, Modifier.weight(1f)) { vm.run() }
-                FuncKey("x≷y", page.color, Modifier.weight(1f)) { vm.cmd("swap") }
             }
 
             // Numeric block: wide ENTER (2 cols, normal height) + CHS + EEX, then digits.
@@ -215,6 +215,12 @@ private fun ProgramSheet(vm: CalcViewModel, prog: ProgUi, onDismiss: () -> Unit)
             )
             OutlinedButton(onClick = { picker.launch(null) }, modifier = Modifier.fillMaxWidth()) {
                 Text(if (prog.folderSet) "Change programs folder" else "Pick programs folder")
+            }
+            if (prog.folderSet) {
+                Text(
+                    "Folder: ${vm.folderName() ?: "(selected)"}",
+                    fontSize = 12.sp, fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.primary,
+                )
             }
             if (files.isEmpty()) {
                 Text(if (prog.folderSet) "No .xrpn / .txt files in that folder." else "No folder chosen yet.", fontSize = 13.sp, color = MaterialTheme.colorScheme.secondary)

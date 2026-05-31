@@ -116,6 +116,14 @@ class CalcViewModel(app: Application) : AndroidViewModel(app) {
         _prog.value = _prog.value.copy(folderSet = true)
     }
 
+    /** Human-readable name of the chosen programs folder, or null if none. */
+    fun folderName(): String? {
+        val f = folderUri() ?: return null
+        return runCatching {
+            DocumentFile.fromTreeUri(getApplication(), Uri.parse(f))?.name
+        }.getOrNull() ?: Uri.parse(f).lastPathSegment?.substringAfterLast('/')
+    }
+
     /** (display name, uri) for .xrpn / .txt files in the chosen folder. */
     fun listFiles(): List<Pair<String, Uri>> {
         val f = folderUri() ?: return emptyList()
