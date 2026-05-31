@@ -22,15 +22,15 @@ prompt the changes that fit *your* phone.
 
 ## The apps
 
-| App | applicationId | Role | Pairs with |
+| | App | Role | Pairs with |
 |---|---|---|---|
-| **tasks** | `com.isene.tasks` | HyperList todo editor + Glance home-screen widget for `~/.tasks/todo.hl` | [scribe](https://github.com/isene/scribe), [kastrup](https://github.com/isene/kastrup) |
-| **hyperlist** | `com.isene.hyperlist` | General [HyperList](https://isene.org/hyperlist/) editor — full syntax highlighting, fold, drag-reorder across depth, auto-renumber | [scribe](https://github.com/isene/scribe) |
-| **relay** | `com.isene.relay` | Notification gateway: relays WhatsApp / Messenger / Instagram / SMS / Discord (and photos) to kastrup and fires replies — replaces the laptop's Marionette bridge | [kastrup](https://github.com/isene/kastrup) |
-| **astro** | `com.isene.astro` | Amateur-astronomy companion: ephemeris, met.no weather + observing conditions, in-the-sky events, APOD, starchart, and a telescope/eyepiece gear catalog | [astro](https://github.com/isene/astro) |
-| **watchit** | `com.isene.watchit` | TMDB movie / series browser — top-rated & popular lists, wish/dump lists, posters, full detail, search-to-add | [watchit](https://github.com/isene/watchit) |
-| **amardice** | `com.isene.amardice` | Amar RPG O6 dice roller: D6, skill, combat (crit/fumble tables), and fear rolls | [amar](https://github.com/isene/amar) |
-| **xrpn** | `com.isene.xrpn` | Pocket HP-41 RPN scientific calculator — full stack/registers/modes, multi-shift keypad, and a FOCAL program runner | [xrpn](https://github.com/isene/xrpn) |
+| <img src="apps/tasks/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**tasks**](apps/tasks/) | HyperList todo editor + Glance home-screen widget for `~/.tasks/todo.hl` | [scribe](https://github.com/isene/scribe), [kastrup](https://github.com/isene/kastrup) |
+| <img src="apps/hyperlist/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**hyperlist**](apps/hyperlist/) | General [HyperList](https://isene.org/hyperlist/) editor — full syntax highlighting, fold, drag-reorder across depth, auto-renumber | [scribe](https://github.com/isene/scribe) |
+| <img src="apps/relay/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**relay**](apps/relay/) | Notification gateway: relays WhatsApp / Messenger / Instagram / SMS / Discord (and photos) to kastrup and fires replies — replaces the laptop's Marionette bridge | [kastrup](https://github.com/isene/kastrup) |
+| <img src="apps/astro/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**astro**](apps/astro/) | Amateur-astronomy companion: ephemeris, met.no weather + observing conditions, in-the-sky events, APOD, starchart, and a telescope/eyepiece gear catalog | [astro](https://github.com/isene/astro) |
+| <img src="apps/watchit/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**watchit**](apps/watchit/) | TMDB movie / series browser — top-rated & popular lists, wish/dump lists, posters, full detail, search-to-add | [watchit](https://github.com/isene/watchit) |
+| <img src="apps/amardice/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**amardice**](apps/amardice/) | Amar RPG O6 dice roller: D6, skill, combat (crit/fumble tables), and fear rolls | [amar](https://github.com/isene/amar) |
+| <img src="apps/xrpn/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**xrpn**](apps/xrpn/) | Pocket HP-41 RPN scientific calculator — full stack/registers/modes, multi-shift keypad, and a FOCAL program runner | [xrpn](https://github.com/isene/xrpn) |
 
 Each ships as its own signed APK with its own launcher icon, sideloaded from a
 Syncthing-synced folder.
