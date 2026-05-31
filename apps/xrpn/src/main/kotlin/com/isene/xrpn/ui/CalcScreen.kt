@@ -1,6 +1,7 @@
 package com.isene.xrpn.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -90,8 +91,11 @@ fun CalcScreen(vm: CalcViewModel) {
     val page = PAGES[shiftPage]
 
     Scaffold { pad ->
+      Box(Modifier.padding(pad).fillMaxSize()) {
+        // Calculator keeps its full size — the keyboard overlays it rather than
+        // squeezing it. The command field (below) floats above the keyboard.
         Column(
-            Modifier.padding(pad).fillMaxSize().imePadding().padding(horizontal = 8.dp, vertical = 6.dp),
+            Modifier.fillMaxSize().padding(horizontal = 8.dp, vertical = 6.dp).padding(bottom = 70.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             // Stack display.
@@ -191,8 +195,17 @@ fun CalcScreen(vm: CalcViewModel) {
                 }
             }
 
+        }
+
+        // Command field pinned to the bottom; imePadding lifts it above the
+        // keyboard when focused, floating over the keypad without resizing it.
+        Box(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().imePadding()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        ) {
             CommandLine(vm)
         }
+      }
     }
 
     if (showSheet) ProgramSheet(vm, prog) { showSheet = false }
