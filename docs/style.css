@@ -1,9 +1,9 @@
-/* nomad site — dark starfield, Kotlin-purple accent over Rust-core glow */
+/* nomad site — dark starfield, Android-green accent over Rust-core glow */
 
 :root {
-  --accent: #7f52ff;       /* Kotlin / Compose purple (the shell) */
-  --accent-dark: #5b34d6;
-  --accent-glow: #a78bfa;
+  --accent: #3ddc84;       /* Android green (the shell) */
+  --accent-dark: #1f9d57;
+  --accent-glow: #6ee7a8;
   --rust: #f74c00;         /* the Rust core */
   --rust-glow: #ff7a3a;
   --bg: #0a0a14;
@@ -39,10 +39,10 @@ body::before {
     radial-gradient(1px 1px at 80% 60%,  rgba(255,255,255,0.7), transparent 50%),
     radial-gradient(1px 1px at 30% 80%,  rgba(255,255,255,0.5), transparent 50%),
     radial-gradient(1px 1px at 70% 90%,  rgba(255,255,255,0.6), transparent 50%),
-    radial-gradient(1px 1px at 90% 40%,  rgba(167,139,250,0.5), transparent 50%),
+    radial-gradient(1px 1px at 90% 40%,  rgba(110,231,168,0.5), transparent 50%),
     radial-gradient(2px 2px at 10% 70%,  rgba(255,233,168,0.5), transparent 50%),
     radial-gradient(1px 1px at 50% 50%,  rgba(255,255,255,0.4), transparent 50%),
-    radial-gradient(1200px 800px at 80% -10%, rgba(127,82,255,0.14), transparent 60%),
+    radial-gradient(1200px 800px at 80% -10%, rgba(61,220,132,0.14), transparent 60%),
     radial-gradient(900px 600px at -10% 100%, rgba(247,76,0,0.09), transparent 60%);
   pointer-events: none;
   z-index: -1;
@@ -54,7 +54,7 @@ body::before {
 .hero { padding: 6rem 0 4rem; text-align: center; }
 .hero-logo {
   width: 150px; height: 150px; margin: 0 auto 1.5rem; display: block;
-  filter: drop-shadow(0 0 40px rgba(127, 82, 255, 0.45));
+  filter: drop-shadow(0 0 40px rgba(61, 220, 132, 0.45));
 }
 .hero h1 {
   font-size: clamp(2.5rem, 6vw, 4.5rem);
@@ -109,10 +109,10 @@ section .section-intro { color: var(--fg-dim); max-width: 740px; margin-bottom: 
   position: relative; overflow: hidden;
   display: flex; flex-direction: column; gap: 0.75rem;
 }
-.card:hover { transform: translateY(-4px); border-color: var(--accent-glow); box-shadow: 0 20px 50px rgba(127, 82, 255, 0.18); }
+.card:hover { transform: translateY(-4px); border-color: var(--accent-glow); box-shadow: 0 20px 50px rgba(61, 220, 132, 0.18); }
 .card::before {
   content: ""; position: absolute; inset: 0;
-  background: radial-gradient(200px 150px at 0% 0%, rgba(127, 82, 255, 0.10), transparent 70%);
+  background: radial-gradient(200px 150px at 0% 0%, rgba(61, 220, 132, 0.10), transparent 70%);
   pointer-events: none;
 }
 .card-head { display: flex; align-items: center; gap: 1rem; }
