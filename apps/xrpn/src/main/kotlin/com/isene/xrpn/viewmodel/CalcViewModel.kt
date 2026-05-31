@@ -22,7 +22,9 @@ import uniffi.fe2o3_mobile_core.keyEex
 import uniffi.fe2o3_mobile_core.keyEnter
 import uniffi.fe2o3_mobile_core.newState
 import uniffi.fe2o3_mobile_core.parseProgram
+import uniffi.fe2o3_mobile_core.parseState
 import uniffi.fe2o3_mobile_core.runProgram
+import uniffi.fe2o3_mobile_core.serializeState
 
 /** Program panel state for the UI. */
 data class ProgUi(
@@ -38,7 +40,11 @@ data class ProgUi(
 private const val PREFS = "xrpn_prefs"
 
 class CalcViewModel(app: Application) : AndroidViewModel(app) {
-    private var state: CalcState = newState()
+    private val statePrefs = app.getSharedPreferences(PREFS, Application.MODE_PRIVATE)
+    // Restore the stack/registers/flags/mode from the last session.
+    private var state: CalcState = statePrefs.getString("calc_state", null)
+        ?.let { runCatching { parseState(it) }.getOrDefault(newState()) }
+        ?: newState()
 
     private val _disp = MutableStateFlow(display(state))
     val disp: StateFlow<CalcDisplay> = _disp.asStateFlow()
@@ -61,7 +67,11 @@ class CalcViewModel(app: Application) : AndroidViewModel(app) {
     private val _prog = MutableStateFlow(ProgUi(folderSet = folderUri() != null))
     val prog: StateFlow<ProgUi> = _prog.asStateFlow()
 
-    private fun refresh() { _disp.value = display(state) }
+    private fun refresh() {
+        _disp.value = display(state)
+        // Persist the full state (human-paced, async apply — negligible cost).
+        statePrefs.edit().putString("calc_state", serializeState(state)).apply()
+    }
 
     // ---- shift / entry ----
     fun cycleShift() { _shiftPage.value = (_shiftPage.value + 1) % pageCount; _pending.value = null }

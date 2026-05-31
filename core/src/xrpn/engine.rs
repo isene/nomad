@@ -4,10 +4,11 @@
 // ENTER lifts and disables the next stack lift (so the next digit overwrites X).
 
 use super::format::to_num;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Full calculator state. Small enough to cross the FFI per keypress.
-#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, uniffi::Record)]
 pub struct CalcState {
     pub x: f64,
     pub y: f64,
@@ -73,6 +74,18 @@ pub fn new_state() -> CalcState {
         entering: String::new(),
         lift_enabled: true,
     }
+}
+
+/// Serialize the full state for persistence across launches.
+#[uniffi::export]
+pub fn serialize_state(state: CalcState) -> String {
+    serde_json::to_string(&state).unwrap_or_default()
+}
+
+/// Restore a persisted state; falls back to a fresh state on any error.
+#[uniffi::export]
+pub fn parse_state(json: String) -> CalcState {
+    serde_json::from_str(&json).unwrap_or_else(|_| new_state())
 }
 
 fn comma(s: &CalcState) -> bool {

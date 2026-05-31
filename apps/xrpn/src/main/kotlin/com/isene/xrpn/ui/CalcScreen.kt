@@ -104,16 +104,25 @@ fun CalcScreen(vm: CalcViewModel) {
                     StackRow("Z", d.z, false)
                     StackRow("Y", d.y, false)
                     StackRow("X", d.x, true)
+                    // Single status line: error (red) replaces the mode label
+                    // when present, so the card height never grows and the
+                    // command field below isn't squeezed.
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(d.mode, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary, fontFamily = FontFamily.Monospace)
+                        Text(
+                            err ?: d.mode,
+                            fontSize = 11.sp,
+                            color = if (err != null) Color(0xFFFF8A80) else MaterialTheme.colorScheme.primary,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f),
+                        )
                         val right = when {
                             pending != null -> "${pending!!.uppercase()} _"
                             d.alpha.isNotEmpty() -> "α: ${d.alpha}"
                             else -> ""
                         }
-                        if (right.isNotEmpty()) Text(right, fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary, fontFamily = FontFamily.Monospace)
+                        if (right.isNotEmpty()) Text(right, fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary, fontFamily = FontFamily.Monospace, maxLines = 1)
                     }
-                    err?.let { Text(it, fontSize = 11.sp, color = Color(0xFFFF8A80)) }
                 }
             }
 
@@ -132,26 +141,21 @@ fun CalcScreen(vm: CalcViewModel) {
                 }
             }
 
-            // SHIFT (cycles colour pages) + PRGM (open program sheet).
+            // Control row: SHIFT (cycle colour pages), PRGM (program sheet),
+            // R/S (run/resume a loaded program), x≷y (swap). Each one key wide.
             KeyRow {
                 Button(
                     onClick = { vm.cycleShift() },
-                    modifier = Modifier.weight(2f).fillMaxSize(),
+                    modifier = Modifier.weight(1f).fillMaxSize(),
                     colors = ButtonDefaults.buttonColors(containerColor = page.color, contentColor = Color(0xFF0E141A)),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
                     contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
                 ) {
-                    Text(if (page.tag.isEmpty()) "SHIFT" else "SHIFT ▸ ${page.tag}", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Text(if (page.tag.isEmpty()) "SHIFT" else "SH ${page.tag}", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
                 }
-                Button(
-                    onClick = { showSheet = true },
-                    modifier = Modifier.weight(2f).fillMaxSize(),
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surface, contentColor = MaterialTheme.colorScheme.secondary),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-                ) {
-                    Text("PRGM", fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 13.sp)
-                }
+                FuncKey("PRGM", MaterialTheme.colorScheme.secondary, Modifier.weight(1f)) { showSheet = true }
+                FuncKey("R/S", MaterialTheme.colorScheme.secondary, Modifier.weight(1f)) { vm.run() }
+                FuncKey("x≷y", page.color, Modifier.weight(1f)) { vm.cmd("swap") }
             }
 
             // Numeric block: wide ENTER (2 cols, normal height) + CHS + EEX, then digits.
