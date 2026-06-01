@@ -27,6 +27,8 @@ object Gateway {
         "com.discord" to "discord",
         "org.telegram.messenger" to "telegram",
         "org.thoughtcrime.securesms" to "signal",
+        "com.linkedin.android" to "linkedin",
+        "com.reddit.frontpage" to "reddit",
     )
 
     /** Enabled out of the box: Instagram + Messenger (the Marionette

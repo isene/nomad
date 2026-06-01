@@ -114,7 +114,11 @@ private fun WidgetContent(rows: List<WidgetRow>, transparent: Boolean) {
                     Row(
                         modifier = GlanceModifier
                             .fillMaxWidth()
-                            .padding(vertical = 2.dp),
+                            .padding(vertical = 2.dp)
+                            // Glance LazyColumn rows swallow the parent Box's
+                            // click, so each row needs its own action to open
+                            // the app.
+                            .clickable(openApp),
                     ) {
                         Text(
                             text = row.category,
