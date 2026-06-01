@@ -33,6 +33,7 @@ prompt the changes that fit *your* phone.
 | <img src="apps/xrpn/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**xrpn**](apps/xrpn/) | Pocket HP-41 RPN scientific calculator — full stack/registers/modes, multi-shift keypad, and a FOCAL program runner | [xrpn](https://github.com/isene/xrpn) |
 | <img src="apps/vox/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**vox**](apps/vox/) | Voice quick-capture: records on launch, Whisper-transcribes, files the text to your `todo.hl` Inbox or a notes file | laptop VTT |
 | <img src="apps/scribe/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**scribe**](apps/scribe/) | Distraction-free notes pad — edit the `.md`/`.hl`/`.txt` files in your synced writing folder, monospace, no chrome | [scribe](https://github.com/isene/scribe) |
+| <img src="apps/ref/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**ref**](apps/ref/) | Offline searchable reference reader — glossaries, books, and writings as JSON collections (bundled + synced) | — |
 
 Each ships as its own signed APK with its own launcher icon, sideloaded from a
 Syncthing-synced folder.
