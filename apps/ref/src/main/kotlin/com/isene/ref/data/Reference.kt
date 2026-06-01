@@ -5,8 +5,9 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import org.json.JSONObject
 
-/** One reference entry: a headword/section title and its text. */
-data class Entry(val title: String, val body: String)
+/** One reference entry: a headword/section title, its text, and any images
+ *  (asset paths, shown after the body — only for bundled collections). */
+data class Entry(val title: String, val body: String, val images: List<String> = emptyList())
 
 /** A named collection of entries (a glossary, a book, a set of writings). */
 data class Collection(val name: String, val entries: List<Entry>, val bundled: Boolean)
@@ -67,7 +68,12 @@ object Library {
             val e = arr.optJSONObject(i) ?: continue
             val title = e.optString("title")
             val body = e.optString("body")
-            if (title.isNotBlank() || body.isNotBlank()) entries.add(Entry(title, body))
+            val imgs = e.optJSONArray("images")
+            val images = if (imgs == null) emptyList()
+            else (0 until imgs.length()).mapNotNull { imgs.optString(it).ifBlank { null } }
+            if (title.isNotBlank() || body.isNotBlank() || images.isNotEmpty()) {
+                entries.add(Entry(title, body, images))
+            }
         }
         return Collection(name, entries, bundled)
     }

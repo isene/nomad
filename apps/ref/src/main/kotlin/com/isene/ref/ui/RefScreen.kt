@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +49,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -204,16 +207,41 @@ private fun ReaderScreen(entry: Entry, onBack: () -> Unit) {
             )
         },
     ) { inner ->
-        SelectionContainer(modifier = Modifier.fillMaxSize().padding(inner)) {
-            Text(
-                entry.body,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 18.dp, vertical = 12.dp),
-                style = MaterialTheme.typography.bodyLarge,
-            )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(inner)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 18.dp, vertical = 12.dp),
+        ) {
+            if (entry.body.isNotBlank()) {
+                SelectionContainer {
+                    Text(entry.body, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            entry.images.forEach { path ->
+                Spacer(Modifier.size(12.dp))
+                AssetImage(path)
+            }
         }
+    }
+}
+
+@Composable
+private fun AssetImage(path: String) {
+    val ctx = LocalContext.current
+    val bmp = remember(path) {
+        runCatching {
+            ctx.assets.open(path).use { android.graphics.BitmapFactory.decodeStream(it) }
+        }.getOrNull()?.asImageBitmap()
+    }
+    if (bmp != null) {
+        Image(
+            bitmap = bmp,
+            contentDescription = null,
+            modifier = Modifier.fillMaxWidth(),
+            contentScale = ContentScale.FillWidth,
+        )
     }
 }
 
