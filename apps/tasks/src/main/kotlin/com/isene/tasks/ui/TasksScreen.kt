@@ -23,6 +23,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
@@ -148,6 +150,17 @@ fun TasksScreen(vm: TasksViewModel) {
                         expanded = overflowOpen,
                         onDismissRequest = { overflowOpen = false },
                     ) {
+                        DropdownMenuItem(
+                            text = { Text("Transparent widget") },
+                            leadingIcon = { Icon(Icons.Filled.Opacity, null) },
+                            trailingIcon = {
+                                if (state.widgetTransparent) Icon(Icons.Filled.Check, null)
+                            },
+                            onClick = {
+                                overflowOpen = false
+                                vm.setWidgetTransparent(!state.widgetTransparent)
+                            },
+                        )
                         DropdownMenuItem(
                             text = { Text("About") },
                             leadingIcon = { Icon(Icons.Filled.Info, null) },

@@ -41,6 +41,7 @@ import uniffi.fe2o3_mobile_core.widgetRows
 // widget shows an empty-state hint.
 private const val PREFS = "tasks_prefs"
 private const val KEY_URI = "doc_uri"
+private const val KEY_TRANSPARENT = "widget_transparent"
 private const val MAX_ROWS: UInt = 12u
 
 class TasksWidget : GlanceAppWidget() {
@@ -49,9 +50,11 @@ class TasksWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val rows = loadRows(context)
+        val transparent = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean(KEY_TRANSPARENT, false)
         provideContent {
             GlanceTheme {
-                WidgetContent(rows)
+                WidgetContent(rows, transparent)
             }
         }
     }
@@ -74,14 +77,15 @@ class TasksWidget : GlanceAppWidget() {
 }
 
 @Composable
-private fun WidgetContent(rows: List<WidgetRow>) {
+private fun WidgetContent(rows: List<WidgetRow>, transparent: Boolean) {
     val openApp = actionStartActivity<MainActivity>()
+    val base = GlanceModifier
+        .fillMaxSize()
+        .let { if (transparent) it else it.background(GlanceTheme.colors.background) }
+        .padding(8.dp)
+        .clickable(openApp)
     Box(
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .background(GlanceTheme.colors.background)
-            .padding(8.dp)
-            .clickable(openApp),
+        modifier = base,
         contentAlignment = Alignment.TopStart,
     ) {
         if (rows.isEmpty()) {

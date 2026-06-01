@@ -28,6 +28,7 @@ import uniffi.fe2o3_mobile_core.renameItem as rustRenameItem
 private const val PREFS = "tasks_prefs"
 private const val KEY_URI = "doc_uri"
 private const val KEY_COLLAPSED = "collapsed_categories"
+private const val KEY_WIDGET_TRANSPARENT = "widget_transparent"
 
 data class UiState(
     val pickedUri: Uri? = null,
@@ -36,6 +37,7 @@ data class UiState(
     val collapsed: Set<String> = emptySet(),
     val toast: String? = null,
     val loading: Boolean = false,
+    val widgetTransparent: Boolean = false,
 )
 
 class TasksViewModel(app: Application) : AndroidViewModel(app) {
@@ -43,7 +45,9 @@ class TasksViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = TaskRepository(app)
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-    private val _state = MutableStateFlow(UiState())
+    private val _state = MutableStateFlow(
+        UiState(widgetTransparent = prefs.getBoolean(KEY_WIDGET_TRANSPARENT, false)),
+    )
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     private var lastSeenMtime: Long = 0L
@@ -221,6 +225,14 @@ class TasksViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearToast() {
         _state.value = _state.value.copy(toast = null)
+    }
+
+    /** Toggle the home-screen widget's transparent background, then refresh
+     *  any installed widget so it re-renders with the new background. */
+    fun setWidgetTransparent(on: Boolean) {
+        prefs.edit().putBoolean(KEY_WIDGET_TRANSPARENT, on).apply()
+        _state.value = _state.value.copy(widgetTransparent = on)
+        pokeWidget()
     }
 
     private fun persist() {
