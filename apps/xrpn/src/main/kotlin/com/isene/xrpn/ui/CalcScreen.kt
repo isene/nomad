@@ -1,6 +1,7 @@
 package com.isene.xrpn.ui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -48,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -217,6 +220,7 @@ fun CalcScreen(vm: CalcViewModel) {
         // keyboard when focused, floating over the keypad without resizing it.
         Box(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().imePadding()
+                .background(Color.Black)
                 .padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
             CommandLine(vm)
@@ -377,7 +381,18 @@ private fun CommandLine(vm: CalcViewModel) {
         singleLine = true,
         textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = 15.sp),
         placeholder = { Text("command  (sto 25, fix 2, dechex…)", fontSize = 12.sp) },
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Go),
+        // Opaque field so it never shows the keypad through it; no autocorrect
+        // (commands aren't words — the IME suggestion strip used to draw a
+        // ghost label over the keys).
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = Color.Black,
+            unfocusedContainerColor = Color.Black,
+        ),
+        keyboardOptions = KeyboardOptions(
+            autoCorrectEnabled = false,
+            keyboardType = KeyboardType.Ascii,
+            imeAction = ImeAction.Go,
+        ),
         keyboardActions = KeyboardActions(onGo = {
             val t = text.trim()
             if (t.isNotEmpty()) { vm.cmd(t); text = "" }
