@@ -4,7 +4,7 @@
 
 # scribe
 
-![version](https://img.shields.io/badge/version-0.1.1-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.2.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A distraction-free notes pad for the phone — the touch companion to the Fe₂O₃ [scribe](https://github.com/isene/scribe) editor. Part of the [nomad](../../) mobile suite.
 
@@ -17,8 +17,11 @@ A distraction-free notes pad for the phone — the touch companion to the Fe₂O
 Point it at a notes folder (Syncthing-shared with your writing tree) and
 edit, no chrome in the way.
 
-- Lists the `.md` / `.hl` / `.txt` files in the folder, newest first
-- Full-screen monospace editor — just the text
+- Lists the `.md` / `.hl` / `.txt` files in the folder; filter by name and
+  toggle sort (newest-first / A–Z)
+- Per-note actions: rename, duplicate, delete (the ⋮ menu)
+- Full-screen monospace editor — just the text — with in-file find (▲▼ to
+  step matches) and a live word / char count
 - Auto-saves on back and when the app is backgrounded
 - New note with one tap (`+`)
 - Files live in a SAF folder you grant once; nothing is copied, nothing

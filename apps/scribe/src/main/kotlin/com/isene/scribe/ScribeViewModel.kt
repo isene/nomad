@@ -14,6 +14,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+enum class SortMode { MODIFIED, NAME }
+
 class ScribeViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = NotesRepo(app)
 
@@ -21,6 +23,8 @@ class ScribeViewModel(app: Application) : AndroidViewModel(app) {
     var folderName by mutableStateOf<String?>(null); private set
     val notes = mutableStateListOf<NoteRef>()
     var loading by mutableStateOf(false); private set
+    var sortMode by mutableStateOf(SortMode.MODIFIED); private set
+    var query by mutableStateOf("")
 
     // Open editor state. openUri == null → file-list screen.
     var openUri by mutableStateOf<Uri?>(null); private set
@@ -47,9 +51,58 @@ class ScribeViewModel(app: Application) : AndroidViewModel(app) {
             val fname = repo.folderName(uri)
             withContext(Dispatchers.Main) {
                 notes.clear()
-                notes.addAll(list)
+                notes.addAll(sorted(list))
                 folderName = fname
                 loading = false
+            }
+        }
+    }
+
+    private fun sorted(list: List<NoteRef>): List<NoteRef> = when (sortMode) {
+        SortMode.MODIFIED -> list.sortedByDescending { it.modified }
+        SortMode.NAME -> list.sortedBy { it.name.lowercase() }
+    }
+
+    fun toggleSort() {
+        sortMode = if (sortMode == SortMode.MODIFIED) SortMode.NAME else SortMode.MODIFIED
+        val current = notes.toList()
+        notes.clear()
+        notes.addAll(sorted(current))
+    }
+
+    /** Notes filtered by the current query (filename match, instant — no file
+     *  reads, so the list stays cheap to filter). */
+    fun visible(): List<NoteRef> {
+        val q = query.trim()
+        return if (q.isEmpty()) notes else notes.filter { it.name.contains(q, ignoreCase = true) }
+    }
+
+    fun rename(ref: NoteRef, newName: String) {
+        val name = newName.trim()
+        if (name.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            val ok = repo.rename(ref.uri, ref.name, name)
+            withContext(Dispatchers.Main) {
+                if (ok) refresh() else message = "Rename failed (name in use?)"
+            }
+        }
+    }
+
+    fun delete(ref: NoteRef) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val ok = repo.delete(ref.uri)
+            withContext(Dispatchers.Main) {
+                if (ok) refresh() else message = "Delete failed"
+            }
+        }
+    }
+
+    fun duplicate(ref: NoteRef) {
+        val uri = folderUri ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            val copy = repo.duplicate(uri, ref)
+            withContext(Dispatchers.Main) {
+                if (copy != null) refresh() else message = "Duplicate failed"
             }
         }
     }
