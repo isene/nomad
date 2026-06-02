@@ -2,6 +2,7 @@ package com.isene.relay
 
 import android.content.Context
 import java.io.File
+import org.json.JSONObject
 
 /**
  * Shared config + paths for the notification gateway. The gateway dir is a
@@ -16,6 +17,11 @@ object Gateway {
     const val KEY_DIR = "gateway_dir"
     const val KEY_ALLOW = "allowlist"
     const val KEY_SMS = "sms_enabled"
+    // Custom apps the user adds at runtime (package -> display label), stored
+    // as a JSON object. Kept out of PLATFORMS so app-specific identifiers
+    // (e.g. an employer's internal chat app) live only on the device, never
+    // in the source tree.
+    const val KEY_CUSTOM = "custom_apps"
 
     val DEFAULT_DIR = "/storage/emulated/0/Documents/kastrup-gw"
 
@@ -52,6 +58,44 @@ object Gateway {
 
     fun setAllow(c: Context, pkgs: Set<String>) =
         prefs(c).edit().putStringSet(KEY_ALLOW, pkgs).apply()
+
+    // ---- custom apps (runtime-added; package -> display label) ----
+
+    fun customApps(c: Context): Map<String, String> {
+        val raw = prefs(c).getString(KEY_CUSTOM, null) ?: return emptyMap()
+        return try {
+            val o = JSONObject(raw)
+            buildMap { o.keys().forEach { put(it, o.optString(it)) } }
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    fun addCustomApp(c: Context, pkg: String, label: String) {
+        val o = JSONObject()
+        customApps(c).forEach { (k, v) -> o.put(k, v) }
+        o.put(pkg, label)
+        prefs(c).edit().putString(KEY_CUSTOM, o.toString()).apply()
+    }
+
+    fun removeCustomApp(c: Context, pkg: String) {
+        val o = JSONObject()
+        customApps(c).filterKeys { it != pkg }.forEach { (k, v) -> o.put(k, v) }
+        prefs(c).edit().putString(KEY_CUSTOM, o.toString()).apply()
+    }
+
+    /** A custom app is captured whenever it's present (added == enabled). */
+    fun isAllowed(c: Context, pkg: String): Boolean =
+        pkg in allow(c) || customApps(c).containsKey(pkg)
+
+    /** Platform slug for a package: a built-in name, or a slug derived from a
+     *  custom app's label (lowercase, hyphenated). Null if the app is neither. */
+    fun platformFor(c: Context, pkg: String): String? {
+        PLATFORMS[pkg]?.let { return it }
+        val label = customApps(c)[pkg] ?: return null
+        val slug = label.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-')
+        return slug.ifEmpty { pkg.substringAfterLast('.') }
+    }
 
     /** Native SMS (RECEIVE_SMS broadcast + SmsManager send), separate from the
      *  notification allowlist. Off until the user toggles it + grants perms. */

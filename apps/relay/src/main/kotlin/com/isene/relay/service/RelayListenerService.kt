@@ -82,8 +82,8 @@ class RelayListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val ctx = applicationContext
         val pkg = sbn.packageName
-        if (pkg !in Gateway.allow(ctx)) return
-        val platform = Gateway.PLATFORMS[pkg] ?: return
+        if (!Gateway.isAllowed(ctx, pkg)) return
+        val platform = Gateway.platformFor(ctx, pkg) ?: return
         val n = sbn.notification ?: return
 
         // Drop group-summary rollups ("N messages from M chats") — they aren't
@@ -148,7 +148,7 @@ class RelayListenerService : NotificationListenerService() {
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        val platform = Gateway.PLATFORMS[sbn.packageName] ?: return
+        val platform = Gateway.platformFor(applicationContext, sbn.packageName) ?: return
         val n = sbn.notification ?: return
         val rawTitle = NotificationCompat.MessagingStyle
             .extractMessagingStyleFromNotification(n)?.conversationTitle?.toString()

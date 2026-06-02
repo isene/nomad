@@ -17,7 +17,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -36,6 +40,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -106,6 +111,8 @@ private fun RelayScreen() {
     var allow by remember(refresh) { mutableStateOf(Gateway.allow(ctx)) }
     var smsOn by remember(refresh) { mutableStateOf(Gateway.smsEnabled(ctx) && smsPermsGranted(ctx)) }
     var showAbout by remember { mutableStateOf(false) }
+    var customApps by remember(refresh) { mutableStateOf(Gateway.customApps(ctx)) }
+    var showAddApp by remember { mutableStateOf(false) }
 
     val smsPermLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
@@ -251,6 +258,26 @@ private fun RelayScreen() {
                 )
             }
 
+            // Custom apps the user added (e.g. a work chat app). Each shows
+            // with a switch; turning it off removes it.
+            customApps.forEach { (pkg, label) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    Switch(
+                        checked = true,
+                        onCheckedChange = {
+                            Gateway.removeCustomApp(ctx, pkg)
+                            customApps = Gateway.customApps(ctx)
+                        },
+                    )
+                }
+            }
+            Spacer(Modifier.size(8.dp))
+            OutlinedButton(onClick = { showAddApp = true }) { Text("Add app…") }
+
             Spacer(Modifier.size(24.dp))
             Button(onClick = { showAbout = true }) { Text("About") }
         }
@@ -295,6 +322,50 @@ private fun RelayScreen() {
             },
         )
     }
+
+    if (showAddApp) {
+        val apps = remember {
+            launchableApps(ctx).filter {
+                it.first !in Gateway.PLATFORMS && it.first !in customApps
+            }
+        }
+        AlertDialog(
+            onDismissRequest = { showAddApp = false },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { showAddApp = false }) { Text("Cancel") } },
+            title = { Text("Add an app to relay") },
+            text = {
+                LazyColumn(modifier = Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+                    items(apps) { (pkg, label) ->
+                        Text(
+                            label,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    Gateway.addCustomApp(ctx, pkg, label)
+                                    customApps = Gateway.customApps(ctx)
+                                    showAddApp = false
+                                }
+                                .padding(vertical = 12.dp),
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                }
+            },
+        )
+    }
+}
+
+/** Installed launchable apps (package -> label), sorted by label. Visible
+ *  thanks to the <queries> launcher intent in the manifest. */
+private fun launchableApps(ctx: android.content.Context): List<Pair<String, String>> {
+    val pm = ctx.packageManager
+    val intent = Intent(Intent.ACTION_MAIN, null).addCategory(Intent.CATEGORY_LAUNCHER)
+    return pm.queryIntentActivities(intent, 0)
+        .map { it.activityInfo.packageName to it.loadLabel(pm).toString() }
+        .distinctBy { it.first }
+        .filter { it.first != ctx.packageName }
+        .sortedBy { it.second.lowercase() }
 }
 
 @Composable

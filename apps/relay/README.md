@@ -4,7 +4,7 @@
 
 # relay
 
-![version](https://img.shields.io/badge/version-0.3.5-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.3.6-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A phone-side notification gateway that feeds [kastrup](https://github.com/isene/kastrup) — part of the [nomad](../../) mobile suite.
 
@@ -19,6 +19,8 @@ replacing the headless Firefox/Marionette session kastrup used to drive.
 
 - **NotificationListenerService** captures incoming messages from an allowlist:
   WhatsApp, Messenger, Instagram, SMS (native), Discord, LinkedIn, and Reddit
+- **Add app…** — pick any other installed chat app to relay it too (stored in
+  on-device prefs, so app-specific identifiers never enter the repo)
 - Writes each as uniform JSON into a [Syncthing](https://syncthing.net)-shared
   `inbound/` folder that kastrup drains
 - **Direct Reply** — kastrup queues a reply into `outbox/`, relay fires the
