@@ -4,7 +4,7 @@
 
 # xrpn
 
-![version](https://img.shields.io/badge/version-0.3.6-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.3.7-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A pocket HP-41 RPN scientific calculator — mobile companion to [XRPN](https://github.com/isene/xrpn). Part of the [nomad](../../) mobile suite.
 
@@ -22,6 +22,8 @@ The XRPN calculator, faithful to the desktop down to the number formatting.
 - **HP-41-style keypad** — wide ENTER top-left, and a **multi-shift** key that
   cycles coloured command pages (primary / f / g / modes) to reach the whole set
 - HP-style pending prefix (STO then a digit), plus a command line for the long tail
+- **Alpha register** — type `"text"` to set it (`>"x"` / `"|x"` to append) and
+  the alpha command set: ALENG, AROT, ASHF, XTOA, ATOX, ANUM, ARCL, ASTO, POSA, CLA
 - **State persists** across launches (stack, registers, flags, mode)
 - **FOCAL program runner** — load `.xrpn` programs from a Syncthing-synced
   folder and RUN / single-step them: labels, GTO/XEQ/RTN/END, conditionals,

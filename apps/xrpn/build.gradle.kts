@@ -112,8 +112,8 @@ android {
         applicationId = "com.isene.xrpn"
         minSdk = 33
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.3.6"
+        versionCode = 10
+        versionName = "0.3.7"
         ndk { abiFilters += androidAbis.keys }
     }
 

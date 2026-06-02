@@ -248,6 +248,9 @@ fun CalcScreen(vm: CalcViewModel) {
                             "the tag shows the active page.\n" +
                             "• Two-key commands (STO, RCL, FIX…) prompt for a digit.\n" +
                             "• The command line (bottom) takes any XRPN command by name.\n" +
+                            "• Alpha: type \"text\" to set the Alpha register (>\"x\" or " +
+                            "\"|x\" to append); ALENG, AROT, XTOA, ATOX, ANUM, ARCL, ASTO, " +
+                            "POSA and CLA work on it.\n" +
                             "• PRGM: pick your synced .xrpn folder and load a program; " +
                             "R/S runs or resumes it.\n" +
                             "• Stack, registers, flags and mode persist between launches.",
@@ -380,7 +383,7 @@ private fun CommandLine(vm: CalcViewModel) {
         modifier = Modifier.fillMaxWidth().height(64.dp),
         singleLine = true,
         textStyle = androidx.compose.ui.text.TextStyle(fontFamily = FontFamily.Monospace, fontSize = 15.sp),
-        placeholder = { Text("command  (sto 25, fix 2, dechex…)", fontSize = 12.sp) },
+        placeholder = { Text("command  (\"text\", arcl 5, anum, sto 25…)", fontSize = 12.sp) },
         // Opaque field so it never shows the keypad through it; no autocorrect
         // (commands aren't words — the IME suggestion strip used to draw a
         // ghost label over the keys).

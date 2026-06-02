@@ -18,6 +18,11 @@ pub struct CalcState {
     pub alpha: String,
     /// Numbered registers, keyed by index as a string ("0".."n"). Sparse.
     pub reg: HashMap<String, f64>,
+    /// Alpha (string) register store: where ASTO parks the Alpha register and
+    /// ARCL recalls it. Separate from `reg` because the numeric stack/registers
+    /// can't hold text. Keyed like `reg`. Sparse; defaulted for old states.
+    #[serde(default)]
+    pub areg: HashMap<String, String>,
     /// Statistics summation registers live at srg.. (XRPN default 11).
     pub stat_base: i32,
     pub flags: HashMap<String, bool>,
@@ -65,6 +70,7 @@ pub fn new_state() -> CalcState {
         l: 0.0,
         alpha: String::new(),
         reg: HashMap::new(),
+        areg: HashMap::new(),
         stat_base: 11,
         flags,
         decimals: 4,
@@ -317,6 +323,27 @@ fn from_rad(s: &CalcState, v: f64) -> f64 {
 pub fn execute(mut state: CalcState, command: String) -> StepResult {
     commit_entry(&mut state);
     let cmd = command.trim();
+
+    // Alpha-register entry (XRPN string literals, case + spaces preserved):
+    //   "text"        set Alpha
+    //   >"text"       append to Alpha
+    //   "|text"       append to Alpha
+    if let Some(rest) = cmd.strip_prefix(">\"") {
+        state.alpha.push_str(rest.trim_end_matches('"'));
+        state.lift_enabled = true;
+        return StepResult { state, error: None };
+    }
+    if let Some(rest) = cmd.strip_prefix("\"|") {
+        state.alpha.push_str(rest.trim_end_matches('"'));
+        state.lift_enabled = true;
+        return StepResult { state, error: None };
+    }
+    if cmd.starts_with('"') {
+        state.alpha = cmd.trim_matches('"').to_string();
+        state.lift_enabled = true;
+        return StepResult { state, error: None };
+    }
+
     let (name, arg) = split_arg(cmd);
     let mut err: Option<String> = None;
 
@@ -583,7 +610,98 @@ pub fn execute(mut state: CalcState, command: String) -> StepResult {
                 }
             } else { err = Some("OCTDEC needs octal in Alpha or as arg".into()); }
         }
+        // ----- alpha register manipulation
         "cla" => state.alpha = String::new(),
+        // AVIEW is a no-op here: the Alpha register is always shown on screen.
+        "aview" | "avi" | "aviewc" | "aon" | "aoff" | "prompt" | "pse" => {}
+        "aleng" => {
+            let n = state.alpha.chars().count() as f64;
+            push_value(&mut state, n);
+        }
+        "ashf" => {
+            state.alpha = state.alpha.chars().skip(6).collect();
+        }
+        "arot" => {
+            let chars: Vec<char> = state.alpha.chars().collect();
+            let len = chars.len();
+            if len > 0 {
+                let n = state.x as i64;
+                // positive => rotate left, negative => rotate right
+                let shift = (((n % len as i64) + len as i64) % len as i64) as usize;
+                let rotated: String =
+                    chars[shift..].iter().chain(chars[..shift].iter()).collect();
+                state.alpha = rotated;
+            }
+        }
+        "xtoa" => {
+            let code = state.x as u32;
+            match char::from_u32(code) {
+                Some(c) => state.alpha.push(c),
+                None => err = Some("XTOA: X is not a valid character code".into()),
+            }
+        }
+        "atox" => {
+            match state.alpha.chars().next() {
+                Some(c) => {
+                    push_value(&mut state, c as u32 as f64);
+                    state.alpha = state.alpha.chars().skip(1).collect();
+                }
+                None => err = Some("ATOX: Alpha is empty".into()),
+            }
+        }
+        "anum" => match first_number(&state.alpha, comma(&state)) {
+            Some(v) => push_value(&mut state, v),
+            None => err = Some("ANUM: no number in Alpha".into()),
+        },
+        "posa" => {
+            // Numeric-stack variant: X is a character code; report its 1-based
+            // position in Alpha (0 if absent). The string-pattern form needs
+            // text on the stack, which the numeric stack can't hold.
+            state.l = state.x;
+            let code = state.x as u32;
+            let pos = char::from_u32(code)
+                .and_then(|target| state.alpha.chars().position(|c| c == target))
+                .map(|i| i as f64 + 1.0)
+                .unwrap_or(0.0);
+            state.x = pos;
+        }
+        "asto" => {
+            if let Some(r) = arg.as_deref() {
+                match r.to_lowercase().as_str() {
+                    "x" | "y" | "z" | "t" | "l" => {
+                        err = Some("ASTO to the stack needs Alpha on the stack (unsupported on the numeric stack)".into());
+                    }
+                    _ => {
+                        state.areg.insert(r.to_string(), state.alpha.clone());
+                    }
+                }
+            } else {
+                err = Some("ASTO needs a register".into());
+            }
+        }
+        "arcl" => {
+            if let Some(r) = arg.as_deref() {
+                match r.to_lowercase().as_str() {
+                    "x" => state.alpha.push_str(&fmt(&state, state.x)),
+                    "y" => state.alpha.push_str(&fmt(&state, state.y)),
+                    "z" => state.alpha.push_str(&fmt(&state, state.z)),
+                    "t" => state.alpha.push_str(&fmt(&state, state.t)),
+                    "l" => state.alpha.push_str(&fmt(&state, state.l)),
+                    _ => {
+                        if let Some(s) = state.areg.get(r) {
+                            let s = s.clone();
+                            state.alpha.push_str(&s);
+                        } else if let Some(&v) = state.reg.get(r) {
+                            state.alpha.push_str(&fmt(&state, v));
+                        } else {
+                            err = Some(format!("ARCL: register {} is empty", r));
+                        }
+                    }
+                }
+            } else {
+                err = Some("ARCL needs a register".into());
+            }
+        }
         _ => {
             err = Some(format!("No such command: {}", name));
         }
@@ -638,6 +756,25 @@ fn toggle_flag(s: &mut CalcState, f: &str) {
 
 fn nonempty(s: &str) -> Option<String> {
     if s.is_empty() { None } else { Some(s.to_string()) }
+}
+
+/// First numeric token in a string (ANUM). Mirrors desktop XRPN: grab the
+/// first run of digits / separators / exponent, then parse (comma→dot when
+/// comma is the decimal separator).
+fn first_number(a: &str, comma_decimal: bool) -> Option<f64> {
+    let mut tok = String::new();
+    for c in a.chars() {
+        if c.is_ascii_digit() || c == '.' || c == ',' || c == 'e' || c == 'E' {
+            tok.push(c);
+        } else if !tok.is_empty() {
+            break;
+        }
+    }
+    if tok.is_empty() {
+        return None;
+    }
+    let norm = if comma_decimal { tok.replace(',', ".") } else { tok };
+    norm.parse::<f64>().ok()
 }
 
 fn reg_key(r: &str) -> String {
@@ -741,6 +878,69 @@ mod tests {
         s = typed(s, "3");
         s = execute(s, "+".into()).state;
         assert_eq!(s.x, 8.0);
+    }
+
+    #[test]
+    fn alpha_entry_set_and_append() {
+        let mut s = new_state();
+        s = run(s, &["\"Hello\""]);
+        assert_eq!(s.alpha, "Hello");
+        s = run(s, &[">\" World\""]); // append form
+        assert_eq!(s.alpha, "Hello World");
+        s = run(s, &["\"|!\""]); // other append form
+        assert_eq!(s.alpha, "Hello World!");
+        s = run(s, &["cla"]);
+        assert_eq!(s.alpha, "");
+    }
+
+    #[test]
+    fn alpha_aleng_arot_ashf() {
+        let mut s = new_state();
+        s = run(s, &["\"ABCDE\"", "aleng"]);
+        assert_eq!(s.x, 5.0);
+        // rotate left by 2 -> CDEAB
+        s = typed(s, "2");
+        s = run(s, &["arot"]);
+        assert_eq!(s.alpha, "CDEAB");
+        // shift drops first 6 (here all 5) -> empty
+        s = run(s, &["\"ABCDEFGH\"", "ashf"]);
+        assert_eq!(s.alpha, "GH");
+    }
+
+    #[test]
+    fn alpha_xtoa_atox_anum() {
+        let mut s = new_state();
+        s = typed(s, "65"); // 'A'
+        s = run(s, &["xtoa"]);
+        assert_eq!(s.alpha, "A");
+        // atox pops the 'A' code back to X
+        s = run(s, &["atox"]);
+        assert_eq!(s.x, 65.0);
+        assert_eq!(s.alpha, "");
+        // anum pulls the first number out of free text
+        s = run(s, &["\"qty 42 left\"", "anum"]);
+        assert_eq!(s.x, 42.0);
+    }
+
+    #[test]
+    fn alpha_asto_arcl_roundtrip_and_number() {
+        let mut s = new_state();
+        // store/recall an alpha string via a numbered register
+        s = run(s, &["\"Tag\"", "asto 5", "cla", "arcl 5"]);
+        assert_eq!(s.alpha, "Tag");
+        // ARCL of a numeric register appends the formatted value
+        s = typed(s, "3");
+        s = run(s, &["sto 7", "cla", "\"n=\"", "arcl 7"]);
+        assert_eq!(s.alpha, "n=3,0000"); // comma decimal, FIX 4 default
+    }
+
+    #[test]
+    fn alpha_posa_charcode() {
+        let mut s = new_state();
+        s = run(s, &["\"ABC\""]);
+        s = typed(s, "66"); // 'B'
+        s = run(s, &["posa"]);
+        assert_eq!(s.x, 2.0); // 1-based
     }
 
     #[test]
