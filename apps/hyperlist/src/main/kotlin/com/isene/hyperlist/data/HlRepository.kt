@@ -19,17 +19,21 @@ import uniffi.fe2o3_mobile_core.serializeDoc
  */
 class HlRepository(private val context: Context) {
 
-    fun load(uri: Uri): HlDoc {
-        val text = context.contentResolver.openInputStream(uri)?.use { input ->
+    fun load(uri: Uri): HlDoc = parseDoc(loadRaw(uri))
+
+    fun save(uri: Uri, doc: HlDoc) = saveRaw(uri, serializeDoc(doc))
+
+    /** Raw file text — used by the encryption path, which inspects/transforms
+     *  the bytes (ENC: envelope) before parsing. */
+    fun loadRaw(uri: Uri): String =
+        context.contentResolver.openInputStream(uri)?.use { input ->
             input.bufferedReader(Charsets.UTF_8).readText()
         } ?: throw IOException("could not open $uri for read")
-        return parseDoc(text)
-    }
 
-    fun save(uri: Uri, doc: HlDoc) {
-        val payload = serializeDoc(doc).toByteArray(Charsets.UTF_8)
-        context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(payload) }
-            ?: throw IOException("could not open $uri for write")
+    fun saveRaw(uri: Uri, text: String) {
+        context.contentResolver.openOutputStream(uri, "wt")?.use {
+            it.write(text.toByteArray(Charsets.UTF_8))
+        } ?: throw IOException("could not open $uri for write")
     }
 
     fun lastModified(uri: Uri): Long =

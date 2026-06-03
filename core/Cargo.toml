@@ -20,6 +20,19 @@ orbit = { path = "../../orbit", package = "fe2o3-orbit" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+# HyperList .p.hl encryption — byte-compatible with desktop scribe / the Ruby
+# hyperlist app: AES-256-CBC, PBKDF2-HMAC-SHA256(pw, salt, 10000, 32),
+# payload = "ENC:" + base64(salt[16] || iv[16] || ciphertext). All pure Rust,
+# cross-compile cleanly to Android.
+aes = "0.8"
+cbc = { version = "0.1", features = ["block-padding"] }
+cipher = { version = "0.4", features = ["block-padding", "alloc"] }
+pbkdf2 = { version = "0.12", default-features = false }
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.22"
+getrandom = "0.2"
+
 [build-dependencies]
 uniffi = { version = "0.28", features = ["build"] }
 

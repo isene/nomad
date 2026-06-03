@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
@@ -50,11 +51,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -71,6 +74,8 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -151,6 +156,13 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
     var overflowOpen by remember { mutableStateOf(false) }
     var pendingScroll by remember { mutableStateOf<Int?>(null) }
     var draggedLine by remember { mutableStateOf<Int?>(null) }
+    var showPasswordDialog by remember { mutableStateOf(false) }
+    var encryptDialog by remember { mutableStateOf(false) }
+
+    // Pop the unlock prompt automatically whenever a file is locked.
+    LaunchedEffect(state.awaitingPassword) {
+        if (state.awaitingPassword) showPasswordDialog = true
+    }
 
     // `order` is the live, drag-reorderable list of visible doc-line indices.
     // It is rebuilt from (doc, folded) whenever those change (i.e. NOT during a
@@ -204,6 +216,13 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
                             enabled = state.pickedUri != null,
                             onClick = { overflowOpen = false; vm.renumberDoc() },
                         )
+                        if (state.pickedUri != null && !state.encrypted && !state.awaitingPassword) {
+                            DropdownMenuItem(
+                                text = { Text("Encrypt…") },
+                                leadingIcon = { Icon(Icons.Filled.Lock, null) },
+                                onClick = { overflowOpen = false; encryptDialog = true },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("About") },
                             leadingIcon = { Icon(Icons.Filled.Info, null) },
@@ -217,7 +236,7 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
             )
         },
         bottomBar = {
-            if (state.pickedUri != null) {
+            if (state.pickedUri != null && !state.awaitingPassword) {
                 EditorToolbar(
                     enabled = state.selected != null,
                     onIndent = { vm.indentSelected() },
@@ -234,6 +253,11 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
     ) { inner ->
         if (state.pickedUri == null) {
             EmptyState(onPick = { picker.launch(arrayOf("*/*")) }, modifier = Modifier.padding(inner))
+        } else if (state.awaitingPassword) {
+            LockedView(
+                modifier = Modifier.padding(inner),
+                onUnlock = { showPasswordDialog = true },
+            )
         } else {
             LazyColumn(
                 state = listState,
@@ -319,6 +343,72 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
     if (showAbout) {
         AboutDialog(onDismiss = { showAbout = false })
     }
+    if (showPasswordDialog) {
+        PasswordDialog(
+            title = "Unlock encrypted file",
+            confirmLabel = "Unlock",
+            onDismiss = { showPasswordDialog = false },
+            onConfirm = { pw -> showPasswordDialog = false; vm.submitPassword(pw) },
+        )
+    }
+    if (encryptDialog) {
+        PasswordDialog(
+            title = "Encrypt with password",
+            confirmLabel = "Encrypt",
+            onDismiss = { encryptDialog = false },
+            onConfirm = { pw -> encryptDialog = false; vm.encryptWith(pw) },
+        )
+    }
+}
+
+@Composable
+private fun LockedView(modifier: Modifier = Modifier, onUnlock: () -> Unit) {
+    Column(
+        modifier = modifier.fillMaxSize().padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            Icons.Filled.Lock,
+            contentDescription = null,
+            modifier = Modifier.size(48.dp),
+            tint = MaterialTheme.colorScheme.primary,
+        )
+        Spacer(Modifier.size(12.dp))
+        Text("Encrypted file", style = MaterialTheme.typography.titleMedium)
+        Spacer(Modifier.size(16.dp))
+        Button(onClick = onUnlock) { Text("Enter password") }
+    }
+}
+
+@Composable
+private fun PasswordDialog(
+    title: String,
+    confirmLabel: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+) {
+    var pw by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            OutlinedTextField(
+                value = pw,
+                onValueChange = { pw = it },
+                singleLine = true,
+                label = { Text("Password") },
+                visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = { if (pw.isNotEmpty()) onConfirm(pw) }, enabled = pw.isNotEmpty()) {
+                Text(confirmLabel)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @Composable

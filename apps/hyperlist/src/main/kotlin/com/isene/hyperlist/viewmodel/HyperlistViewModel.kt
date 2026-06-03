@@ -14,6 +14,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.fe2o3_mobile_core.HlDoc
 import uniffi.fe2o3_mobile_core.LineSpans
+import uniffi.fe2o3_mobile_core.hlDecrypt
+import uniffi.fe2o3_mobile_core.hlEncrypt
+import uniffi.fe2o3_mobile_core.isEncrypted
 import uniffi.fe2o3_mobile_core.deleteSubtree
 import uniffi.fe2o3_mobile_core.highlightDoc
 import uniffi.fe2o3_mobile_core.indentSubtree
@@ -22,8 +25,10 @@ import uniffi.fe2o3_mobile_core.moveSubtreeBefore
 import uniffi.fe2o3_mobile_core.moveSubtreeDown
 import uniffi.fe2o3_mobile_core.moveSubtreeUp
 import uniffi.fe2o3_mobile_core.outdentSubtree
+import uniffi.fe2o3_mobile_core.parseDoc
 import uniffi.fe2o3_mobile_core.renumber
 import uniffi.fe2o3_mobile_core.resolveReference
+import uniffi.fe2o3_mobile_core.serializeDoc
 import uniffi.fe2o3_mobile_core.setLineText
 import uniffi.fe2o3_mobile_core.toggleCheckbox
 
@@ -38,6 +43,11 @@ data class UiState(
     val folded: Set<Int> = emptySet(),
     val selected: Int? = null,
     val toast: String? = null,
+    /** The open file is an encrypted .p.hl (ENC: envelope). Saves re-encrypt. */
+    val encrypted: Boolean = false,
+    /** An encrypted file is open but not yet unlocked — show the password
+     *  prompt and keep the (empty) doc hidden. */
+    val awaitingPassword: Boolean = false,
 )
 
 class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
@@ -49,6 +59,9 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     private var lastSeenMtime: Long = 0L
+    /** In-memory password for an encrypted file. Never persisted to prefs or
+     *  disk; lost on process death (the user re-enters it). */
+    private var password: String? = null
 
     init {
         prefs.getString(KEY_URI, null)?.let { uriStr ->
@@ -78,18 +91,90 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
         reload()
     }
 
+    /** Open a file handed in by another app (VIEW/EDIT of a .hl), for the
+     *  session only — does NOT replace the user's default file in prefs. */
+    fun openExternal(uri: Uri) {
+        try {
+            getApplication<Application>().contentResolver.takePersistableUriPermission(
+                uri,
+                android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    android.content.Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+        } catch (_: SecurityException) {
+            // Transient grant from the intent still covers this session.
+        }
+        password = null
+        _state.value = _state.value.copy(
+            pickedUri = uri,
+            displayName = repo.displayName(uri),
+            folded = emptySet(),
+            selected = null,
+            encrypted = false,
+            awaitingPassword = false,
+        )
+        reload()
+    }
+
     fun reload() {
         val uri = _state.value.pickedUri ?: return
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val doc = repo.load(uri)
+                val raw = repo.loadRaw(uri)
                 lastSeenMtime = repo.lastModified(uri)
-                val spans = highlightDoc(doc.lines.map { it.text })
-                _state.value = _state.value.copy(doc = doc, spans = spans, folded = emptySet())
+                if (isEncrypted(raw)) {
+                    val pw = password
+                    if (pw == null) {
+                        // Locked: show the password prompt, keep content hidden.
+                        _state.value = _state.value.copy(
+                            doc = HlDoc(emptyList()), spans = emptyList(), folded = emptySet(),
+                            selected = null, encrypted = true, awaitingPassword = true,
+                        )
+                        return@launch
+                    }
+                    val plain = hlDecrypt(raw, pw)
+                    if (plain == null) {
+                        password = null
+                        _state.value = _state.value.copy(
+                            doc = HlDoc(emptyList()), spans = emptyList(),
+                            encrypted = true, awaitingPassword = true,
+                            toast = "Wrong password",
+                        )
+                        return@launch
+                    }
+                    val doc = parseDoc(plain)
+                    _state.value = _state.value.copy(
+                        doc = doc, spans = highlightDoc(doc.lines.map { it.text }),
+                        folded = emptySet(), encrypted = true, awaitingPassword = false,
+                    )
+                } else {
+                    password = null
+                    val doc = parseDoc(raw)
+                    _state.value = _state.value.copy(
+                        doc = doc, spans = highlightDoc(doc.lines.map { it.text }),
+                        folded = emptySet(), encrypted = false, awaitingPassword = false,
+                    )
+                }
             } catch (e: Exception) {
                 _state.value = _state.value.copy(toast = "Load failed: ${e.message}")
             }
         }
+    }
+
+    /** Submit a password for the locked file: re-run load with it. */
+    fun submitPassword(pw: String) {
+        if (pw.isEmpty()) return
+        password = pw
+        reload()
+    }
+
+    /** Encrypt the currently-open plaintext file with `pw` (turns it into a
+     *  .p.hl-style ENC: file on the next save, which we trigger now). */
+    fun encryptWith(pw: String) {
+        if (pw.isEmpty()) return
+        password = pw
+        _state.value = _state.value.copy(encrypted = true)
+        persist()
+        _state.value = _state.value.copy(toast = "Encrypted")
     }
 
     fun reloadIfChanged() {
@@ -257,11 +342,24 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun persist() {
-        val uri = _state.value.pickedUri ?: return
-        val doc = _state.value.doc
+        val s = _state.value
+        val uri = s.pickedUri ?: return
+        // Never write while a file is still locked — that would clobber the
+        // encrypted content with an empty plaintext doc.
+        if (s.awaitingPassword) return
+        val doc = s.doc
+        val enc = s.encrypted
+        val pw = password
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                repo.save(uri, doc)
+                if (enc) {
+                    val plain = serializeDoc(doc)
+                    val blob = hlEncrypt(plain, pw ?: "")
+                        ?: throw RuntimeException("encryption failed")
+                    repo.saveRaw(uri, blob)
+                } else {
+                    repo.save(uri, doc)
+                }
                 lastSeenMtime = repo.lastModified(uri)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {

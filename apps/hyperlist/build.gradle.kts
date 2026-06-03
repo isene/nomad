@@ -121,8 +121,8 @@ android {
         applicationId = "com.isene.hyperlist"
         minSdk = 33
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.1.2"
+        versionCode = 5
+        versionName = "0.2.0"
         ndk { abiFilters += androidAbis.keys }
     }
 
