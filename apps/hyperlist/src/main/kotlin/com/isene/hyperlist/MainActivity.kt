@@ -16,7 +16,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        handleIntent(intent)
+        // If launched to view a specific .hl, open it; otherwise restore the
+        // user's default file. Never both (the restore would race the intent).
+        if (!handleIntent(intent)) vm.restoreLast()
         setContent {
             HyperlistTheme { HyperlistScreen(vm) }
         }
@@ -29,11 +31,15 @@ class MainActivity : ComponentActivity() {
     }
 
     /** Launched to view/edit a .hl from another app: open that document for
-     *  the session (encrypted .p.hl prompts for a password). */
-    private fun handleIntent(intent: Intent?) {
-        if (intent == null) return
+     *  the session (encrypted .p.hl prompts for a password). Returns true if it
+     *  consumed a file intent. */
+    private fun handleIntent(intent: Intent?): Boolean {
+        if (intent == null) return false
         if (intent.action == Intent.ACTION_VIEW || intent.action == Intent.ACTION_EDIT) {
-            intent.data?.let { vm.openExternal(it) }
+            val uri = intent.data ?: return false
+            vm.openExternal(uri)
+            return true
         }
+        return false
     }
 }

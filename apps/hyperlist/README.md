@@ -4,7 +4,7 @@
 
 # hyperlist
 
-![version](https://img.shields.io/badge/version-0.2.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.3.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A general [HyperList](https://isene.org/hyperlist/) editor for the phone — part of the [nomad](../../) mobile suite.
 
@@ -25,10 +25,12 @@ HyperList handling on the laptop. Where `tasks` is the fixed 2-level todo,
 - **Drag-reorder across depth** — move a collapsed item and its children as one
 - Auto-renumber numbered siblings
 - Path-aware reference resolution (`<Item/Sub/Identifier>`)
-- **Encrypted `.p.hl` files** — opens an `ENC:` file by prompting for a
-  password and re-encrypts on save; byte-compatible with scribe's scheme
-  (AES-256-CBC, PBKDF2-HMAC-SHA256), so the same password files open on laptop
-  and phone. "Encrypt…" in the ⋮ menu locks a plaintext file.
+- **Encrypted `.p.hl` files** — opens an encrypted file by prompting for a
+  password, then re-encrypts in the same envelope on save. Handles both desktop
+  schemes: scribe's `ENC:` and the vim HyperList plugin's `openssl aes-256-cbc
+  -pbkdf2 -salt` (both AES-256-CBC, PBKDF2-HMAC-SHA256). So the same password
+  file opens on laptop and phone, whichever tool wrote it. "Encrypt…" in the ⋮
+  menu locks a plaintext file.
 - **Opens `.hl` from any app** — registered as a `.hl` handler (set it the
   default), so tapping a `.hl` in a file manager opens it here
 - SAF file access to the synced folder

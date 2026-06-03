@@ -16,7 +16,9 @@ import uniffi.fe2o3_mobile_core.HlDoc
 import uniffi.fe2o3_mobile_core.LineSpans
 import uniffi.fe2o3_mobile_core.hlDecrypt
 import uniffi.fe2o3_mobile_core.hlEncrypt
+import uniffi.fe2o3_mobile_core.hlEncryptOpenssl
 import uniffi.fe2o3_mobile_core.isEncrypted
+import uniffi.fe2o3_mobile_core.isOpensslEncrypted
 import uniffi.fe2o3_mobile_core.deleteSubtree
 import uniffi.fe2o3_mobile_core.highlightDoc
 import uniffi.fe2o3_mobile_core.indentSubtree
@@ -43,8 +45,12 @@ data class UiState(
     val folded: Set<Int> = emptySet(),
     val selected: Int? = null,
     val toast: String? = null,
-    /** The open file is an encrypted .p.hl (ENC: envelope). Saves re-encrypt. */
+    /** The open file is encrypted. Saves re-encrypt with the in-memory password. */
     val encrypted: Boolean = false,
+    /** The encrypted file uses the openssl `Salted__` envelope (vim hyperlist
+     *  plugin) rather than scribe's `ENC:` one. Saves preserve the format so
+     *  the file stays readable by whichever laptop tool owns it. */
+    val opensslFormat: Boolean = false,
     /** An encrypted file is open but not yet unlocked — show the password
      *  prompt and keep the (empty) doc hidden. */
     val awaitingPassword: Boolean = false,
@@ -62,8 +68,16 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
     /** In-memory password for an encrypted file. Never persisted to prefs or
      *  disk; lost on process death (the user re-enters it). */
     private var password: String? = null
+    /** Monotonic load token. Each reload() bumps it; a coroutine only publishes
+     *  its result if still current. Prevents a stale load (e.g. the init-time
+     *  last-file restore) from clobbering a file opened via an intent. */
+    private var loadSeq: Int = 0
 
-    init {
+    /** Reopen the user's default file from prefs. Called by the Activity only
+     *  when it was NOT launched to view a specific .hl, so an intent-opened
+     *  file is never shadowed by (or races with) the last-file restore. */
+    fun restoreLast() {
+        if (_state.value.pickedUri != null) return
         prefs.getString(KEY_URI, null)?.let { uriStr ->
             val uri = Uri.parse(uriStr)
             _state.value = _state.value.copy(pickedUri = uri, displayName = repo.displayName(uri))
@@ -82,11 +96,15 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
         } catch (_: SecurityException) {
         }
         prefs.edit().putString(KEY_URI, uri.toString()).apply()
+        password = null
         _state.value = _state.value.copy(
             pickedUri = uri,
             displayName = repo.displayName(uri),
             folded = emptySet(),
             selected = null,
+            encrypted = false,
+            opensslFormat = false,
+            awaitingPassword = false,
         )
         reload()
     }
@@ -110,6 +128,7 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
             folded = emptySet(),
             selected = null,
             encrypted = false,
+            opensslFormat = false,
             awaitingPassword = false,
         )
         reload()
@@ -117,44 +136,58 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reload() {
         val uri = _state.value.pickedUri ?: return
+        val seq = ++loadSeq
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val raw = repo.loadRaw(uri)
-                lastSeenMtime = repo.lastModified(uri)
+                val mtime = repo.lastModified(uri)
+                if (seq != loadSeq) return@launch
+                lastSeenMtime = mtime
                 if (isEncrypted(raw)) {
+                    val openssl = isOpensslEncrypted(raw)
                     val pw = password
                     if (pw == null) {
                         // Locked: show the password prompt, keep content hidden.
+                        if (seq != loadSeq) return@launch
                         _state.value = _state.value.copy(
                             doc = HlDoc(emptyList()), spans = emptyList(), folded = emptySet(),
-                            selected = null, encrypted = true, awaitingPassword = true,
+                            selected = null, encrypted = true, opensslFormat = openssl,
+                            awaitingPassword = true,
                         )
                         return@launch
                     }
                     val plain = hlDecrypt(raw, pw)
                     if (plain == null) {
                         password = null
+                        if (seq != loadSeq) return@launch
                         _state.value = _state.value.copy(
                             doc = HlDoc(emptyList()), spans = emptyList(),
-                            encrypted = true, awaitingPassword = true,
+                            encrypted = true, opensslFormat = openssl, awaitingPassword = true,
                             toast = "Wrong password",
                         )
                         return@launch
                     }
                     val doc = parseDoc(plain)
+                    val spans = highlightDoc(doc.lines.map { it.text })
+                    if (seq != loadSeq) return@launch
                     _state.value = _state.value.copy(
-                        doc = doc, spans = highlightDoc(doc.lines.map { it.text }),
-                        folded = emptySet(), encrypted = true, awaitingPassword = false,
+                        doc = doc, spans = spans,
+                        folded = emptySet(), encrypted = true, opensslFormat = openssl,
+                        awaitingPassword = false,
                     )
                 } else {
                     password = null
                     val doc = parseDoc(raw)
+                    val spans = highlightDoc(doc.lines.map { it.text })
+                    if (seq != loadSeq) return@launch
                     _state.value = _state.value.copy(
-                        doc = doc, spans = highlightDoc(doc.lines.map { it.text }),
-                        folded = emptySet(), encrypted = false, awaitingPassword = false,
+                        doc = doc, spans = spans,
+                        folded = emptySet(), encrypted = false, opensslFormat = false,
+                        awaitingPassword = false,
                     )
                 }
             } catch (e: Exception) {
+                if (seq != loadSeq) return@launch
                 _state.value = _state.value.copy(toast = "Load failed: ${e.message}")
             }
         }
@@ -349,12 +382,17 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
         if (s.awaitingPassword) return
         val doc = s.doc
         val enc = s.encrypted
+        val openssl = s.opensslFormat
         val pw = password
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 if (enc) {
                     val plain = serializeDoc(doc)
-                    val blob = hlEncrypt(plain, pw ?: "")
+                    // Re-encrypt in the same envelope the file arrived in, so it
+                    // stays readable by its laptop owner (vim plugin = openssl,
+                    // scribe = ENC:).
+                    val blob = (if (openssl) hlEncryptOpenssl(plain, pw ?: "")
+                                else hlEncrypt(plain, pw ?: ""))
                         ?: throw RuntimeException("encryption failed")
                     repo.saveRaw(uri, blob)
                 } else {
