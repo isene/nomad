@@ -107,6 +107,21 @@ class ScribeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Open a document handed in by another app (VIEW/EDIT intent) straight
+     *  into the editor, bypassing the folder list. Save writes back to it. */
+    fun openExternal(uri: Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val content = runCatching { repo.read(uri) }.getOrElse { "" }
+            val name = repo.displayName(uri) ?: "note"
+            withContext(Dispatchers.Main) {
+                openUri = uri
+                openName = name
+                buffer = content
+                dirty = false
+            }
+        }
+    }
+
     fun open(ref: NoteRef) {
         viewModelScope.launch(Dispatchers.IO) {
             val content = runCatching { repo.read(ref.uri) }.getOrElse { "" }

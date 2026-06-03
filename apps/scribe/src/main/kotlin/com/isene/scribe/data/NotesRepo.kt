@@ -48,6 +48,11 @@ class NotesRepo(private val context: Context) {
     fun folderName(treeUriStr: String): String? =
         DocumentFile.fromTreeUri(context, Uri.parse(treeUriStr))?.name
 
+    /** Display name of a single document URI (e.g. one handed in by another
+     *  app's "edit with" intent). */
+    fun displayName(uri: Uri): String? =
+        DocumentFile.fromSingleUri(context, uri)?.name
+
     /** Rename a note, preserving its extension if the new name omits one. */
     fun rename(uri: Uri, oldName: String, rawName: String): Boolean {
         val doc = DocumentFile.fromSingleUri(context, uri) ?: return false
