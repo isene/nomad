@@ -90,6 +90,13 @@ class RelayListenerService : NotificationListenerService() {
         // real messages, just Android's grouping placeholder. Locale-independent.
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
 
+        // Custom (user-added) apps may not follow the MessagingStyle /
+        // CATEGORY_MESSAGE conventions, so we trust them more (see the filter
+        // below) — but skip their persistent "ongoing" notifications so a
+        // chat app's connected-status banner isn't relayed as a message.
+        val isCustom = pkg !in Gateway.PLATFORMS
+        if (isCustom && n.flags and Notification.FLAG_ONGOING_EVENT != 0) return
+
         val style = NotificationCompat.MessagingStyle
             .extractMessagingStyleFromNotification(n)
         val extras = n.extras
@@ -115,9 +122,10 @@ class RelayListenerService : NotificationListenerService() {
             text = last.text?.toString() ?: ""
             if (last.timestamp > 0) msgTs = last.timestamp
         } else {
-            // No MessagingStyle: only accept if it's explicitly a message, to
-            // filter out IG likes/follows and other non-DM notifications.
-            if (n.category != Notification.CATEGORY_MESSAGE) return
+            // No MessagingStyle: for built-in apps only accept an explicit
+            // message category (filters IG likes/follows etc.). Custom apps the
+            // user opted into are trusted, so we keep their notifications too.
+            if (!isCustom && n.category != Notification.CATEGORY_MESSAGE) return
             sender = title
             text = (extras.getCharSequence(Notification.EXTRA_TEXT)
                 ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT))?.toString() ?: ""
