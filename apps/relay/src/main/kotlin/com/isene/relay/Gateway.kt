@@ -124,7 +124,4 @@ object Gateway {
     fun mediaDir(c: Context) = File(inboundDir(c), "media").apply { mkdirs() }
     fun outboxDir(c: Context) = File(dir(c), "outbox").apply { mkdirs() }
     fun sentDir(c: Context) = File(dir(c), "sent").apply { mkdirs() }
-    /** Diagnostic dumps of custom-app notifications (temporary; for tuning the
-     *  parser against an app's real notification format). */
-    fun debugDir(c: Context) = File(dir(c), "debug").apply { mkdirs() }
 }
