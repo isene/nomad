@@ -127,8 +127,16 @@ class RelayListenerService : NotificationListenerService() {
             // user opted into are trusted, so we keep their notifications too.
             if (!isCustom && n.category != Notification.CATEGORY_MESSAGE) return
             sender = title
-            text = (extras.getCharSequence(Notification.EXTRA_TEXT)
-                ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT))?.toString() ?: ""
+            // Prefer the richest body: InboxStyle lines (some apps list the
+            // actual messages there while the collapsed text stays generic),
+            // then BigText, then the plain text.
+            val inboxLines = extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+                ?.joinToString("\n") { it.toString() }
+                ?.takeIf { it.isNotBlank() }
+            text = inboxLines
+                ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString()
+                ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString()
+                ?: ""
         }
         // Still-image preview, if the notification carries one (BigPictureStyle).
         // Pulled from extras (already materialised, so cheap); only compressed +
