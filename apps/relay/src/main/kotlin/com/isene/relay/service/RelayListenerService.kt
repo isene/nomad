@@ -3,6 +3,7 @@ package com.isene.relay.service
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.RemoteInput
+import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -97,6 +98,11 @@ class RelayListenerService : NotificationListenerService() {
         val isCustom = pkg !in Gateway.PLATFORMS
         if (isCustom && n.flags and Notification.FLAG_ONGOING_EVENT != 0) return
 
+        // DIAGNOSTIC (temporary): dump the full notification for custom apps so
+        // the parser can be tuned to their real format. Written to gateway
+        // debug/; remove once tuned.
+        if (isCustom) dumpNotification(ctx, sbn, n)
+
         val style = NotificationCompat.MessagingStyle
             .extractMessagingStyleFromNotification(n)
         val extras = n.extras
@@ -189,6 +195,56 @@ class RelayListenerService : NotificationListenerService() {
                 return
             }
         }
+    }
+
+    /** DIAGNOSTIC (temporary): write the full notification structure for a
+     *  custom app to gateway debug/, so its real format can be inspected and
+     *  the parser tuned. Remove once done. */
+    private fun dumpNotification(ctx: Context, sbn: StatusBarNotification, n: Notification) {
+        if (!hasStorage()) return
+        try {
+            val extras = n.extras
+            val sb = StringBuilder()
+            sb.append("package: ").append(sbn.packageName).append('\n')
+            sb.append("postTime: ").append(sbn.postTime).append('\n')
+            sb.append("category: ").append(n.category ?: "null").append('\n')
+            sb.append("flags: ").append(n.flags).append('\n')
+            sb.append("template: ").append(extras.getString(Notification.EXTRA_TEMPLATE) ?: "null").append('\n')
+            sb.append("--- extras ---\n")
+            for (key in extras.keySet()) {
+                sb.append(key).append(" = ").append(renderExtra(extras.get(key))).append('\n')
+            }
+            val ms = NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)
+            if (ms != null) {
+                sb.append("--- MessagingStyle ---\n")
+                sb.append("conversationTitle: ").append(ms.conversationTitle ?: "null").append('\n')
+                sb.append("isGroup: ").append(ms.isGroupConversation).append('\n')
+                ms.messages.forEachIndexed { i, m ->
+                    sb.append("msg[").append(i).append("]: person=").append(m.person?.name ?: "null")
+                        .append(" ts=").append(m.timestamp)
+                        .append(" text=").append(m.text ?: "null").append('\n')
+                }
+            }
+            n.actions?.forEachIndexed { i, a ->
+                sb.append("action[").append(i).append("]: title=").append(a.title ?: "null")
+                    .append(" remoteInputs=").append(a.remoteInputs?.size ?: 0).append('\n')
+            }
+            val name = "notif-${sbn.packageName}-${sbn.postTime}.txt"
+            val dir = Gateway.debugDir(ctx)
+            val tmp = File(dir, "$name.tmp")
+            tmp.writeText(sb.toString())
+            if (!tmp.renameTo(File(dir, name))) tmp.delete()
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun renderExtra(v: Any?): String = when (v) {
+        null -> "null"
+        is CharSequence -> v.toString()
+        is Array<*> -> v.joinToString(" | ") { it?.toString() ?: "null" }
+        is android.os.Bundle -> "Bundle{" + v.keySet().joinToString(",") + "}"
+        is android.graphics.Bitmap -> "<bitmap " + v.width + "x" + v.height + ">"
+        else -> v.toString()
     }
 
     private fun writeInbound(
