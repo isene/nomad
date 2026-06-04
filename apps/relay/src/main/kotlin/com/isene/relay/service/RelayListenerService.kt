@@ -32,15 +32,38 @@ import org.json.JSONObject
  *
  * Outbound: a FileObserver on outbox/ (inotify, event-driven — no polling)
  * picks up reply-requests and fires the matching notification's RemoteInput
- * reply action, cached here per conversation.
+ * reply action, cached here per conversation. If the thread has no live action
+ * yet (notification swiped, or never seen this session), the request is held
+ * and retried the next time that thread notifies; every request gets a terminal
+ * sent/failed result in outbox_status/ for kastrup. SMS sends natively and
+ * resolves immediately.
  */
 class RelayListenerService : NotificationListenerService() {
 
     private data class ReplyAction(val intent: PendingIntent, val inputs: Array<RemoteInput>)
 
-    // conversation key -> live reply action (valid only while the notification
-    // is active). Refreshed on each post, evicted on removal.
+    // conversation key -> last-seen reply action. Refreshed on each post and
+    // deliberately NOT evicted when the notification is dismissed: a dismissed
+    // notification's reply PendingIntent usually stays valid a while, which is
+    // what widens the reply window. Bounded — one entry per thread.
     private val replyCache = ConcurrentHashMap<String, ReplyAction>()
+
+    // A reply request from kastrup that couldn't fire yet (no live action for
+    // the thread). Held in memory and retried when the thread next notifies;
+    // the request file on disk is the durable backup across a process restart.
+    private data class PendingReply(
+        val id: String,
+        val platform: String,
+        val threadKey: String,
+        val text: String,
+        val firstSeenMs: Long,
+    )
+
+    // request id -> pending reply awaiting a live notification to fire against.
+    private val pending = ConcurrentHashMap<String, PendingReply>()
+
+    // After this long undelivered, give up and report "failed" to kastrup.
+    private val outboxTtlMs = 24L * 60 * 60 * 1000
 
     // Recently-written message keys, to suppress duplicate inbound files when
     // an app re-posts the same notification (UI/read-state updates). Bounded
@@ -77,6 +100,15 @@ class RelayListenerService : NotificationListenerService() {
         watcher?.stopWatching()
         val dir = Gateway.outboxDir(applicationContext)
         watcher = OutboxWatcher(this, dir).also { it.startWatching() }
+        // Drain anything that landed (or was left pending) while we were down.
+        // FileObserver only fires for events after it starts, so a request that
+        // synced during a relay restart would otherwise sit untouched.
+        scanOutbox(dir)
+    }
+
+    private fun scanOutbox(dir: File) {
+        val files = dir.listFiles { f -> f.isFile && f.name.endsWith(".json") } ?: return
+        for (f in files) handleOutboxRequest(f)
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
@@ -153,26 +185,22 @@ class RelayListenerService : NotificationListenerService() {
                 // Still refresh the reply action — the live PendingIntent may
                 // have changed even though the message is the same.
                 cacheReplyAction(platform, title, n)
+                retryPending(platform, title)
                 return
             }
         }
 
         cacheReplyAction(platform, title, n)
+        retryPending(platform, title)
         // Media-only message (no caption): give it a short label so the row reads.
         val outText = if (text.isBlank()) "📷 Photo" else text
         writeInbound(platform, title, sender, outText, msgTs, isGroup, picture)
     }
 
-    override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        val platform = Gateway.platformFor(applicationContext, sbn.packageName) ?: return
-        val n = sbn.notification ?: return
-        val rawTitle = NotificationCompat.MessagingStyle
-            .extractMessagingStyleFromNotification(n)?.conversationTitle?.toString()
-            ?: n.extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
-            ?: n.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
-            ?: return
-        replyCache.remove(key(platform, stripCountSuffix(rawTitle)))
-    }
+    // No onNotificationRemoved override: we intentionally keep the cached reply
+    // action after a notification is dismissed (see replyCache above). The
+    // PendingIntent typically outlives the visible notification, which is what
+    // lets a reply land after the user has swiped the chat away.
 
     /** Strip a trailing per-notification count like " (7 messages)" or
      *  " (2 chats)". Requires "(<digits> <word…>)" so legitimate parenthetical
@@ -294,9 +322,8 @@ class RelayListenerService : NotificationListenerService() {
     /** Send an SMS to a reply target (the thread_key). For contact threads the
      *  thread_key is the contact name, so map it back to the number that
      *  messaged; no-contact threads key by the number itself and pass through.
-     *  Native — works for any number, no active notification needed. Called by
-     *  the OutboxWatcher for platform == "sms". */
-    fun sendSms(target: String, text: String): Boolean {
+     *  Native — works for any number, no active notification needed. */
+    private fun sendSms(target: String, text: String): Boolean {
         val number = Gateway.smsNumberFor(applicationContext, target)
         return try {
             @Suppress("DEPRECATION")
@@ -317,10 +344,9 @@ class RelayListenerService : NotificationListenerService() {
         }
     }
 
-    /** Fire a cached reply action for a conversation. Returns false if no live
-     *  notification/action exists for it (e.g. the thread has no active
-     *  notification). Called by the OutboxWatcher. */
-    fun fireReply(platform: String, threadKey: String, text: String): Boolean {
+    /** Fire a cached reply action for a conversation. Returns false if there's
+     *  no cached action for it, or the (possibly stale) PendingIntent throws. */
+    private fun fireReply(platform: String, threadKey: String, text: String): Boolean {
         val ra = replyCache[key(platform, threadKey)] ?: return false
         return try {
             val intent = Intent()
@@ -330,7 +356,119 @@ class RelayListenerService : NotificationListenerService() {
             ra.intent.send(applicationContext, 0, intent)
             true
         } catch (_: Exception) {
+            // Stale PendingIntent (canceled by the app): drop it so the next
+            // notification re-caches a fresh one before we retry.
+            replyCache.remove(key(platform, threadKey))
             false
+        }
+    }
+
+    // ---- outbound request handling (called by OutboxWatcher + scanOutbox) ----
+
+    /** Process one outbox request file. SMS sends natively and resolves now.
+     *  A RemoteInput reply fires if the thread has a cached action; otherwise
+     *  the request is held (file kept) and retried when the thread next posts.
+     *  Terminal outcomes write outbox_status/<id>.json and delete the request. */
+    fun handleOutboxRequest(f: File) {
+        val o = try {
+            JSONObject(f.readText())
+        } catch (_: Exception) {
+            // Malformed or half-synced — leave it for the next event / scan.
+            return
+        }
+        val id = o.optString("id").ifEmpty { f.nameWithoutExtension }
+        val platform = o.optString("platform")
+        val threadKey = o.optString("thread_key")
+        val text = o.optString("text")
+        val ts = o.optLong("ts", 0L)
+
+        if (platform.isEmpty() || threadKey.isEmpty() || text.isEmpty()) {
+            finishFailed(id, "malformed")
+            f.delete()
+            return
+        }
+
+        // SMS is native and notification-independent: terminal either way.
+        if (platform == "sms") {
+            if (sendSms(threadKey, text)) finishSent(id) else finishFailed(id, "sms_failed")
+            f.delete()
+            return
+        }
+
+        // RemoteInput platforms (discord, whatsapp, messenger, …).
+        sweepExpired()
+        val firstSeenMs = if (ts > 0) ts * 1000 else System.currentTimeMillis()
+        if (System.currentTimeMillis() - firstSeenMs >= outboxTtlMs) {
+            finishFailed(id, "no_live_notification")
+            f.delete()
+            return
+        }
+        if (fireReply(platform, threadKey, text)) {
+            finishSent(id)
+            f.delete()
+        } else {
+            // Hold for retry on the next notification from this thread.
+            pending[id] = PendingReply(id, platform, threadKey, text, firstSeenMs)
+        }
+    }
+
+    /** Retry any held requests for a thread that just notified (so a fresh
+     *  reply action is now cached). Cold when nothing is queued — one
+     *  ConcurrentHashMap.isEmpty() check on the notification hot path. */
+    private fun retryPending(platform: String, threadKey: String) {
+        if (pending.isEmpty()) return
+        sweepExpired()
+        val k = key(platform, threadKey)
+        for (p in pending.values.toList()) {
+            if (key(p.platform, p.threadKey) != k) continue
+            if (fireReply(p.platform, p.threadKey, p.text)) {
+                finishSent(p.id)
+                deleteRequest(p.id)
+                pending.remove(p.id)
+            }
+        }
+    }
+
+    /** Lazily expire held requests past their TTL (event-driven, no timer):
+     *  swept whenever a request arrives or a thread notifies. */
+    private fun sweepExpired() {
+        if (pending.isEmpty()) return
+        val now = System.currentTimeMillis()
+        for (p in pending.values.toList()) {
+            if (now - p.firstSeenMs >= outboxTtlMs) {
+                finishFailed(p.id, "no_live_notification")
+                deleteRequest(p.id)
+                pending.remove(p.id)
+            }
+        }
+    }
+
+    private fun finishSent(id: String) = writeStatus(id, "sent", null)
+    private fun finishFailed(id: String, reason: String) = writeStatus(id, "failed", reason)
+
+    /** Write the terminal delivery result for kastrup (tmp + rename). kastrup
+     *  reads outbox_status/<id>.json then deletes it. */
+    private fun writeStatus(id: String, status: String, reason: String?) {
+        if (!hasStorage()) return
+        try {
+            val obj = JSONObject().apply {
+                put("id", id)
+                put("status", status)
+                if (reason != null) put("reason", reason)
+                put("at", System.currentTimeMillis() / 1000)
+            }
+            val dir = Gateway.outboxStatusDir(applicationContext)
+            val tmp = File(dir, "$id.json.tmp")
+            tmp.writeText(obj.toString())
+            tmp.renameTo(File(dir, "$id.json"))
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun deleteRequest(id: String) {
+        try {
+            File(Gateway.outboxDir(applicationContext), "$id.json").delete()
+        } catch (_: Exception) {
         }
     }
 }

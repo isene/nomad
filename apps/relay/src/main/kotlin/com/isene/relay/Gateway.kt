@@ -8,9 +8,10 @@ import org.json.JSONObject
  * Shared config + paths for the notification gateway. The gateway dir is a
  * real path under shared storage (so Syncthing-Fork can sync it and the app
  * can watch it with FileObserver). Subdirs:
- *   inbound/  phone -> laptop : captured message JSON (kastrup drains)
- *   outbox/   laptop -> phone : reply requests (relay drains + fires)
- *   sent/     acks
+ *   inbound/        phone -> laptop : captured message JSON (kastrup drains)
+ *   outbox/         laptop -> phone : reply requests (relay drains + fires)
+ *   outbox_status/  phone -> laptop : per-request delivery result (kastrup reads + deletes)
+ *   sent/           acks (legacy)
  */
 object Gateway {
     const val PREFS = "relay_prefs"
@@ -123,5 +124,8 @@ object Gateway {
      *  Syncthing root as "media/<name>". Kastrup drains these like the JSON. */
     fun mediaDir(c: Context) = File(inboundDir(c), "media").apply { mkdirs() }
     fun outboxDir(c: Context) = File(dir(c), "outbox").apply { mkdirs() }
+    /** Per-request delivery results the relay writes back for kastrup to read:
+     *  outbox_status/<id>.json = {"id","status":"sent"|"failed","reason"?,"at"}. */
+    fun outboxStatusDir(c: Context) = File(dir(c), "outbox_status").apply { mkdirs() }
     fun sentDir(c: Context) = File(dir(c), "sent").apply { mkdirs() }
 }

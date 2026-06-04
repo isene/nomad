@@ -4,7 +4,7 @@
 
 # relay
 
-![version](https://img.shields.io/badge/version-0.3.10-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.4.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A phone-side notification gateway that feeds [kastrup](https://github.com/isene/kastrup) — part of the [nomad](../../) mobile suite.
 
@@ -24,7 +24,13 @@ replacing the headless Firefox/Marionette session kastrup used to drive.
 - Writes each as uniform JSON into a [Syncthing](https://syncthing.net)-shared
   `inbound/` folder that kastrup drains
 - **Direct Reply** — kastrup queues a reply into `outbox/`, relay fires the
-  notification's RemoteInput action (or sends the SMS natively)
+  notification's RemoteInput action (or sends the SMS natively). The cached
+  action is kept after the notification is dismissed, so a reply still lands
+  once the chat has been swiped away; if the thread has no live action yet, the
+  request is held and auto-sent the next time that thread notifies (24h TTL)
+- **Delivery status** — every reply gets a truthful result written back to
+  `outbox_status/<id>.json` (`sent` / `failed`), so kastrup can show whether the
+  phone actually delivered it
 - **Still-image media** — pulls the BigPicture preview off a photo notification
   and relays it as `media[]` (written before the JSON, atomically)
 - De-dupes re-posted notifications; strips WhatsApp's group-summary noise and
