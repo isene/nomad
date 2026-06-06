@@ -43,6 +43,10 @@ data class UiState(
     val doc: HlDoc = HlDoc(emptyList()),
     val spans: List<LineSpans> = emptyList(),
     val folded: Set<Int> = emptySet(),
+    /** Last bulk fold level applied (0 = only top level visible; null = all
+     *  expanded). Manual single-line toggles don't update this; the level
+     *  buttons recompute a clean fold set from it. */
+    val foldLevel: Int? = null,
     val selected: Int? = null,
     val toast: String? = null,
     /** The open file is encrypted. Saves re-encrypt with the in-memory password. */
@@ -170,9 +174,13 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
                     val doc = parseDoc(plain)
                     val spans = highlightDoc(doc.lines.map { it.text })
                     if (seq != loadSeq) return@launch
+                    // Encrypted files are password managers: collapse to the top
+                    // level on open so secrets don't flash on screen. The user
+                    // expands the branch they need.
                     _state.value = _state.value.copy(
                         doc = doc, spans = spans,
-                        folded = emptySet(), encrypted = true, opensslFormat = openssl,
+                        folded = levelFoldSet(doc, 0), foldLevel = 0,
+                        encrypted = true, opensslFormat = openssl,
                         awaitingPassword = false,
                     )
                 } else {
@@ -182,7 +190,8 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
                     if (seq != loadSeq) return@launch
                     _state.value = _state.value.copy(
                         doc = doc, spans = spans,
-                        folded = emptySet(), encrypted = false, opensslFormat = false,
+                        folded = emptySet(), foldLevel = null,
+                        encrypted = false, opensslFormat = false,
                         awaitingPassword = false,
                     )
                 }
@@ -231,6 +240,59 @@ class HyperlistViewModel(app: Application) : AndroidViewModel(app) {
         val cur = _state.value.folded
         val next = if (cur.contains(idx)) cur - idx else cur + idx
         _state.value = _state.value.copy(folded = next)
+    }
+
+    // ---- bulk folding by depth ----
+
+    /** Fold set for "show depths 0..level": every line at indent >= level that
+     *  has children is collapsed; shallower lines stay open. */
+    private fun levelFoldSet(doc: HlDoc, level: Int): Set<Int> {
+        val lines = doc.lines
+        return buildSet {
+            for (i in lines.indices) {
+                val indent = lines[i].indent.toInt()
+                val hasKids = i + 1 < lines.size && lines[i + 1].indent.toInt() > indent
+                if (hasKids && indent >= level) add(i)
+            }
+        }
+    }
+
+    /** Deepest indent that still has children — the level at/above which
+     *  everything is already expanded. */
+    private fun maxParentIndent(): Int {
+        val lines = _state.value.doc.lines
+        var m = 0
+        for (i in lines.indices) {
+            val indent = lines[i].indent.toInt()
+            val hasKids = i + 1 < lines.size && lines[i + 1].indent.toInt() > indent
+            if (hasKids && indent > m) m = indent
+        }
+        return m
+    }
+
+    /** Collapse/expand the whole document to show depths 0..level. */
+    fun foldToLevel(level: Int) {
+        val lvl = level.coerceAtLeast(0)
+        _state.value = _state.value.copy(
+            folded = levelFoldSet(_state.value.doc, lvl),
+            foldLevel = lvl,
+        )
+    }
+
+    fun unfoldAll() {
+        _state.value = _state.value.copy(folded = emptySet(), foldLevel = null)
+    }
+
+    /** Collapse one level further (fewer levels shown); floor at 0. */
+    fun foldMore() {
+        val cur = _state.value.foldLevel ?: (maxParentIndent() + 1)
+        foldToLevel(cur - 1)
+    }
+
+    /** Reveal one level more; past the deepest parent, expand everything. */
+    fun foldLess() {
+        val cur = _state.value.foldLevel ?: (maxParentIndent() + 1)
+        if (cur + 1 > maxParentIndent()) unfoldAll() else foldToLevel(cur + 1)
     }
 
     // ---- structural edits: delegate to Rust, recompute spans, persist ----

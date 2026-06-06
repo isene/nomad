@@ -4,7 +4,7 @@
 
 # hyperlist
 
-![version](https://img.shields.io/badge/version-0.3.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.4.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A general [HyperList](https://isene.org/hyperlist/) editor for the phone — part of the [nomad](../../) mobile suite.
 
@@ -22,6 +22,10 @@ HyperList handling on the laptop. Where `tasks` is the fixed 2-level todo,
   substitutions, tags, comments — a hand-port of the [fe2o3-highlight](https://github.com/isene/highlight) HyperList lexer
 - Per-line structured editing model
 - Fold / unfold; collapse a subtree to one line
+- **Fold level** — header arrows collapse/expand the whole list one depth at a
+  time; encrypted files open fully collapsed so secrets don't flash on screen
+- **Select + copy** — long-press any line to select and copy part of it (a
+  username, a password, a reference)
 - **Drag-reorder across depth** — move a collapsed item and its children as one
 - Auto-renumber numbered siblings
 - Path-aware reference resolution (`<Item/Sub/Identifier>`)

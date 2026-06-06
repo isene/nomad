@@ -39,6 +39,8 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -58,6 +60,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -200,6 +203,13 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
                     )
                 },
                 actions = {
+                    val foldable = state.pickedUri != null && !state.awaitingPassword
+                    IconButton(onClick = { vm.foldMore() }, enabled = foldable) {
+                        Icon(Icons.Filled.UnfoldLess, contentDescription = "Collapse one level")
+                    }
+                    IconButton(onClick = { vm.foldLess() }, enabled = foldable) {
+                        Icon(Icons.Filled.UnfoldMore, contentDescription = "Expand one level")
+                    }
                     IconButton(onClick = { vm.reload() }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Reload")
                     }
@@ -451,34 +461,41 @@ private fun LineRow(
         }
         Spacer(Modifier.width(4.dp))
 
+        // Wrapped in a SelectionContainer so a username / password substring can
+        // be long-pressed, selected, and copied. Long-press starts selection;
+        // a plain tap still reaches the checkbox / reference / select handler.
         if (annotated != null) {
-            Text(
-                text = annotated,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier
-                    .weight(1f)
-                    .pointerInput(annotated, hasCheckbox) {
-                        detectTapGestures { pos ->
-                            val lr = layout
-                            if (lr != null) {
-                                val off = lr.getOffsetForPosition(pos)
-                                if (hasCheckbox && off <= 2) {
-                                    onToggleCheckbox()
-                                    return@detectTapGestures
+            SelectionContainer(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = annotated,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .pointerInput(annotated, hasCheckbox) {
+                            detectTapGestures { pos ->
+                                val lr = layout
+                                if (lr != null) {
+                                    val off = lr.getOffsetForPosition(pos)
+                                    if (hasCheckbox && off <= 2) {
+                                        onToggleCheckbox()
+                                        return@detectTapGestures
+                                    }
+                                    val ann = annotated.getStringAnnotations(REF_TAG, off, off)
+                                    if (ann.isNotEmpty()) {
+                                        onRefTap(ann.first().item)
+                                        return@detectTapGestures
+                                    }
                                 }
-                                val ann = annotated.getStringAnnotations(REF_TAG, off, off)
-                                if (ann.isNotEmpty()) {
-                                    onRefTap(ann.first().item)
-                                    return@detectTapGestures
-                                }
+                                onSelect()
                             }
-                            onSelect()
-                        }
-                    },
-                onTextLayout = { layout = it },
-            )
+                        },
+                    onTextLayout = { layout = it },
+                )
+            }
         } else {
-            Text(rawText, modifier = Modifier.weight(1f).clickable { onSelect() })
+            SelectionContainer(modifier = Modifier.weight(1f)) {
+                Text(rawText, modifier = Modifier.fillMaxWidth().clickable { onSelect() })
+            }
         }
 
         if (isFolded && childCount > 0) {
@@ -616,8 +633,13 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 Spacer(Modifier.size(4.dp))
                 Text(
                     "• Tap the file icon to open a .hl file from your synced folder.\n" +
-                        "• Tap a line to edit it; the toolbar indents/outdents, " +
+                        "• Tap a line to select it; the toolbar indents/outdents, " +
                         "folds, toggles checkboxes, and reorders.\n" +
+                        "• The two arrows in the header set the fold level — " +
+                        "collapse/expand the whole list one depth at a time. " +
+                        "Encrypted files open fully collapsed.\n" +
+                        "• Long-press a line to select and copy part of it " +
+                        "(e.g. a username or password).\n" +
                         "• Drag to move a line (a collapsed item moves its whole " +
                         "subtree). Numbered lists auto-renumber.\n" +
                         "• Edits save back to the file automatically.",
