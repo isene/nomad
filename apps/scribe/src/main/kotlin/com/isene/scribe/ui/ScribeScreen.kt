@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -346,7 +348,16 @@ private fun EditorScreen(vm: ScribeViewModel) {
             )
         },
     ) { inner ->
-        Column(modifier = Modifier.fillMaxSize().padding(inner)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(inner)
+                // Push the editor up above the soft keyboard so the cursor and
+                // text it covers stay visible. consumeWindowInsets(inner) keeps
+                // imePadding from double-counting the nav-bar already in `inner`.
+                .consumeWindowInsets(inner)
+                .imePadding(),
+        ) {
             if (findOpen) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),

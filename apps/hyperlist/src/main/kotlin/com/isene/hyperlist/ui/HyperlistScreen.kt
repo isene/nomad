@@ -235,20 +235,6 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
                 ),
             )
         },
-        bottomBar = {
-            if (state.pickedUri != null && !state.awaitingPassword) {
-                EditorToolbar(
-                    enabled = state.selected != null,
-                    onIndent = { vm.indentSelected() },
-                    onOutdent = { vm.outdentSelected() },
-                    onAdd = { addDialog = true },
-                    onEdit = { state.selected?.let { editingIdx = it } },
-                    onDelete = { vm.deleteSelected() },
-                    onUp = { vm.moveSelectedUp() },
-                    onDown = { vm.moveSelectedDown() },
-                )
-            }
-        },
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { inner ->
         if (state.pickedUri == null) {
@@ -259,13 +245,26 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
                 onUnlock = { showPasswordDialog = true },
             )
         } else {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(inner),
-                contentPadding = PaddingValues(vertical = 4.dp),
-            ) {
+            Column(modifier = Modifier.fillMaxSize().padding(inner)) {
+                // Editor actions pinned at the TOP, under the header, so they
+                // never overlap the system navigation buttons at the bottom.
+                EditorToolbar(
+                    enabled = state.selected != null,
+                    onIndent = { vm.indentSelected() },
+                    onOutdent = { vm.outdentSelected() },
+                    onAdd = { addDialog = true },
+                    onEdit = { state.selected?.let { editingIdx = it } },
+                    onDelete = { vm.deleteSelected() },
+                    onUp = { vm.moveSelectedUp() },
+                    onDown = { vm.moveSelectedDown() },
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                ) {
                 items(order, key = { it }) { lineIdx ->
                     ReorderableItem(reorderState, key = lineIdx) { _ ->
                         val line = state.doc.lines.getOrNull(lineIdx)
@@ -312,6 +311,7 @@ fun HyperlistScreen(vm: HyperlistViewModel) {
                     }
                 }
                 item { Spacer(Modifier.size(64.dp)) }
+                }
             }
         }
     }
@@ -511,11 +511,10 @@ private fun EditorToolbar(
     onDown: () -> Unit,
 ) {
     Column {
-        HorizontalDivider()
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 4.dp),
+                .padding(horizontal = 4.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -541,6 +540,7 @@ private fun EditorToolbar(
                 Icon(Icons.Filled.Delete, contentDescription = "Delete")
             }
         }
+        HorizontalDivider()
     }
 }
 
