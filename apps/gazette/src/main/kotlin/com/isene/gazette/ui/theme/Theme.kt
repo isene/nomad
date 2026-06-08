@@ -11,7 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
-// Gazette brand: Dualog-free navy + blue, the same palette as the TUI/PDF.
+// Gazette brand: navy + blue, the same palette as the TUI and PDF.
 private val LightColors = lightColorScheme(
     primary = Color(0xFF0B5FA5),
     secondary = Color(0xFF0C2C4D),
