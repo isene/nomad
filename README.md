@@ -34,6 +34,7 @@ prompt the changes that fit *your* phone.
 | <img src="apps/vox/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**vox**](apps/vox/) | Voice quick-capture: records on launch, Whisper-transcribes, files the text to your `todo.hl` Inbox or a notes file | laptop VTT |
 | <img src="apps/scribe/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**scribe**](apps/scribe/) | Distraction-free notes pad — edit the `.md`/`.hl`/`.txt` files in your synced writing folder, monospace, no chrome | [scribe](https://github.com/isene/scribe) |
 | <img src="apps/ref/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**ref**](apps/ref/) | Offline searchable reference reader — glossaries, books, and writings as JSON collections (bundled + synced) | — |
+| <img src="apps/gazette/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**gazette**](apps/gazette/) | Reader for your personal daily news digest — browse the last 7 daily issues (and the typeset PDF) synced into `~/.news`, open source links | [gazette](https://github.com/isene/gazette) |
 
 Each ships as its own signed APK with its own launcher icon, sideloaded from a
 Syncthing-synced folder.

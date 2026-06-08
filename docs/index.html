@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>nomad — Fe2O3 on the phone</title>
-  <meta name="description" content="nomad is the mobile half of the Fe2O3 suite: an Android monorepo with a shared Rust core (UniFFI) under thin Kotlin/Compose shells. Ten apps — tasks, hyperlist, relay, astro, watchit, amardice, xrpn, vox, scribe, ref — synced over Syncthing.">
+  <meta name="description" content="nomad is the mobile half of the Fe2O3 suite: an Android monorepo with a shared Rust core (UniFFI) under thin Kotlin/Compose shells. Eleven apps — tasks, hyperlist, relay, astro, watchit, amardice, xrpn, vox, scribe, ref, gazette — synced over Syncthing.">
   <link rel="icon" href="img/nomad.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <meta property="og:title" content="nomad — Fe2O3 on the phone">
@@ -237,6 +237,21 @@
             synced folder, so private corpora never leave your devices.
           </p>
           <div class="card-meta"><span class="repo">apps/ref</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/gazette">gazette</a></h3>
+            <div class="card-kind">News digest reader</div>
+            <div class="card-pairs">Pairs with <a href="https://github.com/isene/gazette">gazette</a></div>
+          </div></div>
+          <p class="card-desc">
+            Reader for your personal daily news digest. A server-side Claude run
+            gathers the news you care about into a dated Markdown issue and a
+            typeset PDF; gazette browses the last 7 days synced into
+            <code>~/.news</code> and opens source links.
+          </p>
+          <div class="card-meta"><span class="repo">apps/gazette</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
         </div>
 
       </div>
