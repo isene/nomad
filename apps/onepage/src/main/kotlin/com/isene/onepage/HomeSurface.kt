@@ -172,13 +172,23 @@ class HomeSurface(context: Context) : FrameLayout(context) {
                 }
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
-                if (active != null && ev.pointerCount == 2) {
-                    removeCallbacks(longPress)
-                    resizing = true
-                    startDist = pinchDist(ev).coerceAtLeast(1f)
-                    val lp = active!!.view.layoutParams as LayoutParams
-                    startW = lp.width
-                    startH = lp.height
+                if (ev.pointerCount == 2) {
+                    // Pinch targets whichever widget EITHER finger is on —
+                    // with a natural thumb+index pinch the first touch often
+                    // lands just outside the widget.
+                    if (active == null) {
+                        active = topEntryAt(ev.getX(0), ev.getY(0))
+                            ?: topEntryAt(ev.getX(1), ev.getY(1))
+                    }
+                    if (active != null) {
+                        removeCallbacks(longPress)
+                        resizing = true
+                        moved = false
+                        startDist = pinchDist(ev).coerceAtLeast(1f)
+                        val lp = active!!.view.layoutParams as LayoutParams
+                        startW = lp.width
+                        startH = lp.height
+                    }
                 }
             }
             MotionEvent.ACTION_MOVE -> {
@@ -310,8 +320,12 @@ class HomeSurface(context: Context) : FrameLayout(context) {
 
     // ---- long-press popup: Resize / Remove ----
 
+    /** Dialogs/popups over a Theme.Wallpaper activity need a real theme. */
+    private fun dialogContext(): Context =
+        android.view.ContextThemeWrapper(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+
     private fun showWidgetMenu(e: Entry) {
-        val menu = PopupMenu(context, e.view)
+        val menu = PopupMenu(dialogContext(), e.view)
         menu.menu.add("Resize…")
         menu.menu.add("Remove")
         menu.setOnMenuItemClickListener { item ->
@@ -330,10 +344,11 @@ class HomeSurface(context: Context) : FrameLayout(context) {
         val origH = lp.height
         val pad = (20 * density).roundToInt()
 
+        val dctx = dialogContext()
         fun slider(label: String, max: Int, cur: Int, onChange: (Int) -> Unit): LinearLayout {
-            val row = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
-            row.addView(TextView(context).apply { text = label })
-            row.addView(SeekBar(context).apply {
+            val row = LinearLayout(dctx).apply { orientation = LinearLayout.VERTICAL }
+            row.addView(TextView(dctx).apply { text = label })
+            row.addView(SeekBar(dctx).apply {
                 this.max = max - minSizePx
                 progress = (cur - minSizePx).coerceIn(0, this.max)
                 setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
@@ -347,14 +362,14 @@ class HomeSurface(context: Context) : FrameLayout(context) {
             return row
         }
 
-        val content = LinearLayout(context).apply {
+        val content = LinearLayout(dctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad, pad, 0)
             addView(slider("Width", width.coerceAtLeast(minSizePx), origW) { applySize(e, it, (e.view.layoutParams as LayoutParams).height) })
             addView(slider("Height", height.coerceAtLeast(minSizePx), origH) { applySize(e, (e.view.layoutParams as LayoutParams).width, it) })
         }
 
-        AlertDialog.Builder(context)
+        AlertDialog.Builder(dctx)
             .setTitle("Resize widget")
             .setView(content)
             .setPositiveButton("OK") { _, _ -> commitSizeHint(e) }

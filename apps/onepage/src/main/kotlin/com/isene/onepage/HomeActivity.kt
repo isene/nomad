@@ -4,9 +4,7 @@ import android.app.Activity
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
-import android.content.ComponentName
 import android.content.Intent
-import android.os.Build
 import android.os.Bundle
 import uniffi.fe2o3_mobile_core.Layout
 import uniffi.fe2o3_mobile_core.WidgetPos
@@ -89,14 +87,56 @@ class HomeActivity : Activity() {
     }
 
     // ---- widget pick / bind / configure flow ----
+    //
+    // In-app picker + direct bind. The legacy ACTION_APPWIDGET_PICK system
+    // picker is broken on ColorOS 16 (returns without binding → "Couldn't
+    // add widget"), so we list installedProviders ourselves and bind via
+    // bindAppWidgetIdIfAllowed, falling back to the one-time
+    // ACTION_APPWIDGET_BIND consent dialog. This is what Launcher3 does.
 
     private fun pickWidget() {
-        pendingWidgetId = host.allocateAppWidgetId()
-        val pick = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).apply {
-            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pendingWidgetId)
+        val pm = packageManager
+        val providers = widgetManager.installedProviders
+        if (providers.isEmpty()) {
+            toast("No widgets installed")
+            return
         }
-        @Suppress("DEPRECATION")
-        startActivityForResult(pick, REQ_PICK_WIDGET)
+        fun appLabel(p: AppWidgetProviderInfo): String = try {
+            pm.getApplicationLabel(
+                pm.getApplicationInfo(p.provider.packageName, 0),
+            ).toString()
+        } catch (_: Exception) {
+            p.provider.packageName
+        }
+        val sorted = providers.sortedWith(
+            compareBy({ appLabel(it).lowercase() }, { it.loadLabel(pm).lowercase() }),
+        )
+        val labels = sorted.map { "${appLabel(it)} — ${it.loadLabel(pm)}" }.toTypedArray()
+        dialogBuilder()
+            .setTitle("Add widget")
+            .setItems(labels) { _, which -> beginBind(sorted[which]) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun beginBind(info: AppWidgetProviderInfo) {
+        pendingWidgetId = host.allocateAppWidgetId()
+        if (widgetManager.bindAppWidgetIdIfAllowed(pendingWidgetId, info.provider)) {
+            configureOrAdd(pendingWidgetId, info)
+        } else {
+            // One-time user consent ("allow OnePage to create widgets");
+            // after the user checks "always allow", future binds are direct.
+            val bind = Intent(AppWidgetManager.ACTION_APPWIDGET_BIND).apply {
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pendingWidgetId)
+                putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, info.provider)
+            }
+            try {
+                @Suppress("DEPRECATION")
+                startActivityForResult(bind, REQ_BIND_WIDGET)
+            } catch (_: Exception) {
+                cancelPendingWidget("Couldn't request widget permission")
+            }
+        }
     }
 
     @Deprecated("Plain-Activity result flow; fine for a launcher.")
@@ -104,45 +144,11 @@ class HomeActivity : Activity() {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
-            REQ_PICK_WIDGET -> {
-                if (resultCode != RESULT_OK || data == null) {
-                    cancelPendingWidget(); return
-                }
-                val id = data.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, pendingWidgetId)
-                pendingWidgetId = id
-                val info = widgetManager.getAppWidgetInfo(id)
-                if (info != null) {
-                    configureOrAdd(id, info)
-                } else {
-                    // Picker returned an unbound provider: ask for the
-                    // user-consent bind (we're not a signature-level launcher).
-                    val provider: ComponentName? =
-                        if (Build.VERSION.SDK_INT >= 33) {
-                            data.getParcelableExtra(
-                                AppWidgetManager.EXTRA_APPWIDGET_PROVIDER,
-                                ComponentName::class.java,
-                            )
-                        } else {
-                            @Suppress("DEPRECATION")
-                            data.getParcelableExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER)
-                        }
-                    if (provider != null) {
-                        val bind = Intent(AppWidgetManager.ACTION_APPWIDGET_BIND).apply {
-                            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
-                            putExtra(AppWidgetManager.EXTRA_APPWIDGET_PROVIDER, provider)
-                        }
-                        @Suppress("DEPRECATION")
-                        startActivityForResult(bind, REQ_BIND_WIDGET)
-                    } else {
-                        cancelPendingWidget()
-                    }
-                }
-            }
             REQ_BIND_WIDGET -> {
                 val info = if (resultCode == RESULT_OK)
                     widgetManager.getAppWidgetInfo(pendingWidgetId) else null
                 if (info != null) configureOrAdd(pendingWidgetId, info)
-                else cancelPendingWidget()
+                else cancelPendingWidget("Widget not allowed")
             }
             REQ_CONFIG_WIDGET -> {
                 val info = if (resultCode == RESULT_OK)
@@ -151,7 +157,7 @@ class HomeActivity : Activity() {
                     surface.addWidget(pendingWidgetId, info)
                     pendingWidgetId = -1
                 } else {
-                    cancelPendingWidget()
+                    cancelPendingWidget("Widget setup cancelled")
                 }
             }
         }
@@ -172,16 +178,27 @@ class HomeActivity : Activity() {
         }
     }
 
-    private fun cancelPendingWidget() {
+    private fun cancelPendingWidget(msg: String? = null) {
         if (pendingWidgetId != -1) {
             host.deleteAppWidgetId(pendingWidgetId)
             pendingWidgetId = -1
         }
+        msg?.let { toast(it) }
     }
+
+    private fun toast(msg: String) =
+        android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
+
+    /** Dialogs on top of a Theme.Wallpaper activity need a real dialog theme. */
+    private fun dialogBuilder(): android.app.AlertDialog.Builder =
+        android.app.AlertDialog.Builder(
+            android.view.ContextThemeWrapper(
+                this, android.R.style.Theme_DeviceDefault_Dialog_Alert,
+            ),
+        )
 
     companion object {
         const val HOST_ID = 1024
-        const val REQ_PICK_WIDGET = 1
         const val REQ_CONFIG_WIDGET = 2
         const val REQ_BIND_WIDGET = 3
     }

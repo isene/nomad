@@ -1,9 +1,10 @@
 <resources>
-    <!-- Home: wallpaper draws through (composited by the system, zero cost to
-         us), transparent window, no preview window on cold launch. -->
-    <style name="Theme.OnePage" parent="android:Theme.Material.NoActionBar">
+    <!-- Home: Theme.Wallpaper is the canonical launcher base — the system
+         composites the wallpaper behind the window at zero cost to us. (A
+         Material.NoActionBar base with windowShowWallpaper bolted on rendered
+         black on ColorOS 16.) -->
+    <style name="Theme.OnePage" parent="android:Theme.Wallpaper.NoTitleBar">
         <item name="android:windowShowWallpaper">true</item>
-        <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowDisablePreview">true</item>
