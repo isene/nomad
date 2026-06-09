@@ -17,6 +17,13 @@
     <!-- Battery optimization exception so ColorOS doesn't phantom-kill us. -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
+    <!-- Keep-alive foreground service: ColorOS freezes third-party launchers,
+         which is the root cause of the dead Home button (confirmed community
+         finding, dontkillmyapp.com/oppo). The service executes NO code — no
+         timers, no threads — it exists purely to pin process priority. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -33,6 +40,7 @@
         <activity
             android:name=".HomeActivity"
             android:launchMode="singleTask"
+            android:taskAffinity=""
             android:stateNotNeeded="true"
             android:excludeFromRecents="true"
             android:exported="true"
@@ -49,6 +57,16 @@
             android:name=".WizardActivity"
             android:exported="false"
             android:theme="@style/Theme.OnePage.Wizard" />
+
+        <!-- Inert keep-alive (see the permission comment above). -->
+        <service
+            android:name=".KeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Launcher keep-alive: prevents the OEM from freezing the home app so the Home button keeps working" />
+        </service>
 
     </application>
 

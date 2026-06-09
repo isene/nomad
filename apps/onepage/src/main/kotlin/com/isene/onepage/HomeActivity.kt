@@ -31,6 +31,13 @@ class HomeActivity : Activity() {
             return
         }
 
+        // Pin the process so ColorOS's app-freeze can't take the launcher
+        // down (the Home-button-does-nothing root cause). Inert service.
+        try {
+            startForegroundService(Intent(this, KeepAliveService::class.java))
+        } catch (_: Exception) {
+        }
+
         widgetManager = AppWidgetManager.getInstance(this)
         host = AppWidgetHost(this, HOST_ID)
 
