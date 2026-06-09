@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- The line that makes the ColorOS Home button work: launchers without
+         SYSTEM_ALERT_WINDOW never appear in ColorOS's "Display over other
+         apps" allowlist and can't be brought back over a fullscreen app. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- AppWidget hosting. BIND_APPWIDGET is signature-level for system
+         launchers; standard launchers go through the user-consent
+         ACTION_APPWIDGET_BIND flow instead, which is what we do. -->
+    <uses-permission
+        android:name="android.permission.BIND_APPWIDGET"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Battery optimization exception so ColorOS doesn't phantom-kill us. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.OnePage">
+
+        <!-- HOME activity. stateNotNeeded + excludeFromRecents are the
+             standard launcher posture; configChanges keeps rotation and
+             ui-mode flips from recreating the always-alive Activity. -->
+        <activity
+            android:name=".HomeActivity"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:configChanges="keyboardHidden|orientation|screenSize|screenLayout|navigation|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <!-- First-run wizard (Compose). Launched until setup completes. -->
+        <activity
+            android:name=".WizardActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OnePage.Wizard" />
+
+    </application>
+
+</manifest>

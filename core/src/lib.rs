@@ -15,3 +15,4 @@ pub mod astro;
 pub mod watchit;
 pub mod amardice;
 pub mod xrpn;
+pub mod onepage;

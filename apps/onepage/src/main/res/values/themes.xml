@@ -1,0 +1,17 @@
+<resources>
+    <!-- Home: wallpaper draws through (composited by the system, zero cost to
+         us), transparent window, no preview window on cold launch. -->
+    <style name="Theme.OnePage" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDisablePreview">true</item>
+    </style>
+
+    <!-- Wizard: plain dark, opaque. -->
+    <style name="Theme.OnePage.Wizard" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowShowWallpaper">false</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>
