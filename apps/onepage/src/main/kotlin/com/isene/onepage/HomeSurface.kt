@@ -96,11 +96,16 @@ class HomeSurface(context: Context) : FrameLayout(context) {
     }
 
     private fun positionChrome() {
-        val lp = (chrome.layoutParams as? LayoutParams)
-            ?: LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
-        lp.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-        lp.bottomMargin = bottomInset + (24 * density).roundToInt()
-        chrome.layoutParams = lp
+        // Always force WRAP_CONTENT: addView without params gives the chrome
+        // FrameLayout's default MATCH_PARENT×MATCH_PARENT, which stretched the
+        // bar over the whole screen (translucent gray) with the buttons
+        // shoved off-screen by the bottom margin.
+        chrome.layoutParams = LayoutParams(
+            LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT,
+        ).apply {
+            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            bottomMargin = bottomInset + (24 * density).roundToInt()
+        }
     }
 
     private val borderPaint = Paint().apply {
