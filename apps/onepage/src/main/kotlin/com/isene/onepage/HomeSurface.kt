@@ -58,7 +58,9 @@ class HomeSurface(context: Context) : FrameLayout(context) {
     private val chrome: LinearLayout = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         setBackgroundColor(0xCC202428.toInt())
-        setPadding((8 * density).roundToInt(), 0, (8 * density).roundToInt(), 0)
+        val ph = (12 * density).roundToInt()
+        val pv = (4 * density).roundToInt()
+        setPadding(ph, pv, ph, pv)
         addView(chromeButton("+ Widget") { onAddWidget?.invoke() })
         addView(chromeButton("Setup") { onSetupAgain?.invoke() })
         addView(chromeButton("Done") { exitEdit() })
@@ -70,7 +72,36 @@ class HomeSurface(context: Context) : FrameLayout(context) {
             setTextColor(0xFFFFFFFF.toInt())
             setBackgroundColor(0)
             setOnClickListener { onClick() }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                marginStart = (6 * density).roundToInt()
+                marginEnd = (6 * density).roundToInt()
+            }
         }
+
+    /** Bottom system-bar inset (3-button nav bar / gesture pill). The window
+     *  is edge-to-edge, so the chrome must sit ABOVE this or its buttons land
+     *  behind the nav bar and become untappable. Updated by the insets
+     *  listener (event-driven, fires only on inset changes). */
+    private var bottomInset = 0
+
+    init {
+        setOnApplyWindowInsetsListener { _, insets ->
+            bottomInset = insets.getInsets(android.view.WindowInsets.Type.systemBars()).bottom
+            if (chrome.parent === this) positionChrome()
+            insets
+        }
+    }
+
+    private fun positionChrome() {
+        val lp = (chrome.layoutParams as? LayoutParams)
+            ?: LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT)
+        lp.gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        lp.bottomMargin = bottomInset + (24 * density).roundToInt()
+        chrome.layoutParams = lp
+    }
 
     private val borderPaint = Paint().apply {
         style = Paint.Style.STROKE
@@ -105,25 +136,30 @@ class HomeSurface(context: Context) : FrameLayout(context) {
     private var startDist = 1f
 
     private val longPress = Runnable {
+        if (moved || resizing) return@Runnable
         val e = active
-        if (e != null && !moved && !resizing) {
+        if (e != null) {
             active = null
             showWidgetMenu(e)
+        } else {
+            // Long-press on EMPTY space while editing: toggle edit mode off.
+            // Escape hatch so the user can never be trapped in edit mode even
+            // if the chrome bar is unreachable for any reason.
+            exitEdit()
         }
     }
 
     // ---- mode transitions ----
+
+    fun isEditMode(): Boolean = editMode
 
     fun enterEdit() {
         if (editMode) return
         editMode = true
         // Dim the wallpaper: background draws behind the widget children.
         setBackgroundColor(0x66000000)
-        val lp = LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
-            gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
-            bottomMargin = (24 * density).roundToInt()
-        }
-        addView(chrome, lp)
+        addView(chrome)
+        positionChrome()
         invalidate()
     }
 
@@ -168,8 +204,10 @@ class HomeSurface(context: Context) : FrameLayout(context) {
                     startTop = lp.topMargin
                     startW = lp.width
                     startH = lp.height
-                    postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
                 }
+                // Posted for widget AND empty space: widget → popup menu,
+                // empty space → exit edit mode (see longPress).
+                postDelayed(longPress, ViewConfiguration.getLongPressTimeout().toLong())
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
                 if (ev.pointerCount == 2) {
@@ -192,7 +230,16 @@ class HomeSurface(context: Context) : FrameLayout(context) {
                 }
             }
             MotionEvent.ACTION_MOVE -> {
-                val e = active ?: return true
+                val e = active
+                if (e == null) {
+                    // Empty-space gesture: drifting past slop cancels the
+                    // exit-edit long-press (it's a scroll-ish touch, not a hold).
+                    if (!moved && (abs(ev.x - downX) > touchSlop || abs(ev.y - downY) > touchSlop)) {
+                        moved = true
+                        removeCallbacks(longPress)
+                    }
+                    return true
+                }
                 if (resizing && ev.pointerCount >= 2) {
                     val scale = pinchDist(ev) / startDist
                     applySize(e, (startW * scale).roundToInt(), (startH * scale).roundToInt())

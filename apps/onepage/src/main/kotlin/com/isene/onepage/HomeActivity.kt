@@ -84,13 +84,18 @@ class HomeActivity : Activity() {
     }
 
     override fun onStop() {
+        // Leaving the launcher ends edit mode (and persists) — but not while
+        // a widget bind/configure activity is up mid-add, which also stops us.
+        if (::surface.isInitialized && pendingWidgetId == -1) surface.exitEdit()
         if (::host.isInitialized) host.stopListening()
         super.onStop()
     }
 
     @Deprecated("Home must not back out; deliberate swallow.")
     override fun onBackPressed() {
-        // Swallow. A launcher has nowhere to go back to.
+        // Back exits edit mode (escape hatch); otherwise swallow — a
+        // launcher has nowhere to go back to.
+        if (::surface.isInitialized && surface.isEditMode()) surface.exitEdit()
     }
 
     // ---- widget pick / bind / configure flow ----
