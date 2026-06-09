@@ -139,6 +139,8 @@ class HomeSurface(context: Context) : FrameLayout(context) {
     private var startW = 0
     private var startH = 0
     private var startDist = 1f
+    private var startSpanX = 0f
+    private var startSpanY = 0f
 
     private val longPress = Runnable {
         if (moved || resizing) return@Runnable
@@ -228,6 +230,8 @@ class HomeSurface(context: Context) : FrameLayout(context) {
                         resizing = true
                         moved = false
                         startDist = pinchDist(ev).coerceAtLeast(1f)
+                        startSpanX = abs(ev.getX(0) - ev.getX(1))
+                        startSpanY = abs(ev.getY(0) - ev.getY(1))
                         val lp = active!!.view.layoutParams as LayoutParams
                         startW = lp.width
                         startH = lp.height
@@ -246,8 +250,18 @@ class HomeSurface(context: Context) : FrameLayout(context) {
                     return true
                 }
                 if (resizing && ev.pointerCount >= 2) {
-                    val scale = pinchDist(ev) / startDist
-                    applySize(e, (startW * scale).roundToInt(), (startH * scale).roundToInt())
+                    // Per-axis scaling: horizontal finger spread drives width,
+                    // vertical drives height — NOT aspect-locked. When the
+                    // fingers start nearly aligned on an axis (tiny span),
+                    // that axis falls back to the overall distance scale so a
+                    // near-zero denominator can't blow the size up.
+                    val dist = pinchDist(ev) / startDist
+                    val minSpan = 24 * density
+                    val sx = if (startSpanX > minSpan)
+                        abs(ev.getX(0) - ev.getX(1)) / startSpanX else dist
+                    val sy = if (startSpanY > minSpan)
+                        abs(ev.getY(0) - ev.getY(1)) / startSpanY else dist
+                    applySize(e, (startW * sx).roundToInt(), (startH * sy).roundToInt())
                 } else if (!resizing) {
                     val dx = ev.x - downX
                     val dy = ev.y - downY
