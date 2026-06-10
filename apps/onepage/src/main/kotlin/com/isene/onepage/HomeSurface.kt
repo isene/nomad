@@ -16,7 +16,6 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupMenu
-import android.widget.SeekBar
 import android.widget.TextView
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -395,50 +394,63 @@ class HomeSurface(context: Context) : FrameLayout(context) {
         menu.show()
     }
 
+    /** Resize via +/- steppers. Buttons (unlike SeekBars in a dialog) can't
+     *  be rendered untappable by layout-param quirks, and they give precise
+     *  control: each tap nudges that axis by `step`. Changes apply live;
+     *  Cancel restores the original size. */
     private fun showResizeDialog(e: Entry) {
-        val lp = e.view.layoutParams as LayoutParams
-        val origW = lp.width
-        val origH = lp.height
+        val lp0 = e.view.layoutParams as LayoutParams
+        val origW = lp0.width
+        val origH = lp0.height
+        val step = (24 * density).roundToInt()
         val pad = (20 * density).roundToInt()
-
         val dctx = dialogContext()
-        // Children must get explicit MATCH_PARENT params: LinearLayout's
-        // default is WRAP_CONTENT, which gave the SeekBars a few px of track
-        // (the thumb literally could not move).
-        val fill = {
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            )
-        }
-        fun slider(label: String, max: Int, cur: Int, onChange: (Int) -> Unit): LinearLayout {
-            val row = LinearLayout(dctx).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = fill()
+
+        fun curW() = (e.view.layoutParams as LayoutParams).width
+        fun curH() = (e.view.layoutParams as LayoutParams).height
+        fun dp(px: Int) = (px / density).roundToInt()
+
+        fun stepperRow(
+            label: String,
+            get: () -> Int,
+            set: (Int) -> Unit,
+        ): LinearLayout {
+            val value = TextView(dctx).apply {
+                text = "${dp(get())} dp"
+                textSize = 18f
+                gravity = Gravity.CENTER
+                minWidth = (96 * density).roundToInt()
             }
-            row.addView(TextView(dctx).apply { text = label }, fill())
-            row.addView(
-                SeekBar(dctx).apply {
-                    this.max = max - minSizePx
-                    progress = (cur - minSizePx).coerceIn(0, this.max)
-                    setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-                        override fun onProgressChanged(sb: SeekBar?, p: Int, fromUser: Boolean) {
-                            if (fromUser) onChange(minSizePx + p)
-                        }
-                        override fun onStartTrackingTouch(sb: SeekBar?) {}
-                        override fun onStopTrackingTouch(sb: SeekBar?) {}
-                    })
-                },
-                fill(),
-            )
-            return row
+            fun bump(delta: Int) {
+                set(get() + delta)
+                value.text = "${dp(get())} dp"
+            }
+            fun bigBtn(txt: String, delta: Int) = Button(dctx).apply {
+                text = txt
+                textSize = 22f
+                minimumWidth = (64 * density).roundToInt()
+                setOnClickListener { bump(delta) }
+            }
+            return LinearLayout(dctx).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, pad / 2, 0, pad / 2)
+                addView(TextView(dctx).apply {
+                    text = label
+                    textSize = 16f
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                })
+                addView(bigBtn("−", -step)) // minus
+                addView(value)
+                addView(bigBtn("+", step))
+            }
         }
 
         val content = LinearLayout(dctx).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad, pad, 0)
-            addView(slider("Width", width.coerceAtLeast(minSizePx), origW) { applySize(e, it, (e.view.layoutParams as LayoutParams).height) })
-            addView(slider("Height", height.coerceAtLeast(minSizePx), origH) { applySize(e, (e.view.layoutParams as LayoutParams).width, it) })
+            addView(stepperRow("Width", ::curW) { applySize(e, it, curH()) })
+            addView(stepperRow("Height", ::curH) { applySize(e, curW(), it) })
         }
 
         AlertDialog.Builder(dctx)
