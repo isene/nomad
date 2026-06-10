@@ -1,6 +1,5 @@
 package com.isene.onepage
 
-import android.app.AlertDialog
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetHostView
 import android.appwidget.AppWidgetManager
@@ -16,7 +15,6 @@ import android.widget.Button
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.PopupMenu
-import android.widget.TextView
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -31,8 +29,8 @@ import kotlin.math.roundToInt
  * and Android composites the wallpaper without involving us.
  *
  * EDIT mode: the surface intercepts all widget-area touches. Drag moves,
- * two-finger pinch resizes, long-press pops Resize/Remove, a bottom chrome
- * bar offers Add widget / Setup / Done. Done persists and leaves.
+ * two-finger pinch resizes (per-axis), long-press a widget to Remove, a
+ * bottom chrome bar offers Add widget / Setup / Done. Done persists and leaves.
  */
 class HomeSurface(context: Context) : FrameLayout(context) {
 
@@ -374,91 +372,22 @@ class HomeSurface(context: Context) : FrameLayout(context) {
         e.view.updateAppWidgetSize(null, wDp, hDp, wDp, hDp)
     }
 
-    // ---- long-press popup: Resize / Remove ----
+    // ---- long-press popup: Remove ----
+    // Resize is pinch-only (two-finger, per-axis): a dialog control adds
+    // nothing pinch doesn't already do, so the popup is just Remove.
 
-    /** Dialogs/popups over a Theme.Wallpaper activity need a real theme. */
+    /** Popups over a Theme.Wallpaper activity need a real theme. */
     private fun dialogContext(): Context =
         android.view.ContextThemeWrapper(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
 
     private fun showWidgetMenu(e: Entry) {
         val menu = PopupMenu(dialogContext(), e.view)
-        menu.menu.add("Resize…")
         menu.menu.add("Remove")
         menu.setOnMenuItemClickListener { item ->
-            when (item.title.toString()) {
-                "Remove" -> removeWidget(e)
-                "Resize…" -> showResizeDialog(e)
-            }
+            if (item.title.toString() == "Remove") removeWidget(e)
             true
         }
         menu.show()
-    }
-
-    /** Resize via +/- steppers. Buttons (unlike SeekBars in a dialog) can't
-     *  be rendered untappable by layout-param quirks, and they give precise
-     *  control: each tap nudges that axis by `step`. Changes apply live;
-     *  Cancel restores the original size. */
-    private fun showResizeDialog(e: Entry) {
-        val lp0 = e.view.layoutParams as LayoutParams
-        val origW = lp0.width
-        val origH = lp0.height
-        val step = (24 * density).roundToInt()
-        val pad = (20 * density).roundToInt()
-        val dctx = dialogContext()
-
-        fun curW() = (e.view.layoutParams as LayoutParams).width
-        fun curH() = (e.view.layoutParams as LayoutParams).height
-        fun dp(px: Int) = (px / density).roundToInt()
-
-        fun stepperRow(
-            label: String,
-            get: () -> Int,
-            set: (Int) -> Unit,
-        ): LinearLayout {
-            val value = TextView(dctx).apply {
-                text = "${dp(get())} dp"
-                textSize = 18f
-                gravity = Gravity.CENTER
-                minWidth = (96 * density).roundToInt()
-            }
-            fun bump(delta: Int) {
-                set(get() + delta)
-                value.text = "${dp(get())} dp"
-            }
-            fun bigBtn(txt: String, delta: Int) = Button(dctx).apply {
-                text = txt
-                textSize = 22f
-                minimumWidth = (64 * density).roundToInt()
-                setOnClickListener { bump(delta) }
-            }
-            return LinearLayout(dctx).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, pad / 2, 0, pad / 2)
-                addView(TextView(dctx).apply {
-                    text = label
-                    textSize = 16f
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                })
-                addView(bigBtn("−", -step)) // minus
-                addView(value)
-                addView(bigBtn("+", step))
-            }
-        }
-
-        val content = LinearLayout(dctx).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(pad, pad, pad, 0)
-            addView(stepperRow("Width", ::curW) { applySize(e, it, curH()) })
-            addView(stepperRow("Height", ::curH) { applySize(e, curW(), it) })
-        }
-
-        AlertDialog.Builder(dctx)
-            .setTitle("Resize widget")
-            .setView(content)
-            .setPositiveButton("OK") { _, _ -> commitSizeHint(e) }
-            .setNegativeButton("Cancel") { _, _ -> applySize(e, origW, origH) }
-            .show()
     }
 
     // ---- edit-mode borders ----
