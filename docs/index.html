@@ -4,11 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>nomad — Fe2O3 on the phone</title>
-  <meta name="description" content="nomad is the mobile half of the Fe2O3 suite: an Android monorepo with a shared Rust core (UniFFI) under thin Kotlin/Compose shells. Eleven apps — tasks, hyperlist, relay, astro, watchit, amardice, xrpn, vox, scribe, ref, gazette — synced over Syncthing.">
+  <meta name="description" content="nomad is the mobile half of the Fe2O3 suite: an Android monorepo with a shared Rust core (UniFFI) under thin Kotlin/Compose shells. Thirteen apps — tasks, hyperlist, relay, astro, watchit, amardice, xrpn, vox, scribe, ref, gazette, books, onepage — synced over Syncthing.">
   <link rel="icon" href="img/nomad.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <meta property="og:title" content="nomad — Fe2O3 on the phone">
-  <meta property="og:description" content="The mobile half of Fe2O3: one Rust core, ten Kotlin/Compose apps, synced over Syncthing. No Google account, no cloud.">
+  <meta property="og:description" content="The mobile half of Fe2O3: one Rust core, thirteen Kotlin/Compose apps, synced over Syncthing. No Google account, no cloud.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="img/nomad.svg">
 </head>
@@ -20,7 +20,7 @@
       <h1>nomad</h1>
       <p class="tagline">
         The mobile half of the <a href="https://github.com/isene/fe2o3" style="color:var(--accent-glow)">Fe<sub>2</sub>O<sub>3</sub></a>
-        suite. One Rust core, ten Kotlin&nbsp;/&nbsp;Compose apps,
+        suite. One Rust core, thirteen Kotlin&nbsp;/&nbsp;Compose apps,
         synced over Syncthing — no Google account, no cloud middleman.
       </p>
       <div class="badges">
@@ -90,7 +90,7 @@
     <div class="container">
       <h2>The apps</h2>
       <p class="section-intro">
-        Ten phone apps, each pairing with a tool from the
+        Thirteen phone apps, each pairing with a tool from the
         Fe<sub>2</sub>O<sub>3</sub> family.
       </p>
       <div class="grid">
@@ -252,6 +252,35 @@
             <code>~/.news</code> and opens source links.
           </p>
           <div class="card-meta"><span class="repo">apps/gazette</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/books">books</a></h3>
+            <div class="card-kind">Library reader</div>
+            <div class="card-pairs">Pairs with <a href="https://github.com/isene/library">library</a></div>
+          </div></div>
+          <p class="card-desc">
+            The library on your phone. On the laptop you curate a shelf of books
+            that should exist and have Claude write the ones you grab; books is
+            the read-only half: only finished books appear, grouped by shelf,
+            with inline figures, read full-screen and offline.
+          </p>
+          <div class="card-meta"><span class="repo">apps/books</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/onepage">onepage</a></h3>
+            <div class="card-kind">Home launcher</div>
+            <div class="card-pairs">Standalone · zero idle cost</div>
+          </div></div>
+          <p class="card-desc">
+            A minimal home-screen launcher: one screen, your widgets placed
+            freely, nothing else. Built to cost nothing when idle: no polling,
+            no background wake-ups.
+          </p>
+          <div class="card-meta"><span class="repo">apps/onepage</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
         </div>
 
       </div>
