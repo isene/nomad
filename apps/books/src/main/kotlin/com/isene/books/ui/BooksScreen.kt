@@ -21,6 +21,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -255,11 +256,45 @@ private fun BookRow(book: Book, onClick: () -> Unit) {
 private fun ReaderScreen(vm: BooksViewModel) {
     BackHandler { vm.closeReader() }
     val book = vm.open ?: return
+    val ctx = LocalContext.current
+    val snackbar = remember { SnackbarHostState() }
     val scroll = rememberScrollState()
     val progress =
         (100f * scroll.value / scroll.maxValue.coerceAtLeast(1)).toInt().coerceIn(0, 100)
 
+    // Resume at the synced bookmark once the content has laid out.
+    var resumed by remember(book.id) { mutableStateOf(false) }
+    LaunchedEffect(vm.content, scroll.maxValue) {
+        if (!resumed && vm.content != null && scroll.maxValue > 0) {
+            val target = (vm.resumeFrac * scroll.maxValue).toInt()
+            if (target > 0) scroll.scrollTo(target)
+            resumed = true
+        }
+    }
+
+    // First bookmark needs a one-time grant of the writable library-state folder.
+    val pickState = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri ->
+        if (uri != null) {
+            try {
+                ctx.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                )
+            } catch (_: Exception) {}
+            vm.setStateFolder(uri.toString())
+            val frac = if (scroll.maxValue <= 0) 0f else scroll.value.toFloat() / scroll.maxValue
+            vm.saveBookmark(frac)
+        }
+    }
+
+    vm.message?.let { msg ->
+        LaunchedEffect(msg) { snackbar.showSnackbar(msg); vm.clearMessage() }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
                 navigationIcon = {
@@ -276,6 +311,17 @@ private fun ReaderScreen(vm: BooksViewModel) {
                     }
                 },
                 actions = {
+                    IconButton(onClick = {
+                        if (vm.stateFolderUri == null) {
+                            pickState.launch(null)
+                        } else {
+                            val frac = if (scroll.maxValue <= 0) 0f
+                            else scroll.value.toFloat() / scroll.maxValue
+                            vm.saveBookmark(frac)
+                        }
+                    }) {
+                        Icon(Icons.Filled.BookmarkAdd, contentDescription = "Set bookmark here")
+                    }
                     IconButton(onClick = { vm.smallerFont() }) {
                         Icon(Icons.Filled.TextDecrease, contentDescription = "Smaller text")
                     }

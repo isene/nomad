@@ -1,0 +1,46 @@
+package com.isene.books.data
+
+import android.content.Context
+import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
+import org.json.JSONObject
+
+/**
+ * Synced reading positions, in the writable `~/.library-state` folder (a
+ * separate sendreceive Syncthing share, since the library mirror itself is
+ * read-only). One file per book — `<id>.json` = {"pos": 0..1, "updated":
+ * epoch} — so the bookmark follows you between the laptop `library` and
+ * this reader. Last write wins; Syncthing resolves the file.
+ */
+class BookmarkRepo(private val context: Context) {
+
+    private fun name(id: String) = "$id.json"
+
+    /** Resume fraction for a book, or null if unset/unreadable. */
+    fun loadFrac(stateTreeUri: String, id: String): Float? {
+        val tree = DocumentFile.fromTreeUri(context, Uri.parse(stateTreeUri)) ?: return null
+        val f = tree.findFile(name(id))?.takeIf { it.isFile } ?: return null
+        val text = context.contentResolver.openInputStream(f.uri)?.use {
+            it.bufferedReader().readText()
+        } ?: return null
+        val pos = runCatching { JSONObject(text).optDouble("pos", -1.0).toFloat() }.getOrNull()
+        return pos?.takeIf { it in 0f..1f }
+    }
+
+    /** Persist the reading position. Returns true on success. */
+    fun saveFrac(stateTreeUri: String, id: String, frac: Float): Boolean {
+        val tree = DocumentFile.fromTreeUri(context, Uri.parse(stateTreeUri)) ?: return false
+        val file = tree.findFile(name(id))?.takeIf { it.isFile }
+            ?: tree.createFile("application/json", name(id)) ?: return false
+        val json = "{\"pos\": %.4f, \"updated\": %d}\n"
+            .format(frac.coerceIn(0f, 1f), System.currentTimeMillis() / 1000)
+        return runCatching {
+            context.contentResolver.openOutputStream(file.uri, "wt")?.use {
+                it.write(json.toByteArray()); true
+            } ?: false
+        }.getOrDefault(false)
+    }
+
+    fun folderName(stateTreeUri: String): String? =
+        DocumentFile.fromTreeUri(context, Uri.parse(stateTreeUri))?.name
+}

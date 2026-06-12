@@ -9,6 +9,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.isene.books.data.Book
 import com.isene.books.data.BookContent
+import com.isene.books.data.BookmarkRepo
 import com.isene.books.data.LibraryRepo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -16,9 +17,14 @@ import kotlinx.coroutines.withContext
 
 class BooksViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = LibraryRepo(app)
+    private val bm = BookmarkRepo(app)
 
     var folderUri by mutableStateOf(Prefs.folderUri(app)); private set
     var folderName by mutableStateOf<String?>(null); private set
+    var stateFolderUri by mutableStateOf(Prefs.stateUri(app)); private set
+
+    /** Resume fraction for the currently-open book (applied once on open). */
+    var resumeFrac by mutableStateOf(0f); private set
 
     /** Every written book, newest-grab first within each shelf. */
     private val written = mutableStateListOf<Book>()
@@ -79,15 +85,18 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
         val uri = folderUri ?: return
         open = b
         content = null
+        resumeFrac = 0f
         contentLoading = true
         viewModelScope.launch(Dispatchers.IO) {
             val c = runCatching { repo.loadContent(uri, b.id) }.getOrNull()
+            val frac = stateFolderUri?.let { runCatching { bm.loadFrac(it, b.id) }.getOrNull() } ?: 0f
             withContext(Dispatchers.Main) {
                 contentLoading = false
                 if (c == null) {
                     message = "Could not open this book yet (not synced?)."
                     open = null
                 } else {
+                    resumeFrac = frac ?: 0f
                     content = c
                 }
             }
@@ -95,6 +104,24 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun closeReader() { open = null; content = null }
+
+    fun setStateFolder(treeUri: String) {
+        Prefs.setStateUri(getApplication(), treeUri)
+        stateFolderUri = treeUri
+    }
+
+    /** Set/move the bookmark for the open book to a reading fraction. */
+    fun saveBookmark(frac: Float) {
+        val b = open ?: return
+        val st = stateFolderUri
+        if (st == null) { message = "Pick the library-state folder first (bookmark icon)."; return }
+        viewModelScope.launch(Dispatchers.IO) {
+            val ok = runCatching { bm.saveFrac(st, b.id, frac) }.getOrDefault(false)
+            withContext(Dispatchers.Main) {
+                message = if (ok) "Bookmark set at ${(frac * 100).toInt()}%" else "Could not save bookmark."
+            }
+        }
+    }
 
     fun biggerFont() { setScale(fontScale + 0.1f) }
     fun smallerFont() { setScale(fontScale - 0.1f) }
