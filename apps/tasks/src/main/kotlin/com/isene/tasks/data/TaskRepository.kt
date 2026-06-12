@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import java.io.IOException
 import uniffi.fe2o3_mobile_core.Hyperlist
+import uniffi.fe2o3_mobile_core.inboxFirst
 import uniffi.fe2o3_mobile_core.parse
 import uniffi.fe2o3_mobile_core.serialize
 
@@ -27,7 +28,10 @@ class TaskRepository(private val context: Context) {
         val text = context.contentResolver.openInputStream(uri)?.use { input ->
             input.bufferedReader(Charsets.UTF_8).readText()
         } ?: throw IOException("could not open $uri for read")
-        return parse(text)
+        // Inbox to the top: it's the capture target (vox / relay / kastrup),
+        // so new tasks should be the first thing seen. inbox_first keeps every
+        // other category's order; a later save just writes Inbox-first too.
+        return inboxFirst(parse(text))
     }
 
     fun save(uri: Uri, hl: Hyperlist) {

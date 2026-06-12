@@ -221,12 +221,38 @@ pub fn move_item_to(
     h
 }
 
+// -------------------- display ordering --------------------
+
+/// Move the "Inbox" category (case-insensitive) to the front, keeping every
+/// other category in its existing relative order. No-op when there's no
+/// Inbox or it's already first. Applied at load time (app) and inside
+/// `widget_rows` (widget) so the inbox and its items surface at the top
+/// everywhere. The capture target (vox / relay / kastrup drop new tasks into
+/// Inbox) is then always the first thing visible.
+#[uniffi::export]
+pub fn inbox_first(hl: Hyperlist) -> Hyperlist {
+    let mut h = hl;
+    if let Some(pos) = h
+        .categories
+        .iter()
+        .position(|c| c.name.trim().eq_ignore_ascii_case("inbox"))
+    {
+        if pos > 0 {
+            let cat = h.categories.remove(pos);
+            h.categories.insert(0, cat);
+        }
+    }
+    h
+}
+
 // -------------------- widget read API --------------------
 
-/// Flat list for the Glance widget. Returns up to `max_items` rows in
-/// category order. Empty categories are skipped.
+/// Flat list for the Glance widget. Returns up to `max_items` rows with the
+/// Inbox first (see `inbox_first`), then remaining categories in order.
+/// Empty categories are skipped.
 #[uniffi::export]
 pub fn widget_rows(hl: Hyperlist, max_items: u32) -> Vec<WidgetRow> {
+    let hl = inbox_first(hl);
     let mut out = Vec::new();
     let cap = max_items as usize;
     for cat in &hl.categories {
@@ -353,6 +379,44 @@ mod tests {
         assert_eq!(h.categories[0].items[0].text, "x");
         assert_eq!(h.categories[1].items.len(), 1);
         assert_eq!(h.categories[1].items[0].text, "y");
+    }
+
+    #[test]
+    fn inbox_moves_to_front_preserving_order() {
+        let h = add_category(Hyperlist::default(), "Personal".into());
+        let h = add_category(h, "Work".into());
+        let h = add_category(h, "Inbox".into());
+        let h = inbox_first(h);
+        assert_eq!(
+            h.categories.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(),
+            vec!["Inbox", "Personal", "Work"],
+        );
+    }
+
+    #[test]
+    fn inbox_first_is_noop_without_inbox_or_when_first() {
+        let h = add_category(Hyperlist::default(), "A".into());
+        let h = add_category(h, "B".into());
+        let before = h.clone();
+        assert_eq!(inbox_first(h), before); // no Inbox → unchanged
+
+        let h = add_category(Hyperlist::default(), "inbox".into()); // case-insensitive
+        let h = add_category(h, "Other".into());
+        let out = inbox_first(h);
+        assert_eq!(out.categories[0].name, "inbox"); // already first → still first
+        assert_eq!(out.categories[1].name, "Other");
+    }
+
+    #[test]
+    fn widget_rows_puts_inbox_items_first() {
+        let h = add_category(Hyperlist::default(), "Work".into());
+        let h = add_item(h, 0, "ship it".into());
+        let h = add_category(h, "Inbox".into());
+        let h = add_item(h, 1, "captured note".into());
+        let rows = widget_rows(h, 12);
+        assert_eq!(rows[0].category, "Inbox");
+        assert_eq!(rows[0].item, "captured note");
+        assert_eq!(rows[1].category, "Work");
     }
 
     #[test]
