@@ -99,8 +99,11 @@ private fun ShelfScreen(vm: BooksViewModel) {
     ) { uri ->
         if (uri != null) {
             try {
+                // Read + write: reading the catalog/books, and writing PDFs the
+                // user adds into the library's inbox/ for the laptop to import.
                 ctx.contentResolver.takePersistableUriPermission(
-                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
                 )
             } catch (_: Exception) {}
             vm.setFolder(uri.toString())
