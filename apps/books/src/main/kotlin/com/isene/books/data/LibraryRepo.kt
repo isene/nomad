@@ -71,6 +71,58 @@ class LibraryRepo(private val context: Context) {
         return BookContent(text, figs)
     }
 
+    /**
+     * Queue a user-picked PDF for import: copy it into the library tree's
+     * `inbox/` as `<slug>-<ts>.pdf` and drop a `<slug>-<ts>.json` sidecar
+     * ({title, subject, author}). The laptop's `library` tool drains the
+     * inbox (on open or `library --import`), runs pdftotext + Claude, and
+     * the finished book syncs back here. The phone never parses the PDF.
+     *
+     * Returns true once the PDF is in the inbox (the sidecar is best-effort:
+     * a missing sidecar just means the laptop falls back to the filename).
+     */
+    fun queuePdf(treeUriStr: String, pdfUri: Uri, title: String, subject: String): Boolean {
+        val tree = DocumentFile.fromTreeUri(context, Uri.parse(treeUriStr)) ?: return false
+        val inbox = tree.findFile("inbox")?.takeIf { it.isDirectory }
+            ?: tree.createDirectory("inbox") ?: return false
+        // Timestamp keeps the base unique so SAF never renames to "name (1)"
+        // and the .pdf / .json stems always match for the laptop.
+        val base = (slugify(title).ifBlank { "import" }) + "-" + (System.currentTimeMillis() / 1000)
+
+        val pdfDoc = inbox.createFile("application/pdf", "$base.pdf") ?: return false
+        val copied = context.contentResolver.openInputStream(pdfUri)?.use { input ->
+            context.contentResolver.openOutputStream(pdfDoc.uri)?.use { output ->
+                input.copyTo(output); true
+            } ?: false
+        } ?: false
+        if (!copied) { pdfDoc.delete(); return false }
+
+        val side = inbox.createFile("application/json", "$base.json")
+        if (side != null) {
+            val json = JSONObject()
+                .put("title", title)
+                .put("subject", subject)
+                .put("author", "")
+                .toString()
+            context.contentResolver.openOutputStream(side.uri)?.use {
+                it.write(json.toByteArray(Charsets.UTF_8))
+            }
+        }
+        return true
+    }
+
+    /** Filesystem-safe slug, mirroring the laptop's store::slugify. */
+    private fun slugify(s: String): String {
+        val sb = StringBuilder()
+        var prevDash = false
+        for (c in s.lowercase()) {
+            if (c.isLetterOrDigit()) { sb.append(c); prevDash = false }
+            else if (!prevDash && sb.isNotEmpty()) { sb.append('-'); prevDash = true }
+        }
+        while (sb.isNotEmpty() && sb.last() == '-') sb.deleteCharAt(sb.length - 1)
+        return sb.take(48).toString()
+    }
+
     private fun read(uri: Uri): String =
         context.contentResolver.openInputStream(uri)?.use {
             it.bufferedReader(Charsets.UTF_8).readText()

@@ -33,6 +33,10 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
     val shelf = mutableStateListOf<Book>()
     var query by mutableStateOf(""); private set
 
+    /** All shelf names in the catalog (written or not) — the subject choices
+     *  offered when adding a PDF, so an import lands on an existing shelf. */
+    val categories = mutableStateListOf<String>()
+
     var loading by mutableStateOf(false); private set
     var message by mutableStateOf<String?>(null)
 
@@ -54,13 +58,34 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
         val uri = folderUri ?: return
         loading = true
         viewModelScope.launch(Dispatchers.IO) {
-            val all = repo.loadBooks(uri).filter { it.written }
+            val everything = repo.loadBooks(uri)
+            val all = everything.filter { it.written }
+            val cats = everything.map { it.category }.filter { it.isNotBlank() }.distinct()
             val fname = repo.folderName(uri)
             withContext(Dispatchers.Main) {
                 written.clear(); written.addAll(all)
+                categories.clear(); categories.addAll(cats)
                 folderName = fname
                 loading = false
                 applyQuery()
+            }
+        }
+    }
+
+    /** Queue a picked PDF into the synced inbox, tagged with a subject. The
+     *  laptop imports it (pdftotext + Claude) and the book syncs back. */
+    fun addPdf(pdfUri: String, title: String, subject: String) {
+        val uri = folderUri
+        if (uri == null) { message = "Choose your library folder first."; return }
+        val t = title.trim().ifBlank { "Untitled" }
+        viewModelScope.launch(Dispatchers.IO) {
+            val ok = runCatching { repo.queuePdf(uri, android.net.Uri.parse(pdfUri), t, subject.trim()) }
+                .getOrDefault(false)
+            withContext(Dispatchers.Main) {
+                message = if (ok)
+                    "Added “$t” — it will appear once your laptop syncs and imports it."
+                else
+                    "Couldn't add the PDF (is the library folder writable?)."
             }
         }
     }

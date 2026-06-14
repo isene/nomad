@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
@@ -31,6 +33,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.TextDecrease
 import androidx.compose.material.icons.filled.TextIncrease
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -67,6 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.documentfile.provider.DocumentFile
 import coil.compose.AsyncImage
 import com.isene.books.BooksViewModel
 import com.isene.books.data.Book
@@ -86,6 +90,10 @@ private fun ShelfScreen(vm: BooksViewModel) {
     val snackbar = remember { SnackbarHostState() }
     var searching by remember { mutableStateOf(false) }
 
+    // A picked-but-not-yet-confirmed PDF: when non-null, the Add dialog shows.
+    var pendingPdf by remember { mutableStateOf<android.net.Uri?>(null) }
+    var pendingTitle by remember { mutableStateOf("") }
+
     val pickFolder = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree(),
     ) { uri ->
@@ -96,6 +104,17 @@ private fun ShelfScreen(vm: BooksViewModel) {
                 )
             } catch (_: Exception) {}
             vm.setFolder(uri.toString())
+        }
+    }
+
+    val pickPdf = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            val name = DocumentFile.fromSingleUri(ctx, uri)?.name ?: ""
+            pendingTitle = name.removeSuffix(".pdf").removeSuffix(".PDF")
+                .replace('_', ' ').replace('-', ' ').trim()
+            pendingPdf = uri
         }
     }
 
@@ -121,6 +140,11 @@ private fun ShelfScreen(vm: BooksViewModel) {
                     IconButton(onClick = { searching = !searching; if (!searching) vm.search("") }) {
                         Icon(Icons.Filled.Search, contentDescription = "Search")
                     }
+                    if (vm.folderUri != null) {
+                        IconButton(onClick = { pickPdf.launch(arrayOf("application/pdf")) }) {
+                            Icon(Icons.Filled.Add, contentDescription = "Add a PDF book")
+                        }
+                    }
                     IconButton(onClick = { vm.refresh() }) {
                         Icon(Icons.Filled.Refresh, contentDescription = "Reload")
                     }
@@ -142,6 +166,68 @@ private fun ShelfScreen(vm: BooksViewModel) {
             }
         }
     }
+
+    val pdf = pendingPdf
+    if (pdf != null) {
+        AddPdfDialog(
+            initialTitle = pendingTitle,
+            categories = vm.categories.toList(),
+            onDismiss = { pendingPdf = null },
+            onConfirm = { title, subject ->
+                vm.addPdf(pdf.toString(), title, subject)
+                pendingPdf = null
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun AddPdfDialog(
+    initialTitle: String,
+    categories: List<String>,
+    onDismiss: () -> Unit,
+    onConfirm: (title: String, subject: String) -> Unit,
+) {
+    var title by remember { mutableStateOf(initialTitle) }
+    var subject by remember { mutableStateOf(categories.firstOrNull() ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add a PDF book") },
+        text = {
+            Column {
+                Text(
+                    "Your laptop converts it to a readable book and syncs it back here.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                )
+                Spacer(Modifier.height(14.dp))
+                TextField(
+                    value = title, onValueChange = { title = it }, singleLine = true,
+                    label = { Text("Title") }, modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                TextField(
+                    value = subject, onValueChange = { subject = it }, singleLine = true,
+                    label = { Text("Subject (shelf)") }, modifier = Modifier.fillMaxWidth(),
+                )
+                if (categories.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
+                        categories.forEach { c ->
+                            TextButton(onClick = { subject = c }) { Text(c) }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (title.isNotBlank()) onConfirm(title.trim(), subject.trim()) },
+            ) { Text("Add") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
