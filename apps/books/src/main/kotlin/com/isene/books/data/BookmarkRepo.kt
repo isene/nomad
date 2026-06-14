@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
 import org.json.JSONObject
+import java.util.Locale
 
 /**
  * Synced reading positions, in the writable `~/.library-state` folder (a
@@ -32,8 +33,15 @@ class BookmarkRepo(private val context: Context) {
         val tree = DocumentFile.fromTreeUri(context, Uri.parse(stateTreeUri)) ?: return false
         val file = tree.findFile(name(id))?.takeIf { it.isFile }
             ?: tree.createFile("application/json", name(id)) ?: return false
-        val json = "{\"pos\": %.4f, \"updated\": %d}\n"
-            .format(frac.coerceIn(0f, 1f), System.currentTimeMillis() / 1000)
+        // Locale.US so the decimal separator is always '.' — a Norwegian (or
+        // any comma-decimal) locale would otherwise write "0,1300", which is
+        // invalid JSON and reads back as no bookmark.
+        val json = String.format(
+            Locale.US,
+            "{\"pos\": %.4f, \"updated\": %d}\n",
+            frac.coerceIn(0f, 1f),
+            System.currentTimeMillis() / 1000,
+        )
         return runCatching {
             context.contentResolver.openOutputStream(file.uri, "wt")?.use {
                 it.write(json.toByteArray()); true

@@ -47,6 +47,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -262,14 +264,15 @@ private fun ReaderScreen(vm: BooksViewModel) {
     val progress =
         (100f * scroll.value / scroll.maxValue.coerceAtLeast(1)).toInt().coerceIn(0, 100)
 
-    // Resume at the synced bookmark once the content has laid out.
-    var resumed by remember(book.id) { mutableStateOf(false) }
-    LaunchedEffect(vm.content, scroll.maxValue) {
-        if (!resumed && vm.content != null && scroll.maxValue > 0) {
-            val target = (vm.resumeFrac * scroll.maxValue).toInt()
-            if (target > 0) scroll.scrollTo(target)
-            resumed = true
-        }
+    // Resume at the synced bookmark once the content has actually laid out.
+    // ScrollState.maxValue is Int.MAX_VALUE until measured, so wait for the
+    // real overflow before restoring — otherwise the restore scrolls to a
+    // bogus (huge) offset and clamps to the end instead of the bookmark.
+    LaunchedEffect(book.id, vm.content) {
+        if (vm.content == null) return@LaunchedEffect
+        val max = snapshotFlow { scroll.maxValue }.first { it in 1 until Int.MAX_VALUE }
+        val target = (vm.resumeFrac * max).toInt()
+        if (target > 0) scroll.scrollTo(target)
     }
 
     // First bookmark needs a one-time grant of the writable library-state folder.
@@ -284,7 +287,8 @@ private fun ReaderScreen(vm: BooksViewModel) {
                 )
             } catch (_: Exception) {}
             vm.setStateFolder(uri.toString())
-            val frac = if (scroll.maxValue <= 0) 0f else scroll.value.toFloat() / scroll.maxValue
+            val frac = if (scroll.maxValue in 1 until Int.MAX_VALUE)
+                scroll.value.toFloat() / scroll.maxValue else 0f
             vm.saveBookmark(frac)
         }
     }
@@ -315,8 +319,8 @@ private fun ReaderScreen(vm: BooksViewModel) {
                         if (vm.stateFolderUri == null) {
                             pickState.launch(null)
                         } else {
-                            val frac = if (scroll.maxValue <= 0) 0f
-                            else scroll.value.toFloat() / scroll.maxValue
+                            val frac = if (scroll.maxValue in 1 until Int.MAX_VALUE)
+                                scroll.value.toFloat() / scroll.maxValue else 0f
                             vm.saveBookmark(frac)
                         }
                     }) {
