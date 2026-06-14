@@ -4,7 +4,9 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -253,7 +256,7 @@ private fun BookRow(book: Book, onClick: () -> Unit) {
 
 /* ----------------------------- the reader ----------------------------- */
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun ReaderScreen(vm: BooksViewModel) {
     BackHandler { vm.closeReader() }
@@ -287,9 +290,9 @@ private fun ReaderScreen(vm: BooksViewModel) {
                 )
             } catch (_: Exception) {}
             vm.setStateFolder(uri.toString())
-            val frac = if (scroll.maxValue in 1 until Int.MAX_VALUE)
-                scroll.value.toFloat() / scroll.maxValue else 0f
-            vm.saveBookmark(frac)
+            // Re-open the book so it loads the bookmark from the just-chosen
+            // folder and resumes there (rather than overwriting it).
+            vm.open?.let { vm.openBook(it) }
         }
     }
 
@@ -315,16 +318,29 @@ private fun ReaderScreen(vm: BooksViewModel) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = {
-                        if (vm.stateFolderUri == null) {
-                            pickState.launch(null)
-                        } else {
-                            val frac = if (scroll.maxValue in 1 until Int.MAX_VALUE)
-                                scroll.value.toFloat() / scroll.maxValue else 0f
-                            vm.saveBookmark(frac)
-                        }
-                    }) {
-                        Icon(Icons.Filled.BookmarkAdd, contentDescription = "Set bookmark here")
+                    // Tap: set/move the bookmark (picks the folder first time).
+                    // Long-press: re-pick the library-state folder (if the first
+                    // grant pointed at the wrong place).
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .combinedClickable(
+                                onClick = {
+                                    if (vm.stateFolderUri == null) {
+                                        vm.message =
+                                            "Long-press 🔖 to choose your library-state folder first"
+                                    } else {
+                                        val frac = if (scroll.maxValue in 1 until Int.MAX_VALUE)
+                                            scroll.value.toFloat() / scroll.maxValue else 0f
+                                        vm.saveBookmark(frac)
+                                    }
+                                },
+                                onLongClick = { pickState.launch(null) },
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.BookmarkAdd,
+                            contentDescription = "Set bookmark (long-press: choose folder)")
                     }
                     IconButton(onClick = { vm.smallerFont() }) {
                         Icon(Icons.Filled.TextDecrease, contentDescription = "Smaller text")

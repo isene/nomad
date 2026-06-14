@@ -98,6 +98,16 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
                 } else {
                     resumeFrac = frac ?: 0f
                     content = c
+                    // Tell the user (and us) exactly what the bookmark layer did,
+                    // so a 0% landing is never a mystery.
+                    message = when {
+                        stateFolderUri == null ->
+                            "No bookmark folder set — tap 🔖, choose your library-state folder"
+                        resumeFrac > 0f ->
+                            "Resumed at ${(resumeFrac * 100).toInt()}%"
+                        else ->
+                            "No saved bookmark here yet (long-press 🔖 to re-pick the folder)"
+                    }
                 }
             }
         }
