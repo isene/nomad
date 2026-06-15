@@ -24,8 +24,8 @@ android {
         applicationId = "com.isene.books"
         minSdk = 33
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.2.3"
+        versionCode = 6
+        versionName = "0.2.4"
     }
 
     signingConfigs {

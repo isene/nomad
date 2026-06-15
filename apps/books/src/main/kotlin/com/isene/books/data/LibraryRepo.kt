@@ -25,8 +25,13 @@ data class Book(
     val deep: Boolean,
 )
 
-/** A loaded book: its Markdown plus the resolved figure image URIs (n -> png). */
-data class BookContent(val md: String, val figures: Map<Int, Uri>)
+/** A loaded book: Markdown plus resolved figure (figN.png) and equation
+ *  (eqN.png) image URIs, keyed by their number. */
+data class BookContent(
+    val md: String,
+    val figures: Map<Int, Uri>,
+    val equations: Map<Int, Uri> = emptyMap(),
+)
 
 /**
  * Read-only reader over the synced `~/.library` folder:
@@ -40,6 +45,7 @@ data class BookContent(val md: String, val figures: Map<Int, Uri>)
 class LibraryRepo(private val context: Context) {
 
     private val figName = Regex("^fig(\\d+)\\.png$")
+    private val eqName = Regex("^eq(\\d+)\\.png$")
 
     /** Parse catalog.json into the full book list (callers filter to written). */
     fun loadBooks(treeUriStr: String): List<Book> {
@@ -61,14 +67,16 @@ class LibraryRepo(private val context: Context) {
         // Defensive: should a figures block ever land in book.md, drop it.
         val cut = text.indexOf("===FIGURES===")
         if (cut >= 0) text = text.substring(0, cut).trimEnd()
-        // One listing of the img dir builds the whole n -> uri map (cheap, once).
+        // One listing of the img dir builds both n -> uri maps (cheap, once).
         val figs = HashMap<Int, Uri>()
+        val eqs = HashMap<Int, Uri>()
         dir.findFile("img")?.takeIf { it.isDirectory }?.listFiles()?.forEach { f ->
             if (!f.isFile) return@forEach
-            val n = figName.find(f.name ?: "")?.groupValues?.get(1)?.toIntOrNull()
-            if (n != null) figs[n] = f.uri
+            val name = f.name ?: ""
+            figName.find(name)?.groupValues?.get(1)?.toIntOrNull()?.let { figs[it] = f.uri }
+            eqName.find(name)?.groupValues?.get(1)?.toIntOrNull()?.let { eqs[it] = f.uri }
         }
-        return BookContent(text, figs)
+        return BookContent(text, figs, eqs)
     }
 
     /**

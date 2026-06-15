@@ -5,8 +5,12 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,6 +20,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -57,7 +62,11 @@ import androidx.compose.runtime.snapshotFlow
 import kotlinx.coroutines.flow.first
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -70,6 +79,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.documentfile.provider.DocumentFile
 import coil.compose.AsyncImage
 import com.isene.books.BooksViewModel
@@ -353,6 +364,8 @@ private fun ReaderScreen(vm: BooksViewModel) {
     val ctx = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     val scroll = rememberScrollState()
+    // A tapped figure/equation to view full-screen with pinch-zoom.
+    var zoom by remember { mutableStateOf<android.net.Uri?>(null) }
     val progress =
         (100f * scroll.value / scroll.maxValue.coerceAtLeast(1)).toInt().coerceIn(0, 100)
 
@@ -450,8 +463,51 @@ private fun ReaderScreen(vm: BooksViewModel) {
                         modifier = Modifier.align(Alignment.Center),
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     )
-                else -> BookText(c.md, c.figures, vm.fontScale, scroll)
+                else -> BookText(c.md, c.figures, c.equations, vm.fontScale, scroll) { zoom = it }
             }
+        }
+    }
+
+    zoom?.let { uri ->
+        ZoomableImageOverlay(uri) { zoom = null }
+    }
+}
+
+/** Full-screen pinch-zoom + pan viewer for a figure/equation image.
+ *  Tap to dismiss, double-tap to toggle a 2.5× zoom. */
+@Composable
+private fun ZoomableImageOverlay(uri: android.net.Uri, onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        var scale by remember { mutableStateOf(1f) }
+        var offset by remember { mutableStateOf(Offset.Zero) }
+        val state = rememberTransformableState { zoomChange, panChange, _ ->
+            scale = (scale * zoomChange).coerceIn(1f, 6f)
+            offset += panChange
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .transformable(state)
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { onDismiss() },
+                        onDoubleTap = {
+                            if (scale > 1f) { scale = 1f; offset = Offset.Zero } else scale = 2.5f
+                        },
+                    )
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            AsyncImage(
+                model = uri,
+                contentDescription = null,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize().graphicsLayer(
+                    scaleX = scale, scaleY = scale,
+                    translationX = offset.x, translationY = offset.y,
+                ),
+            )
         }
     }
 }
@@ -460,13 +516,16 @@ private fun ReaderScreen(vm: BooksViewModel) {
 private fun BookText(
     md: String,
     figures: Map<Int, android.net.Uri>,
+    equations: Map<Int, android.net.Uri>,
     scale: Float,
     scroll: androidx.compose.foundation.ScrollState,
+    onZoom: (android.net.Uri) -> Unit,
 ) {
     val accent = MaterialTheme.colorScheme.primary
     val body = MaterialTheme.colorScheme.onSurface
     val dim = body.copy(alpha = 0.65f)
     val figRe = remember { Regex("""^\[\[FIG\s+(\d+):\s*(.*?)]]$""") }
+    val eqRe = remember { Regex("""^\[\[EQ\s+(\d+)]]$""") }
 
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(scroll)
@@ -476,11 +535,16 @@ private fun BookText(
         for (raw in md.lines()) {
             val line = raw.trim()
             val fig = figRe.find(line)
+            val eq = eqRe.find(line)
             when {
                 line.startsWith("# ") -> {} // title is in the app bar
+                eq != null -> Equation(
+                    uri = equations[eq.groupValues[1].toIntOrNull() ?: -1],
+                    scale = scale, onZoom = onZoom,
+                )
                 fig != null -> Figure(
                     uri = figures[fig.groupValues[1].toIntOrNull() ?: -1],
-                    caption = fig.groupValues[2], dim = dim, scale = scale,
+                    caption = fig.groupValues[2], dim = dim, scale = scale, onZoom = onZoom,
                 )
                 line.startsWith("## ") -> {
                     Spacer(Modifier.height(22.dp))
@@ -518,13 +582,34 @@ private fun BookText(
 }
 
 @Composable
-private fun Figure(uri: android.net.Uri?, caption: String, dim: Color, scale: Float) {
+private fun Equation(uri: android.net.Uri?, scale: Float, onZoom: (android.net.Uri) -> Unit) {
+    if (uri == null) return
+    Spacer(Modifier.height(10.dp))
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        AsyncImage(
+            model = uri,
+            contentDescription = "equation",
+            contentScale = ContentScale.Fit,
+            modifier = Modifier
+                .heightIn(max = (130 * scale).dp)
+                .fillMaxWidth()
+                .clickable { onZoom(uri) },
+        )
+    }
+    Spacer(Modifier.height(10.dp))
+}
+
+@Composable
+private fun Figure(
+    uri: android.net.Uri?, caption: String, dim: Color, scale: Float,
+    onZoom: (android.net.Uri) -> Unit,
+) {
     Spacer(Modifier.height(14.dp))
     if (uri != null) {
         AsyncImage(
             model = uri,
             contentDescription = caption,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().clickable { onZoom(uri) },
         )
     }
     if (caption.isNotBlank()) {
