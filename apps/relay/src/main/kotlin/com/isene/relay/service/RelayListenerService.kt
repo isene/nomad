@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.app.RemoteInput
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Icon
@@ -173,7 +174,13 @@ class RelayListenerService : NotificationListenerService() {
         // Still-image preview, if the notification carries one (BigPictureStyle).
         // Pulled from extras (already materialised, so cheap); only compressed +
         // written for genuinely new messages, after the dedup gate below.
-        val picture = extractPicture(extras)
+        var picture = extractPicture(extras)
+        // MessagingStyle apps (Discord, WhatsApp, Messenger) attach images as a
+        // per-message dataUri, not BigPictureStyle's EXTRA_PICTURE. When the
+        // big-picture path found nothing, pull the latest message's dataUri.
+        if (picture == null) {
+            style?.messages?.lastOrNull()?.let { picture = imageFromDataUri(it.dataUri) }
+        }
 
         // Nothing to relay: no caption and no image.
         if (text.isBlank() && picture == null) return
@@ -299,6 +306,23 @@ class RelayListenerService : NotificationListenerService() {
             iconToBitmap(ic)?.let { return it }
         }
         return null
+    }
+
+    /** Decode a MessagingStyle message's `dataUri` (the image a chat app like
+     *  Discord/WhatsApp/Messenger attaches to a DM) into a Bitmap. Returns null
+     *  if there's no uri, or if Android refuses the read — the content:// URI is
+     *  scoped to the notification, so a listener may or may not be granted
+     *  access. On denial we fall back to text-only, exactly as before. */
+    private fun imageFromDataUri(uri: android.net.Uri?): Bitmap? {
+        val u = uri ?: return null
+        return try {
+            applicationContext.contentResolver.openInputStream(u)?.use {
+                BitmapFactory.decodeStream(it)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("relay", "MessagingStyle dataUri read failed for $u: $e")
+            null
+        }
     }
 
     private fun iconToBitmap(icon: Icon): Bitmap? = try {
