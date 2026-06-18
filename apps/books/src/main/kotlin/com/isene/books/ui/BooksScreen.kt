@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -77,6 +78,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -170,13 +172,16 @@ private fun ShelfScreen(vm: BooksViewModel) {
         },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { inner ->
-        Column(modifier = Modifier.fillMaxSize().padding(inner)) {
+        // Only consume the TOP inset here (under the app bar). The shelf list
+        // takes the BOTTOM inset as contentPadding instead, so it scrolls under
+        // the gesture-nav bar and its last book can scroll fully clear of it.
+        Column(modifier = Modifier.fillMaxSize().padding(top = inner.calculateTopPadding())) {
             if (searching) SearchField(vm.query, vm::search)
             when {
                 vm.folderUri == null -> EmptyState { pickFolder.launch(null) }
                 vm.shelf.isEmpty() ->
                     NoBooks(folderName = vm.folderName, searching = vm.query.isNotBlank())
-                else -> ShelfList(vm)
+                else -> ShelfList(vm, inner.calculateBottomPadding())
             }
         }
     }
@@ -282,9 +287,12 @@ private fun entriesOf(books: List<Book>): List<Entry> {
 }
 
 @Composable
-private fun ShelfList(vm: BooksViewModel) {
+private fun ShelfList(vm: BooksViewModel, bottomInset: Dp) {
     val entries = remember(vm.shelf.toList()) { entriesOf(vm.shelf) }
-    LazyColumn(modifier = Modifier.fillMaxSize()) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = bottomInset + 24.dp),
+    ) {
         items(entries.size) { i ->
             when (val e = entries[i]) {
                 is Entry.Header -> ShelfHeader(e.category, e.count)
@@ -559,19 +567,19 @@ private fun BookText(
                     Spacer(Modifier.height(4.dp))
                 }
                 line.startsWith("> ") -> Text(
-                    inline(line.substring(2), italicAll = true),
+                    inline(line.substring(2), italicAll = true, linkColor = accent),
                     color = dim, fontStyle = FontStyle.Italic,
                     fontSize = (16.5f * scale).sp, lineHeight = (25 * scale).sp,
                     modifier = Modifier.padding(start = 14.dp, top = 4.dp, bottom = 4.dp),
                 )
                 line.startsWith("- ") || line.startsWith("* ") -> Text(
-                    buildAnnotatedString { append("•  "); append(inline(line.substring(2))) },
+                    buildAnnotatedString { append("•  "); append(inline(line.substring(2), linkColor = accent)) },
                     color = body, fontSize = (17 * scale).sp, lineHeight = (26 * scale).sp,
                     modifier = Modifier.padding(start = 6.dp, top = 2.dp, bottom = 2.dp),
                 )
                 line.isBlank() -> Spacer(Modifier.height(9.dp))
                 else -> Text(
-                    inline(line), color = body,
+                    inline(line, linkColor = accent), color = body,
                     fontSize = (17 * scale).sp, lineHeight = (26 * scale).sp,
                     modifier = Modifier.padding(vertical = 2.dp),
                 )
@@ -623,8 +631,12 @@ private fun Figure(
     Spacer(Modifier.height(14.dp))
 }
 
-/** Minimal inline Markdown: **bold**, *italic*, `code`. */
-private fun inline(text: String, italicAll: Boolean = false): AnnotatedString =
+/** Minimal inline Markdown: **bold**, *italic*, `code`, [text](url). */
+private fun inline(
+    text: String,
+    italicAll: Boolean = false,
+    linkColor: Color? = null,
+): AnnotatedString =
     buildAnnotatedString {
         var i = 0
         while (i < text.length) {
@@ -636,6 +648,22 @@ private fun inline(text: String, italicAll: Boolean = false): AnnotatedString =
                             append(text.substring(i + 2, end))
                         }
                         i = end + 2
+                    } else { append(text[i]); i++ }
+                }
+                // [label](url) — show the label only. The reader is one
+                // continuous scroll, so the `#anchor` target has nowhere to go;
+                // render the label in the accent colour and drop the raw URL
+                // (otherwise the literal "(#ch01.xhtml_ch01)" leaks on screen).
+                text[i] == '[' -> {
+                    val close = text.indexOf(']', i + 1)
+                    val end = if (close >= 0 && close + 1 < text.length && text[close + 1] == '(')
+                        text.indexOf(')', close + 2) else -1
+                    if (close > i && end > close) {
+                        val label = text.substring(i + 1, close)
+                        if (linkColor != null) {
+                            withStyle(SpanStyle(color = linkColor)) { append(label) }
+                        } else append(label)
+                        i = end + 1
                     } else { append(text[i]); i++ }
                 }
                 text[i] == '*' -> {
