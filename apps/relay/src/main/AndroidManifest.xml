@@ -16,6 +16,10 @@
          per incoming SMS, so no idle cost. -->
     <uses-permission android:name="android.permission.READ_CONTACTS" />
 
+    <!-- Post the "N replies need manual sending" heads-up when a reply can't be
+         auto-delivered. Runtime-requested on first launch (minSdk 33). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <!-- See launchable apps so the user can pick a custom app to relay
          (the "Add app" picker). Avoids QUERY_ALL_PACKAGES. -->
     <queries>

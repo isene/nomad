@@ -47,6 +47,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -126,6 +127,23 @@ private fun RelayScreen() {
         smsOn = granted
     }
 
+    // Ask for POST_NOTIFICATIONS (minSdk 33) so the "needs manual sending"
+    // heads-up can show. One-shot; harmless if already granted or denied.
+    val notifPermLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) {}
+    LaunchedEffect(Unit) {
+        if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            notifPermLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    // Reply requests the relay couldn't auto-deliver — the user finishes these
+    // by hand. Reloaded on resume (the existing refresh) and after each action.
+    var pending by remember(refresh) { mutableStateOf(Gateway.manualSends(ctx)) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -149,6 +167,44 @@ private fun RelayScreen() {
                 style = MaterialTheme.typography.bodyMedium,
             )
             Spacer(Modifier.size(20.dp))
+
+            if (pending.isNotEmpty()) {
+                Text("Needs manual sending", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "These replies couldn't be sent as you automatically. Send each " +
+                        "one yourself in the app, then tap “Sent”.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.size(8.dp))
+                pending.forEach { ps ->
+                    ManualSendItem(
+                        ps = ps,
+                        onCopy = {
+                            val cm = ctx.getSystemService(android.content.ClipboardManager::class.java)
+                            cm?.setPrimaryClip(android.content.ClipData.newPlainText("reply", ps.text))
+                        },
+                        onOpen = {
+                            Gateway.packageFor(ctx, ps.platform)
+                                ?.let { ctx.packageManager.getLaunchIntentForPackage(it) }
+                                ?.let { ctx.startActivity(it) }
+                        },
+                        onSent = {
+                            Gateway.markManualSent(ctx, ps)
+                            pending = Gateway.manualSends(ctx)
+                            Gateway.refreshManualNotification(ctx)
+                        },
+                        onDiscard = {
+                            Gateway.discardSend(ctx, ps)
+                            pending = Gateway.manualSends(ctx)
+                            Gateway.refreshManualNotification(ctx)
+                        },
+                    )
+                }
+                Spacer(Modifier.size(20.dp))
+                HorizontalDivider()
+                Spacer(Modifier.size(12.dp))
+            }
 
             StatusRow(
                 label = "Notification access",
@@ -393,6 +449,31 @@ private fun StatusRow(label: String, ok: Boolean, action: String, onAction: () -
             Button(onClick = onAction) { Text(action) }
         } else {
             Text("OK", color = Color(0xFF2E9E4B))
+        }
+    }
+}
+
+@Composable
+private fun ManualSendItem(
+    ps: PendingSend,
+    onCopy: () -> Unit,
+    onOpen: () -> Unit,
+    onSent: () -> Unit,
+    onDiscard: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Text(
+            "${ps.platform.replaceFirstChar { it.uppercase() }} · ${ps.threadKey}",
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(ps.text, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.size(4.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = onCopy) { Text("Copy") }
+            TextButton(onClick = onOpen) { Text("Open") }
+            TextButton(onClick = onSent) { Text("Sent") }
+            TextButton(onClick = onDiscard) { Text("Discard") }
         }
     }
 }

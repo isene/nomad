@@ -1,6 +1,11 @@
 package com.isene.relay
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import java.io.File
 import org.json.JSONObject
 
@@ -128,4 +133,117 @@ object Gateway {
      *  outbox_status/<id>.json = {"id","status":"sent"|"failed","reason"?,"at"}. */
     fun outboxStatusDir(c: Context) = File(dir(c), "outbox_status").apply { mkdirs() }
     fun sentDir(c: Context) = File(dir(c), "sent").apply { mkdirs() }
+
+    /** Reply requests still sitting in outbox/ — the ones the relay couldn't
+     *  auto-deliver yet. That dir IS the pending queue, so the manual-send UI
+     *  just reads it. Newest first. */
+    fun pendingSends(c: Context): List<PendingSend> {
+        val files = outboxDir(c).listFiles { f -> f.isFile && f.name.endsWith(".json") }
+            ?: return emptyList()
+        return files.mapNotNull { f ->
+            try {
+                val o = JSONObject(f.readText())
+                val platform = o.optString("platform")
+                val thread = o.optString("thread_key")
+                if (platform.isEmpty() || thread.isEmpty()) null
+                else PendingSend(
+                    o.optString("id").ifEmpty { f.nameWithoutExtension },
+                    platform, thread, o.optString("text"), o.optLong("ts", 0L) * 1000, f,
+                )
+            } catch (_: Exception) { null }
+        }.sortedByDescending { it.tsMs }
+    }
+
+    /** Write a delivery result for kastrup (tmp+rename). `target` =
+     *  "<platform>:<thread_key>" lets kastrup label it even when it is no longer
+     *  tracking the request (e.g. a manual send hours later). */
+    fun writeStatus(c: Context, id: String, status: String, reason: String?, target: String?) {
+        try {
+            val obj = JSONObject().apply {
+                put("id", id)
+                put("status", status)
+                if (reason != null) put("reason", reason)
+                if (target != null) put("target", target)
+                put("at", System.currentTimeMillis() / 1000)
+            }
+            val dir = outboxStatusDir(c)
+            val tmp = File(dir, "$id.json.tmp")
+            tmp.writeText(obj.toString())
+            tmp.renameTo(File(dir, "$id.json"))
+        } catch (_: Exception) {}
+    }
+
+    /** User sent it by hand → mark it sent (as them) to kastrup and drop it. */
+    fun markManualSent(c: Context, ps: PendingSend) {
+        writeStatus(c, ps.id, "sent", "manual", "${ps.platform}:${ps.threadKey}")
+        ps.file.delete()
+    }
+
+    /** User gave up on it → mark it not-sent to kastrup and drop it. */
+    fun discardSend(c: Context, ps: PendingSend) {
+        writeStatus(c, ps.id, "failed", "discarded", "${ps.platform}:${ps.threadKey}")
+        ps.file.delete()
+    }
+
+    /** Best-effort launchable package for a relayed platform — the "Open" button
+     *  in the manual-send list jumps to it. */
+    fun packageFor(c: Context, platform: String): String? {
+        PLATFORMS.entries.firstOrNull { it.value == platform }?.let { return it.key }
+        return customApps(c).entries.firstOrNull { it.value.equals(platform, true) }?.key
+    }
+
+    /** Held longer than this with no auto-delivery → surfaced for manual send. */
+    const val AUTO_WINDOW_MS = 3L * 60 * 1000L
+    private const val MANUAL_CHANNEL = "manual_send"
+    private const val MANUAL_NOTIF_ID = 0x4d53
+
+    /** Pending sends that have waited past the auto window — the ones actually
+     *  surfaced for manual handling (a fresh hold may still auto-fire, so it is
+     *  not shown yet). */
+    fun manualSends(c: Context): List<PendingSend> {
+        val now = System.currentTimeMillis()
+        return pendingSends(c).filter { now - it.tsMs >= AUTO_WINDOW_MS }
+    }
+
+    /** Show/refresh/clear the "N replies need manual sending" heads-up. Counts
+     *  only requests held past the auto window (fresh holds may still auto-fire).
+     *  Cold when nothing qualifies — one dir listing, no timer. Safe to call from
+     *  the service (on events) or the UI (after a manual action). */
+    fun refreshManualNotification(c: Context) {
+        val n = manualSends(c).size
+        val nm = c.getSystemService(NotificationManager::class.java) ?: return
+        if (n == 0) { nm.cancel(MANUAL_NOTIF_ID); return }
+        if (nm.getNotificationChannel(MANUAL_CHANNEL) == null) {
+            nm.createNotificationChannel(
+                NotificationChannel(
+                    MANUAL_CHANNEL, "Manual send needed",
+                    NotificationManager.IMPORTANCE_DEFAULT,
+                ).apply { description = "Replies the relay couldn't send automatically" },
+            )
+        }
+        val pi = PendingIntent.getActivity(
+            c, 0,
+            Intent(c, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notif = Notification.Builder(c, MANUAL_CHANNEL)
+            .setSmallIcon(android.R.drawable.stat_notify_error)
+            .setContentTitle("$n repl${if (n == 1) "y" else "ies"} need manual sending")
+            .setContentText("Tap to send them yourself in each app")
+            .setContentIntent(pi)
+            .setAutoCancel(false)
+            .build()
+        nm.notify(MANUAL_NOTIF_ID, notif)
+    }
 }
+
+/** A reply request the relay is holding because it couldn't fire it
+ *  automatically (no live notification handle for the thread). */
+data class PendingSend(
+    val id: String,
+    val platform: String,
+    val threadKey: String,
+    val text: String,
+    val tsMs: Long,
+    val file: File,
+)

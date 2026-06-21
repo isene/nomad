@@ -12,6 +12,8 @@ import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.telephony.SmsManager
@@ -63,8 +65,12 @@ class RelayListenerService : NotificationListenerService() {
     // request id -> pending reply awaiting a live notification to fire against.
     private val pending = ConcurrentHashMap<String, PendingReply>()
 
-    // After this long undelivered, give up and report "failed" to kastrup.
-    private val outboxTtlMs = 24L * 60 * 60 * 1000
+    // A manual item nobody acted on this long is dropped, so nothing queues
+    // truly forever. Generous: it's visible the whole time, this is just a backstop.
+    // (The "surface it for manual sending" window is Gateway.AUTO_WINDOW_MS.)
+    private val manualMaxAgeMs = 7L * 24 * 60 * 60 * 1000
+
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     // Recently-written message keys, to suppress duplicate inbound files when
     // an app re-posts the same notification (UI/read-state updates). Bounded
@@ -105,6 +111,9 @@ class RelayListenerService : NotificationListenerService() {
         // FileObserver only fires for events after it starts, so a request that
         // synced during a relay restart would otherwise sit untouched.
         scanOutbox(dir)
+        // Anything still undelivered past the window → re-raise the manual-send
+        // heads-up (the in-memory hold map was lost on restart).
+        Gateway.refreshManualNotification(applicationContext)
     }
 
     private fun scanOutbox(dir: File) {
@@ -437,32 +446,37 @@ class RelayListenerService : NotificationListenerService() {
         val ts = o.optLong("ts", 0L)
 
         if (platform.isEmpty() || threadKey.isEmpty() || text.isEmpty()) {
-            finishFailed(id, "malformed")
+            finishFailed(id, "malformed", null)
             f.delete()
             return
         }
 
         // SMS is native and notification-independent: terminal either way.
         if (platform == "sms") {
-            if (sendSms(threadKey, text)) finishSent(id) else finishFailed(id, "sms_failed")
+            if (sendSms(threadKey, text)) finishSent(id, "sms:$threadKey")
+            else finishFailed(id, "sms_failed", "sms:$threadKey")
             f.delete()
             return
         }
 
         // RemoteInput platforms (discord, whatsapp, messenger, …).
         sweepExpired()
+        val target = "$platform:$threadKey"
         val firstSeenMs = if (ts > 0) ts * 1000 else System.currentTimeMillis()
-        if (System.currentTimeMillis() - firstSeenMs >= outboxTtlMs) {
-            finishFailed(id, "no_live_notification")
-            f.delete()
-            return
-        }
+        // Cache miss (e.g. the service was restarted and lost its in-memory
+        // handles) → recover the reply handle from notifications still in the
+        // status bar before giving up. This is what lets a reply still fire as
+        // the user after a ColorOS kill — the main cause of "held forever".
+        if (replyCache[key(platform, threadKey)] == null) cacheActiveReplyActions()
         if (fireReply(platform, threadKey, text)) {
-            finishSent(id)
+            finishSent(id, target)
             f.delete()
         } else {
-            // Hold for retry on the next notification from this thread.
+            // Couldn't fire now. Keep the request (a later ping can still
+            // auto-deliver it as the user) and, once it has waited past the auto
+            // window, surface it on the phone for manual sending.
             pending[id] = PendingReply(id, platform, threadKey, text, firstSeenMs)
+            scheduleManualCheck()
         }
     }
 
@@ -475,48 +489,41 @@ class RelayListenerService : NotificationListenerService() {
         val k = key(platform, threadKey)
         for (p in pending.values.toList()) {
             if (key(p.platform, p.threadKey) != k) continue
+            // The user may have already sent or discarded it by hand (request
+            // file gone) — don't fire a duplicate.
+            if (!File(Gateway.outboxDir(applicationContext), "${p.id}.json").exists()) {
+                pending.remove(p.id); continue
+            }
             if (fireReply(p.platform, p.threadKey, p.text)) {
-                finishSent(p.id)
+                finishSent(p.id, "${p.platform}:${p.threadKey}")
                 deleteRequest(p.id)
                 pending.remove(p.id)
             }
         }
+        Gateway.refreshManualNotification(applicationContext)
     }
 
-    /** Lazily expire held requests past their TTL (event-driven, no timer):
-     *  swept whenever a request arrives or a thread notifies. */
+    /** Lazily drop manual items nobody touched for a week (event-driven, no
+     *  timer): swept whenever a request arrives or a thread notifies. Items
+     *  inside the window are KEPT — still retryable on the next ping and visible
+     *  in the manual-send list. */
     private fun sweepExpired() {
         if (pending.isEmpty()) return
         val now = System.currentTimeMillis()
         for (p in pending.values.toList()) {
-            if (now - p.firstSeenMs >= outboxTtlMs) {
-                finishFailed(p.id, "no_live_notification")
+            if (now - p.firstSeenMs >= manualMaxAgeMs) {
+                finishFailed(p.id, "expired_unsent", "${p.platform}:${p.threadKey}")
                 deleteRequest(p.id)
                 pending.remove(p.id)
             }
         }
     }
 
-    private fun finishSent(id: String) = writeStatus(id, "sent", null)
-    private fun finishFailed(id: String, reason: String) = writeStatus(id, "failed", reason)
-
-    /** Write the terminal delivery result for kastrup (tmp + rename). kastrup
-     *  reads outbox_status/<id>.json then deletes it. */
-    private fun writeStatus(id: String, status: String, reason: String?) {
-        if (!hasStorage()) return
-        try {
-            val obj = JSONObject().apply {
-                put("id", id)
-                put("status", status)
-                if (reason != null) put("reason", reason)
-                put("at", System.currentTimeMillis() / 1000)
-            }
-            val dir = Gateway.outboxStatusDir(applicationContext)
-            val tmp = File(dir, "$id.json.tmp")
-            tmp.writeText(obj.toString())
-            tmp.renameTo(File(dir, "$id.json"))
-        } catch (_: Exception) {
-        }
+    private fun finishSent(id: String, target: String?) {
+        if (hasStorage()) Gateway.writeStatus(applicationContext, id, "sent", null, target)
+    }
+    private fun finishFailed(id: String, reason: String, target: String?) {
+        if (hasStorage()) Gateway.writeStatus(applicationContext, id, "failed", reason, target)
     }
 
     private fun deleteRequest(id: String) {
@@ -524,5 +531,38 @@ class RelayListenerService : NotificationListenerService() {
             File(Gateway.outboxDir(applicationContext), "$id.json").delete()
         } catch (_: Exception) {
         }
+    }
+
+    /** Re-populate the reply-handle cache from notifications still in the status
+     *  bar. The cache is in-memory, so a service restart (e.g. an OEM kill)
+     *  loses it; this recovers handles for any chat whose notification is still
+     *  showing, so a reply queued before the restart can still fire as the user. */
+    private fun cacheActiveReplyActions() {
+        val ctx = applicationContext
+        val active = try { activeNotifications } catch (_: Exception) { return } ?: return
+        for (sbn in active) {
+            val pkg = sbn.packageName
+            if (!Gateway.isAllowed(ctx, pkg)) continue
+            val platform = Gateway.platformFor(ctx, pkg) ?: continue
+            val n = sbn.notification ?: continue
+            if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) continue
+            val style = NotificationCompat.MessagingStyle
+                .extractMessagingStyleFromNotification(n)
+            val extras = n.extras
+            val rawTitle = style?.conversationTitle?.toString()
+                ?: extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
+                ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
+                ?: continue
+            cacheReplyAction(platform, stripCountSuffix(rawTitle), n)
+        }
+    }
+
+    // One pending re-check at a time: a burst of holds collapses to a single
+    // wake at the window edge (no per-item timer). The request stays retryable
+    // on real notification events meanwhile.
+    private val manualCheck = Runnable { Gateway.refreshManualNotification(applicationContext) }
+    private fun scheduleManualCheck() {
+        mainHandler.removeCallbacks(manualCheck)
+        mainHandler.postDelayed(manualCheck, Gateway.AUTO_WINDOW_MS)
     }
 }
