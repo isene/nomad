@@ -175,11 +175,25 @@ class RelayListenerService : NotificationListenerService() {
         // Pulled from extras (already materialised, so cheap); only compressed +
         // written for genuinely new messages, after the dedup gate below.
         var picture = extractPicture(extras)
+        val bigPicFound = picture != null
         // MessagingStyle apps (Discord, WhatsApp, Messenger) attach images as a
         // per-message dataUri, not BigPictureStyle's EXTRA_PICTURE. When the
         // big-picture path found nothing, pull the latest message's dataUri.
-        if (picture == null) {
-            style?.messages?.lastOrNull()?.let { picture = imageFromDataUri(it.dataUri) }
+        val dataUri = style?.messages?.lastOrNull()?.dataUri
+        if (picture == null && dataUri != null) {
+            picture = imageFromDataUri(dataUri)
+        }
+        // Image-relay diagnostic (temporary). For chat-app / big-picture
+        // notifications, record which path produced the image — so we can tell
+        // "the app embeds no image" (dataUri=null & bigPicture=false) from "the
+        // OEM blocks the content:// read" (dataUri present but decoded=false).
+        // Goes to logcat (tag relay-img) AND to relay-img-debug.log in the synced
+        // gateway root, so it lands on the laptop without adb.
+        if (style != null || bigPicFound) {
+            appendImgDebug("platform=$platform style=${style != null}" +
+                " msgs=${style?.messages?.size ?: 0} bigPicture=$bigPicFound" +
+                " dataUri=${dataUri?.scheme ?: "null"} decoded=${picture != null}" +
+                " textBlank=${text.isBlank()}")
         }
 
         // Nothing to relay: no caption and no image.
@@ -316,13 +330,29 @@ class RelayListenerService : NotificationListenerService() {
     private fun imageFromDataUri(uri: android.net.Uri?): Bitmap? {
         val u = uri ?: return null
         return try {
-            applicationContext.contentResolver.openInputStream(u)?.use {
+            val bmp = applicationContext.contentResolver.openInputStream(u)?.use {
                 BitmapFactory.decodeStream(it)
             }
+            appendImgDebug(if (bmp != null) "  dataUri decoded ${bmp.width}x${bmp.height}"
+                           else "  dataUri opened but decoded null")
+            bmp
         } catch (e: Exception) {
-            android.util.Log.w("relay", "MessagingStyle dataUri read failed for $u: $e")
+            android.util.Log.w("relay-img", "dataUri read failed for $u: $e")
+            appendImgDebug("  dataUri read FAILED: ${e.javaClass.simpleName}: ${e.message}")
             null
         }
+    }
+
+    /** Append a line to the image-relay diagnostic in the synced gateway root
+     *  (lands at ~/.kastrup/gateway/relay-img-debug.log on the laptop). Also
+     *  mirrors to logcat (tag relay-img). Temporary; remove once the
+     *  Messenger/Discord notification image path is understood. */
+    private fun appendImgDebug(line: String) {
+        android.util.Log.i("relay-img", line)
+        try {
+            File(Gateway.inboundDir(applicationContext).parentFile, "relay-img-debug.log")
+                .appendText(line + "\n")
+        } catch (_: Exception) {}
     }
 
     private fun iconToBitmap(icon: Icon): Bitmap? = try {
