@@ -540,8 +540,21 @@ private fun BookText(
             .padding(horizontal = 18.dp),
     ) {
         Spacer(Modifier.height(6.dp))
-        for (raw in md.lines()) {
-            val line = raw.trim()
+        val ls = md.lines()
+        var li = 0
+        while (li < ls.size) {
+            val line = ls[li].trim()
+            // A markdown table: header row, `|---|` separator, then body rows.
+            if (line.startsWith("|") && li + 1 < ls.size && isTableSep(ls[li + 1])) {
+                val rows = mutableListOf(splitRow(line))
+                var lj = li + 2
+                while (lj < ls.size && ls[lj].trim().startsWith("|")) {
+                    rows.add(splitRow(ls[lj])); lj++
+                }
+                MdTable(rows, accent, body, scale)
+                li = lj
+                continue
+            }
             val fig = figRe.find(line)
             val eq = eqRe.find(line)
             when {
@@ -584,6 +597,7 @@ private fun BookText(
                     modifier = Modifier.padding(vertical = 2.dp),
                 )
             }
+            li++
         }
         Spacer(Modifier.height(64.dp))
     }
@@ -688,6 +702,43 @@ private fun inline(
             }
         }
     }
+
+/** A markdown table separator row like `|---|:--:|---|`. */
+private fun isTableSep(s: String): Boolean {
+    val t = s.trim()
+    return t.startsWith("|") && t.contains("-") &&
+        t.all { it == '|' || it == '-' || it == ':' || it == ' ' }
+}
+
+/** Split a `| a | b |` row into trimmed cells (outer pipes dropped). */
+private fun splitRow(s: String): List<String> =
+    s.trim().trim('|').split("|").map { it.trim() }
+
+/** Render a parsed markdown table as aligned, equal-weight columns: a bold
+ *  header in the accent colour, a divider, then body rows. */
+@Composable
+private fun MdTable(rows: List<List<String>>, accent: Color, body: Color, scale: Float) {
+    val cols = rows.maxOfOrNull { it.size } ?: 0
+    if (cols == 0) return
+    Spacer(Modifier.height(8.dp))
+    Column(Modifier.fillMaxWidth()) {
+        rows.forEachIndexed { ri, cells ->
+            Row(Modifier.fillMaxWidth()) {
+                for (c in 0 until cols) {
+                    Text(
+                        inline(cells.getOrNull(c).orEmpty(), linkColor = accent),
+                        color = if (ri == 0) accent else body,
+                        fontWeight = if (ri == 0) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = (15.5f * scale).sp, lineHeight = (22 * scale).sp,
+                        modifier = Modifier.weight(1f).padding(end = 8.dp, top = 3.dp, bottom = 3.dp),
+                    )
+                }
+            }
+            if (ri == 0) HorizontalDivider(Modifier.padding(vertical = 2.dp))
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+}
 
 /* ----------------------------- empty states ----------------------------- */
 
