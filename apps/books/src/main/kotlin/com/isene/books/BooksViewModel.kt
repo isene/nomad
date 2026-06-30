@@ -3,6 +3,7 @@ package com.isene.books
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -33,6 +34,11 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
     val shelf = mutableStateListOf<Book>()
     var query by mutableStateOf(""); private set
 
+    /** Reading progress per book id (bookmark fraction 0..1), shown as a %
+     *  beside bookmarked books on the shelf. Loaded in one directory listing
+     *  off the UI thread; updated when a bookmark is saved. */
+    val progress = mutableStateMapOf<String, Float>()
+
     /** All shelf names in the catalog (written or not) — the subject choices
      *  offered when adding a PDF, so an import lands on an existing shelf. */
     val categories = mutableStateListOf<String>()
@@ -62,9 +68,14 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
             val all = everything.filter { it.written }
             val cats = everything.map { it.category }.filter { it.isNotBlank() }.distinct()
             val fname = repo.folderName(uri)
+            // Bookmark fractions in one listing (off the UI thread).
+            val fracs = stateFolderUri?.let { st ->
+                runCatching { bm.loadAllFracs(st, all.map { it.id }.toSet()) }.getOrNull()
+            } ?: emptyMap()
             withContext(Dispatchers.Main) {
                 written.clear(); written.addAll(all)
                 categories.clear(); categories.addAll(cats)
+                progress.clear(); progress.putAll(fracs)
                 folderName = fname
                 loading = false
                 applyQuery()
@@ -143,6 +154,13 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
     fun setStateFolder(treeUri: String) {
         Prefs.setStateUri(getApplication(), treeUri)
         stateFolderUri = treeUri
+        // Now that we know where bookmarks live, load the shelf %s.
+        viewModelScope.launch(Dispatchers.IO) {
+            val fracs = runCatching {
+                bm.loadAllFracs(treeUri, written.map { it.id }.toSet())
+            }.getOrNull() ?: emptyMap()
+            withContext(Dispatchers.Main) { progress.clear(); progress.putAll(fracs) }
+        }
     }
 
     /** Set/move the bookmark for the open book to a reading fraction. */
@@ -153,6 +171,7 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             val ok = runCatching { bm.saveFrac(st, b.id, frac) }.getOrDefault(false)
             withContext(Dispatchers.Main) {
+                if (ok) progress[b.id] = frac.coerceIn(0f, 1f)
                 message = if (ok) "Bookmark set at ${(frac * 100).toInt()}%" else "Could not save bookmark."
             }
         }

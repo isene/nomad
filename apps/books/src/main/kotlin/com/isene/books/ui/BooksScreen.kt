@@ -296,7 +296,7 @@ private fun ShelfList(vm: BooksViewModel, bottomInset: Dp) {
         items(entries.size) { i ->
             when (val e = entries[i]) {
                 is Entry.Header -> ShelfHeader(e.category, e.count)
-                is Entry.Item -> BookRow(e.book) { vm.openBook(e.book) }
+                is Entry.Item -> BookRow(e.book, vm.progress[e.book.id]) { vm.openBook(e.book) }
             }
         }
     }
@@ -316,7 +316,7 @@ private fun ShelfHeader(category: String, count: Int) {
 }
 
 @Composable
-private fun BookRow(book: Book, onClick: () -> Unit) {
+private fun BookRow(book: Book, frac: Float?, onClick: () -> Unit) {
     val real = book.kind == BookKind.REAL
     val titleColor =
         if (real) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
@@ -357,6 +357,16 @@ private fun BookRow(book: Book, onClick: () -> Unit) {
                     modifier = Modifier.padding(top = 2.dp),
                 )
             }
+        }
+        // Reading-progress % for books with a saved bookmark, trailing the
+        // row (the weighted Column above pushes it to the right edge).
+        if (frac != null) {
+            Text(
+                "${(frac * 100).toInt()}%",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = 12.dp, top = 2.dp),
+            )
         }
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))

@@ -28,6 +28,28 @@ class BookmarkRepo(private val context: Context) {
         return pos?.takeIf { it in 0f..1f }
     }
 
+    /** Resume fractions for many books in ONE directory listing. SAF's
+     *  findFile is O(dir) per call, so loading the shelf's bookmarks
+     *  one-by-one would be O(books × files); list once and filter to the
+     *  ids we care about. Missing / invalid entries are simply absent. */
+    fun loadAllFracs(stateTreeUri: String, ids: Set<String>): Map<String, Float> {
+        val tree = DocumentFile.fromTreeUri(context, Uri.parse(stateTreeUri)) ?: return emptyMap()
+        val out = HashMap<String, Float>()
+        tree.listFiles().forEach { f ->
+            if (!f.isFile) return@forEach
+            val nm = f.name ?: return@forEach
+            if (!nm.endsWith(".json")) return@forEach
+            val id = nm.removeSuffix(".json")
+            if (id !in ids) return@forEach
+            val text = runCatching {
+                context.contentResolver.openInputStream(f.uri)?.use { it.bufferedReader().readText() }
+            }.getOrNull() ?: return@forEach
+            val pos = runCatching { JSONObject(text).optDouble("pos", -1.0).toFloat() }.getOrNull()
+            if (pos != null && pos in 0f..1f) out[id] = pos
+        }
+        return out
+    }
+
     /** Persist the reading position. Returns true on success. */
     fun saveFrac(stateTreeUri: String, id: String, frac: Float): Boolean {
         val tree = DocumentFile.fromTreeUri(context, Uri.parse(stateTreeUri)) ?: return false
