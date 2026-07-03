@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Refresh
@@ -27,6 +29,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -36,9 +39,12 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.SpanStyle
@@ -49,6 +55,8 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.isene.gazette.GazetteViewModel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -109,7 +117,12 @@ fun GazetteScreen(vm: GazetteViewModel) {
                 else -> {
                     DateBar(vm)
                     HorizontalDivider()
-                    IssueBody(vm.content)
+                    val date = vm.currentDate()
+                    // key(date): a fresh scroll state per day, so read-detection
+                    // and scroll position reset when you switch tabs.
+                    key(date) {
+                        IssueBody(vm.content, date, onRead = { d -> vm.markRead(d) })
+                    }
                 }
             }
         }
@@ -125,10 +138,27 @@ private fun DateBar(vm: GazetteViewModel) {
     ) {
         items(vm.issues.size) { i ->
             val issue = vm.issues[i]
+            val read = vm.isRead(issue.date)
             FilterChip(
                 selected = i == vm.selected,
                 onClick = { vm.select(i) },
-                label = { Text(issue.date, style = MaterialTheme.typography.labelLarge) },
+                label = {
+                    Text(
+                        issue.date,
+                        style = MaterialTheme.typography.labelLarge,
+                        // Read days recede so the unread ones stand out.
+                        color = if (read) LocalContentColor.current.copy(alpha = 0.5f)
+                                else Color.Unspecified,
+                    )
+                },
+                leadingIcon = if (read) {
+                    {
+                        Icon(
+                            Icons.Filled.Check, contentDescription = "read",
+                            modifier = Modifier.size(FilterChipDefaults.IconSize),
+                        )
+                    }
+                } else null,
                 colors = FilterChipDefaults.filterChipColors(),
             )
         }
@@ -138,11 +168,24 @@ private fun DateBar(vm: GazetteViewModel) {
 /** Render the issue Markdown. The format is simple and line-oriented: each
  *  body paragraph is a single line, so a line walk is sufficient. */
 @Composable
-private fun IssueBody(md: String) {
+private fun IssueBody(md: String, date: String?, onRead: (String) -> Unit) {
     val uriHandler = LocalUriHandler.current
     val accent = MaterialTheme.colorScheme.primary
+    val scroll = rememberScrollState()
+    // Mark the day read once its news is "indeed read": you scroll to the
+    // bottom of a long issue, or a short issue that fits on one screen has
+    // been open a moment (so tab-hopping doesn't mark it). Event-driven —
+    // snapshotFlow emits only on scroll change, and the delay is a one-shot,
+    // not a repeating timer.
+    LaunchedEffect(md, date) {
+        if (date == null || md.isBlank()) return@LaunchedEffect
+        delay(700) // let the issue lay out so maxValue is real
+        if (scroll.maxValue == 0) { onRead(date); return@LaunchedEffect }
+        snapshotFlow { scroll.value >= scroll.maxValue }.first { it }
+        onRead(date)
+    }
     Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+        modifier = Modifier.fillMaxSize().verticalScroll(scroll)
             .padding(horizontal = 16.dp),
     ) {
         var linkN = 0

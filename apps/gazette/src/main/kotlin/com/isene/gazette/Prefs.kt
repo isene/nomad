@@ -2,7 +2,9 @@ package com.isene.gazette
 
 import android.content.Context
 
-/** Persists the SAF tree URI of the news folder (~/.news). Local to the app. */
+/** Persists the SAF tree URI of the news folder (~/.news). Local to the app.
+ *  Read-state is NOT here — it lives in the synced ~/.news/.gazette-read file
+ *  (see NewsRepo) so it is shared with the desktop gazette. */
 object Prefs {
     private const val PREFS = "gazette_prefs"
     private const val KEY_FOLDER = "folder_uri"

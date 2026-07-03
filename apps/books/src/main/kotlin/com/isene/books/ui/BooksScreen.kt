@@ -318,8 +318,13 @@ private fun ShelfHeader(category: String, count: Int) {
 @Composable
 private fun BookRow(book: Book, frac: Float?, onClick: () -> Unit) {
     val real = book.kind == BookKind.REAL
-    val titleColor =
+    // "Read" = bookmarked at (essentially) the end. No extra state or
+    // button — the bookmark fraction already tells us. Read books gray out.
+    val read = frac != null && frac >= 0.99f
+    val baseTitleColor =
         if (real) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.onSurface
+    val titleColor =
+        if (read) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) else baseTitleColor
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 10.dp),
@@ -330,7 +335,8 @@ private fun BookRow(book: Book, frac: Float?, onClick: () -> Unit) {
                 if (book.starred) {
                     Icon(
                         Icons.Filled.Star, contentDescription = "starred",
-                        tint = MaterialTheme.colorScheme.tertiary,
+                        tint = MaterialTheme.colorScheme.tertiary
+                            .copy(alpha = if (read) 0.38f else 1f),
                         modifier = Modifier.height(16.dp).width(16.dp).padding(end = 4.dp),
                     )
                 }
@@ -358,9 +364,17 @@ private fun BookRow(book: Book, frac: Float?, onClick: () -> Unit) {
                 )
             }
         }
-        // Reading-progress % for books with a saved bookmark, trailing the
-        // row (the weighted Column above pushes it to the right edge).
-        if (frac != null) {
+        // Trailing marker: ✓ once read (bookmarked at the end), else the
+        // reading-progress % for books with a saved bookmark. The weighted
+        // Column above pushes this to the right edge.
+        if (read) {
+            Text(
+                "✓",
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                modifier = Modifier.padding(start = 12.dp, top = 2.dp),
+            )
+        } else if (frac != null) {
             Text(
                 "${(frac * 100).toInt()}%",
                 style = MaterialTheme.typography.labelMedium,
