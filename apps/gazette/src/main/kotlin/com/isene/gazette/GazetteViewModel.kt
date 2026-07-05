@@ -25,24 +25,25 @@ class GazetteViewModel(app: Application) : AndroidViewModel(app) {
     var loading by mutableStateOf(false); private set
     var message by mutableStateOf<String?>(null)
 
-    /** Dates (YYYY-MM-DD) the user has read. Stored in the synced ~/.news
-     *  `.gazette-read` file, so the desktop gazette shares it. Drives the ✓ on
-     *  the date tabs. Reloaded from the file on every refresh. */
+    /** Dates (YYYY-MM-DD) the user has read. Stored phone-locally in
+     *  SharedPreferences (see Prefs). Drives the ✓ on the date tabs.
+     *  Not synced: ~/.news is receive-only on the phone, so writing there
+     *  gets reverted by Syncthing — local storage is the reliable path. */
     val readDates = mutableStateListOf<String>()
 
     init {
+        readDates.addAll(Prefs.readDates(app))
         if (folderUri != null) refresh()
     }
 
     fun isRead(date: String): Boolean = date in readDates
 
     /** Mark a day read once the reader reaches its end. Idempotent; only
-     *  touches the synced file when the set actually changes. */
+     *  writes SharedPreferences when the set actually changes. */
     fun markRead(date: String) {
         if (date in readDates) return
         readDates.add(date)
-        val uri = folderUri ?: return
-        viewModelScope.launch(Dispatchers.IO) { repo.addReadDate(uri, date) }
+        Prefs.setReadDates(getApplication(), readDates.toSet())
     }
 
     fun setFolder(treeUri: String) {
@@ -58,11 +59,9 @@ class GazetteViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch(Dispatchers.IO) {
             val list = repo.list(uri)
             val fname = repo.folderName(uri)
-            val reads = repo.readDates(uri) // fold in reads synced from the desktop
             withContext(Dispatchers.Main) {
                 val prevDate = issues.getOrNull(selected)?.date
                 issues.clear(); issues.addAll(list)
-                readDates.clear(); readDates.addAll(reads)
                 folderName = fname
                 // Keep the cursor on the same date across a refresh if it
                 // survived; otherwise fall back to the newest issue.

@@ -10,8 +10,9 @@ data class Issue(val uri: Uri, val date: String, val modified: Long)
 
 /**
  * Reads daily news issues (`news-YYYY-MM-DD.md`) from a SAF tree — the synced
- * ~/.news folder. Issues are produced server-side and arrive via Syncthing;
- * the only thing this app writes is the shared `.gazette-read` read-state file.
+ * ~/.news folder. Read-only: issues are produced server-side and arrive via
+ * Syncthing (the folder is receive-only on the phone). Read-state is kept
+ * phone-locally in Prefs, not written here.
  */
 class NewsRepo(private val context: Context) {
 
@@ -34,45 +35,6 @@ class NewsRepo(private val context: Context) {
 
     fun folderName(treeUriStr: String): String? =
         DocumentFile.fromTreeUri(context, Uri.parse(treeUriStr))?.name
-
-    /**
-     * Read-state lives in a single file in the same synced ~/.news folder, so
-     * the desktop gazette and this app share which days are read (Syncthing
-     * carries it both ways). One `YYYY-MM-DD` per line.
-     */
-    private val readFileName = ".gazette-read"
-
-    /** Dates the user has read, per the synced file (empty if absent). */
-    fun readDates(treeUriStr: String): Set<String> {
-        val tree = DocumentFile.fromTreeUri(context, Uri.parse(treeUriStr)) ?: return emptySet()
-        val f = tree.findFile(readFileName)?.takeIf { it.isFile } ?: return emptySet()
-        return runCatching {
-            context.contentResolver.openInputStream(f.uri)?.use { s ->
-                s.bufferedReader(Charsets.UTF_8).readLines()
-                    .map { it.trim() }.filter { it.isNotEmpty() }.toSet()
-            } ?: emptySet()
-        }.getOrElse { emptySet() }
-    }
-
-    /**
-     * Record a date as read. Reads the current file first and unions, so a mark
-     * the desktop made (and Syncthing carried in) is preserved. No write when
-     * the date is already there — the file is untouched while just browsing.
-     */
-    fun addReadDate(treeUriStr: String, date: String) {
-        val tree = DocumentFile.fromTreeUri(context, Uri.parse(treeUriStr)) ?: return
-        val current = readDates(treeUriStr).toMutableSet()
-        if (!current.add(date)) return
-        val body = current.sorted().joinToString("\n", postfix = "\n")
-        val doc = tree.findFile(readFileName)?.takeIf { it.isFile }
-            ?: tree.createFile("text/plain", readFileName)
-            ?: return
-        runCatching {
-            context.contentResolver.openOutputStream(doc.uri, "wt")?.use {
-                it.write(body.toByteArray(Charsets.UTF_8))
-            }
-        }
-    }
 
     /** The matching typeset PDF for an issue date, if it has synced. */
     fun pdfUri(treeUriStr: String, date: String): Uri? {
