@@ -1,4 +1,4 @@
-package com.isene.xrpn.viewmodel
+package com.isene.rpnx.viewmodel
 
 import android.app.Application
 import android.net.Uri
@@ -37,7 +37,7 @@ data class ProgUi(
     val folderSet: Boolean = false,
 )
 
-private const val PREFS = "xrpn_prefs"
+private const val PREFS = "rpnx_prefs"
 
 class CalcViewModel(app: Application) : AndroidViewModel(app) {
     private val statePrefs = app.getSharedPreferences(PREFS, Application.MODE_PRIVATE)

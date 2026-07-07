@@ -2,15 +2,15 @@
 
 <img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="100" height="100">
 
-# xrpn
+# RPNx
 
-![version](https://img.shields.io/badge/version-0.3.7-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.3.8-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
-A pocket HP-41 RPN scientific calculator — mobile companion to [XRPN](https://github.com/isene/xrpn). Part of the [nomad](../../) mobile suite.
+A pocket HP-41 RPN scientific calculator + FOCAL program runner. Part of the [nomad](../../) mobile suite.
 
 </div>
 
-`com.isene.xrpn` · pairs with [xrpn](https://github.com/isene/xrpn)
+`com.isene.rpnx` · desktop sibling: **[rpnx](https://github.com/isene/rpnx)** (the terminal calculator) · runs programs in the [XRPN](https://github.com/isene/xrpn) language
 
 ## What it does
 
@@ -30,19 +30,20 @@ The XRPN calculator, faithful to the desktop down to the number formatting.
   ISG/DSE, PROMPT/VIEW
 
 The stack engine, the XRPN-exact `to_num` formatter, and the FOCAL interpreter
-live in the Rust core (`core/src/xrpn/`), so the phone computes — and displays —
-identically to the desktop. (Along the way it fixed an ISG-decrement bug and a
-float-fragile control-number decode, now upstreamed to desktop XRPN.)
+live in the shared Rust core, so the phone computes — and displays — identically
+to the desktop [rpnx](https://github.com/isene/rpnx) TUI. (Along the way it fixed
+an ISG-decrement bug and a float-fragile control-number decode, now upstreamed to
+desktop XRPN.)
 
 ## Build
 
 ```bash
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 export ANDROID_NDK_HOME="$HOME/.android-sdk/ndk/27.2.12479018"
-./gradlew :apps:xrpn:assembleRelease
+./gradlew :apps:rpnx:assembleRelease
 ```
 
-APK → `apps/xrpn/build/outputs/apk/release/`. Sync and sideload; point the
+APK → `apps/rpnx/build/outputs/apk/release/`. Sync and sideload; point the
 PRGM sheet at your synced `.xrpn` programs folder to run them.
 
 ## License

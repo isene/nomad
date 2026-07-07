@@ -1,4 +1,4 @@
-package com.isene.xrpn.ui
+package com.isene.rpnx.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.background
@@ -54,8 +54,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.isene.xrpn.viewmodel.CalcViewModel
-import com.isene.xrpn.viewmodel.ProgUi
+import com.isene.rpnx.viewmodel.CalcViewModel
+import com.isene.rpnx.viewmodel.ProgUi
 
 // One function-grid key: label shown, command sent, and whether it needs a
 // follow-up digit (STO/RCL/FIX/…).
@@ -234,7 +234,7 @@ fun CalcScreen(vm: CalcViewModel) {
         AlertDialog(
             onDismissRequest = { showAbout = false },
             confirmButton = { TextButton(onClick = { showAbout = false }) { Text("Close") } },
-            title = { Text("xrpn  ${com.isene.xrpn.BuildConfig.VERSION_NAME}") },
+            title = { Text("RPNx  ${com.isene.rpnx.BuildConfig.VERSION_NAME}") },
             text = {
                 Column(Modifier.verticalScroll(rememberScrollState())) {
                     Text("A pocket HP-41 RPN scientific calculator.", fontSize = 14.sp)

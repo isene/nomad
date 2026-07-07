@@ -1,13 +1,13 @@
-package com.isene.xrpn
+package com.isene.rpnx
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
-import com.isene.xrpn.ui.CalcScreen
-import com.isene.xrpn.ui.theme.XrpnTheme
-import com.isene.xrpn.viewmodel.CalcViewModel
+import com.isene.rpnx.ui.CalcScreen
+import com.isene.rpnx.ui.theme.RpnxTheme
+import com.isene.rpnx.viewmodel.CalcViewModel
 
 class MainActivity : ComponentActivity() {
     private val vm: CalcViewModel by viewModels()
@@ -16,7 +16,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            XrpnTheme { CalcScreen(vm) }
+            RpnxTheme { CalcScreen(vm) }
         }
     }
 }

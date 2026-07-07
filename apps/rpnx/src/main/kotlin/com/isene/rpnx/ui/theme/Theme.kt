@@ -1,4 +1,4 @@
-package com.isene.xrpn.ui.theme
+package com.isene.rpnx.ui.theme
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -16,6 +16,6 @@ private val Colors = darkColorScheme(
 )
 
 @Composable
-fun XrpnTheme(content: @Composable () -> Unit) {
+fun RpnxTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = Colors, content = content)
 }
