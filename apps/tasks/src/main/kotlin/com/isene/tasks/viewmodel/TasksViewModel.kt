@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import com.isene.tasks.data.Row
 import com.isene.tasks.data.TaskRepository
 import com.isene.tasks.data.flatRows
+import com.isene.tasks.reminder.ReminderScheduler
 import com.isene.tasks.widget.TasksWidgetReceiver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -92,6 +93,9 @@ class TasksViewModel(app: Application) : AndroidViewModel(app) {
                 lastSeenMtime = repo.lastModified(uri)
                 _state.value = _state.value.copy(hyperlist = hl)
                 pokeWidget()
+                // Stamped items become alarms. Idempotent, so doing it on
+                // every load costs nothing when nothing changed.
+                ReminderScheduler.sync(getApplication(), hl)
             } catch (e: Exception) {
                 _state.value = _state.value.copy(toast = "Load failed: ${e.message}")
             }
@@ -243,6 +247,7 @@ class TasksViewModel(app: Application) : AndroidViewModel(app) {
                 repo.save(uri, hl)
                 lastSeenMtime = repo.lastModified(uri)
                 pokeWidget()
+                ReminderScheduler.sync(getApplication(), hl)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     _state.value = _state.value.copy(toast = "Save failed: ${e.message}")

@@ -13,4 +13,6 @@
     <string name="widget_label">tasks</string>
     <string name="widget_empty">No todo.hl picked yet. Open the app to choose your synced file.</string>
     <string name="widget_no_items">No items</string>
+    <string name="reminder_channel">Reminders</string>
+    <string name="reminder_channel_desc">Items stamped with a date and time in todo.hl</string>
 </resources>

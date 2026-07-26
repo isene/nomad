@@ -107,6 +107,15 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - The old standalone repo at `/home/geir/Main/G/GIT-isene/tasks/`
   stays untouched until this app reaches parity and ships. Then we
   archive it.
+- **Reminders.** An item stamped the HyperList way — `2026-07-27 12.08:
+  Call Alice`, period between hours and minutes — fires a notification at
+  that time. Parsing, listing and the spoken-sentence parser live in
+  `core/src/reminder.rs`; the Kotlin side only converts a civil `Stamp` to
+  epoch millis with the device `ZoneId` and drives AlarmManager. Alarms
+  are re-armed on load, on save, after a reboot, and on the exported
+  `com.isene.tasks.action.RESCAN` broadcast that vox sends after filing a
+  spoken reminder. `[x]` items never fire, and a stamp in the past is
+  history, not a missed alarm.
 
 ## Anti-patterns (don't drift into these)
 
