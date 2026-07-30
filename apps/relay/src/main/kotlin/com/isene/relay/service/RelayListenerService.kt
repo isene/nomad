@@ -154,7 +154,7 @@ class RelayListenerService : NotificationListenerService() {
         val isGroup = style?.isGroupConversation ?: false
 
         val sender: String
-        val text: String
+        var text: String
         // Prefer the message's own timestamp (stable across re-posts) over the
         // notification post time, so dedup keys don't drift.
         var msgTs = sbn.postTime
@@ -163,6 +163,11 @@ class RelayListenerService : NotificationListenerService() {
             sender = last.person?.name?.toString() ?: title
             text = last.text?.toString() ?: ""
             if (last.timestamp > 0) msgTs = last.timestamp
+            // Discord cuts the MessagingStyle text at 500 characters, mid-word.
+            // If the same message is carried in full somewhere else in the
+            // notification, take that instead. Only ever lengthens, and only
+            // when the longer one really is this message continued.
+            longerBody(text, extras)?.let { text = it }
         } else {
             // No MessagingStyle: for built-in apps only accept an explicit
             // message category (filters IG likes/follows etc.). Custom apps the
@@ -356,6 +361,36 @@ class RelayListenerService : NotificationListenerService() {
      *  (lands at ~/.kastrup/gateway/relay-img-debug.log on the laptop). Also
      *  mirrors to logcat (tag relay-img). Temporary; remove once the
      *  Messenger/Discord notification image path is understood. */
+    // A fuller version of `short` from elsewhere in the notification, or
+    // null if there isn't one.
+    //
+    // A cut message keeps its start, so the candidate has to begin with
+    // what we already have (minus any ellipsis the app added) to count as
+    // the same message rather than a different one from the same chat.
+    // The length floor keeps a one-word message from matching anything.
+    private fun longerBody(short: String, extras: android.os.Bundle): String? {
+        val stem = short.trimEnd('…', '.', ' ', '\n')
+        if (stem.length < 40) return null
+        val best = listOfNotNull(
+            extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
+            extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+                ?.joinToString("\n") { it.toString() },
+            extras.getCharSequence(Notification.EXTRA_TEXT)?.toString(),
+        ).filter { it.length > short.length && it.startsWith(stem) }
+            .maxByOrNull { it.length }
+        // Log the sizes either way: it is the only way to see from the
+        // laptop whether a truncated message had a fuller copy to find.
+        if (short.length >= 480) {
+            appendImgDebug(
+                "longtext have=${short.length} big=${extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.length ?: -1}" +
+                    " text=${extras.getCharSequence(Notification.EXTRA_TEXT)?.length ?: -1}" +
+                    " lines=${extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.size ?: -1}" +
+                    " took=${best?.length ?: -1}"
+            )
+        }
+        return best
+    }
+
     private fun appendImgDebug(line: String) {
         android.util.Log.i("relay-img", line)
         try {
