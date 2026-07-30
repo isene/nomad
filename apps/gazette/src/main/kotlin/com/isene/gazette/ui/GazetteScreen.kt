@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
@@ -184,50 +185,55 @@ private fun IssueBody(md: String, date: String?, onRead: (String) -> Unit) {
         snapshotFlow { scroll.value >= scroll.maxValue }.first { it }
         onRead(date)
     }
-    Column(
-        modifier = Modifier.fillMaxSize().verticalScroll(scroll)
-            .padding(horizontal = 16.dp),
-    ) {
-        var linkN = 0
-        for (raw in md.lines()) {
-            val line = raw.trimEnd()
-            when {
-                line.startsWith("# ") -> {} // title shown in the app bar
-                line.startsWith("## ") -> {
-                    Spacer(Modifier.height(16.dp))
-                    Text(line.substring(3), style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold, color = accent)
-                    HorizontalDivider(Modifier.padding(top = 4.dp, bottom = 6.dp))
+    // One selection scope around the whole issue, so a long press starts a
+    // selection that can be dragged across headings, paragraphs and links,
+    // and copied out with the usual toolbar. Taps on links still open them.
+    SelectionContainer {
+        Column(
+            modifier = Modifier.fillMaxSize().verticalScroll(scroll)
+                .padding(horizontal = 16.dp),
+        ) {
+            var linkN = 0
+            for (raw in md.lines()) {
+                val line = raw.trimEnd()
+                when {
+                    line.startsWith("# ") -> {} // title shown in the app bar
+                    line.startsWith("## ") -> {
+                        Spacer(Modifier.height(16.dp))
+                        Text(line.substring(3), style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold, color = accent)
+                        HorizontalDivider(Modifier.padding(top = 4.dp, bottom = 6.dp))
+                    }
+                    line.startsWith("### ") -> {
+                        Spacer(Modifier.height(12.dp))
+                        Text(line.substring(4), style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(3.dp))
+                    }
+                    line.startsWith("http://") || line.startsWith("https://") -> {
+                        linkN += 1
+                        val n = linkN
+                        val url = line
+                        Text(
+                            text = buildAnnotatedString {
+                                withStyle(SpanStyle(color = accent, fontWeight = FontWeight.SemiBold)) {
+                                    append("[$n] ")
+                                }
+                                withStyle(SpanStyle(color = accent, fontFamily = FontFamily.Monospace,
+                                    textDecoration = TextDecoration.Underline)) { append(url) }
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
+                                .clickable { runCatching { uriHandler.openUri(url) } },
+                        )
+                    }
+                    line.isBlank() -> Spacer(Modifier.height(6.dp))
+                    else -> Text(line, style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(vertical = 1.dp))
                 }
-                line.startsWith("### ") -> {
-                    Spacer(Modifier.height(12.dp))
-                    Text(line.substring(4), style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(3.dp))
-                }
-                line.startsWith("http://") || line.startsWith("https://") -> {
-                    linkN += 1
-                    val n = linkN
-                    val url = line
-                    Text(
-                        text = buildAnnotatedString {
-                            withStyle(SpanStyle(color = accent, fontWeight = FontWeight.SemiBold)) {
-                                append("[$n] ")
-                            }
-                            withStyle(SpanStyle(color = accent, fontFamily = FontFamily.Monospace,
-                                textDecoration = TextDecoration.Underline)) { append(url) }
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 2.dp, bottom = 8.dp)
-                            .clickable { runCatching { uriHandler.openUri(url) } },
-                    )
-                }
-                line.isBlank() -> Spacer(Modifier.height(6.dp))
-                else -> Text(line, style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(vertical = 1.dp))
             }
+            Spacer(Modifier.height(48.dp))
         }
-        Spacer(Modifier.height(48.dp))
     }
 }
 
