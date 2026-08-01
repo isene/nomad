@@ -53,6 +53,11 @@ import com.isene.watchit.viewmodel.UiState
 import com.isene.watchit.viewmodel.WatchitViewModel
 import uniffi.fe2o3_mobile_core.Details
 import uniffi.fe2o3_mobile_core.ListItem
+import uniffi.fe2o3_mobile_core.ratingFor
+
+/** My own score is gold everywhere; TMDB's crowd score stays the theme's
+ *  primary. Two ratings on one row need to be told apart at a glance. */
+private val MINE_GOLD = Color(0xFFFFC24B)
 
 @Composable
 fun PosterThumb(url: String?, modifier: Modifier = Modifier) {
@@ -71,7 +76,7 @@ fun PosterThumb(url: String?, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun MovieRow(item: ListItem, details: Details?, wished: Boolean, dumped: Boolean, onClick: () -> Unit) {
+fun MovieRow(item: ListItem, details: Details?, wished: Boolean, dumped: Boolean, mine: Int = 0, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -91,6 +96,10 @@ fun MovieRow(item: ListItem, details: Details?, wished: Boolean, dumped: Boolean
             Icon(Icons.Filled.Star, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.width(16.dp))
             Text(String.format("%.1f", item.rating), fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
         }
+        // My own score, in gold, so it reads apart from TMDB's blue.
+        if (mine > 0) {
+            Text("  ★$mine", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MINE_GOLD)
+        }
         if (wished) Text(" ♥", color = Color(0xFF7CFF9B), fontSize = 14.sp)
         if (dumped) Icon(Icons.Filled.ThumbDown, null, tint = Color(0xFFFF8A80), modifier = Modifier.width(18.dp).padding(start = 4.dp))
     }
@@ -99,6 +108,7 @@ fun MovieRow(item: ListItem, details: Details?, wished: Boolean, dumped: Boolean
 @Composable
 fun BrowseScreen(vm: WatchitViewModel, ui: UiState, modifier: Modifier, onOpen: (ListItem) -> Unit, onFilters: () -> Unit) {
     val details by vm.detailsFlow.collectAsState()
+    val ratings by vm.ratings.collectAsState()
     Column(modifier.fillMaxSize()) {
         // Active-filter chip bar.
         Row(
@@ -123,7 +133,8 @@ fun BrowseScreen(vm: WatchitViewModel, ui: UiState, modifier: Modifier, onOpen: 
         } else {
             LazyColumn(Modifier.fillMaxSize()) {
                 items(ui.filtered, key = { it.id }) { item ->
-                    MovieRow(item, details[item.id], vm.isWished(item.id), vm.isDumped(item.id)) { onOpen(item) }
+                    MovieRow(item, details[item.id], vm.isWished(item.id), vm.isDumped(item.id),
+                        ratingFor(ratings, item.id, item.title, item.year)) { onOpen(item) }
                 }
             }
         }
@@ -133,6 +144,7 @@ fun BrowseScreen(vm: WatchitViewModel, ui: UiState, modifier: Modifier, onOpen: 
 @Composable
 fun ListScreen(vm: WatchitViewModel, items: List<ListItem>, emptyMsg: String, modifier: Modifier, onOpen: (ListItem) -> Unit) {
     val details by vm.detailsFlow.collectAsState()
+    val ratings by vm.ratings.collectAsState()
     if (items.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(emptyMsg, color = MaterialTheme.colorScheme.secondary)
@@ -140,7 +152,8 @@ fun ListScreen(vm: WatchitViewModel, items: List<ListItem>, emptyMsg: String, mo
     } else {
         LazyColumn(modifier.fillMaxSize()) {
             items(items, key = { it.id }) { item ->
-                MovieRow(item, details[item.id], vm.isWished(item.id), vm.isDumped(item.id)) { onOpen(item) }
+                MovieRow(item, details[item.id], vm.isWished(item.id), vm.isDumped(item.id),
+                    ratingFor(ratings, item.id, item.title, item.year)) { onOpen(item) }
             }
         }
     }
@@ -191,6 +204,46 @@ fun DetailScreen(vm: WatchitViewModel, item: ListItem, onBack: () -> Unit) {
                             if (s != null || e != null) Text("${s ?: "?"} seasons · ${e ?: "?"} episodes", fontSize = 12.sp)
                         }
                     }
+                }
+            }
+
+            // My rating: ten taps, and tapping the current score clears it.
+            val ratings by vm.ratings.collectAsState()
+            val mine = ratingFor(ratings, item.id, item.title, item.year)
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    if (mine > 0) "My rating: $mine/10" else "My rating: not rated",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (mine > 0) MINE_GOLD else MaterialTheme.colorScheme.secondary,
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    for (n in 1..10) {
+                        val on = n <= mine
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .aspectRatio(0.85f)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (on) MINE_GOLD else MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable { vm.rate(item, if (n == mine) 0 else n) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                "$n",
+                                fontSize = 12.sp,
+                                fontWeight = if (on) FontWeight.Bold else FontWeight.Normal,
+                                color = if (on) Color(0xFF1A1200) else MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+                if (vm.settingsObj().syncTreeUri.isEmpty()) {
+                    Text(
+                        "Not syncing — pick the shared watchit folder in Settings",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
                 }
             }
 

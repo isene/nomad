@@ -4,10 +4,11 @@ import android.content.Context
 
 private const val PREFS = "watchit_prefs"
 
-/** All persisted config + the user's curated lists. Standalone — nothing here
- *  syncs to the desktop watchit; the phone keeps its own key, catalog, and
- *  wish/dump. Ordered lists are stored newline-joined (SharedPreferences
- *  StringSet loses order, which wish/dump care about). */
+/** All persisted config + the user's curated lists. The catalog, key and
+ *  wish/dump are the phone's own — only MY RATINGS cross over, through the
+ *  Syncthing folder named by `syncTreeUri`. Ordered lists are stored
+ *  newline-joined (SharedPreferences StringSet loses order, which wish/dump
+ *  care about). */
 class Settings(ctx: Context) {
     private val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -37,6 +38,12 @@ class Settings(ctx: Context) {
     var view: String
         get() = p.getString("view", "movies") ?: "movies"
         set(v) = p.edit().putString("view", v).apply()
+
+    /** SAF tree for the folder shared with desktop watchit (`~/.watchit/sync/`).
+     *  Empty until picked, and ratings then stay on this phone. */
+    var syncTreeUri: String
+        get() = p.getString("sync_tree_uri", "") ?: ""
+        set(v) = p.edit().putString("sync_tree_uri", v).apply()
 
     var showPosters: Boolean
         get() = p.getBoolean("show_posters", true)

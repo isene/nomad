@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.isene.watchit.data.Net
+import com.isene.watchit.data.RatingsRepo
 import com.isene.watchit.data.Repo
 import com.isene.watchit.data.Settings
 import kotlinx.coroutines.Dispatchers
@@ -14,13 +15,16 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.fe2o3_mobile_core.Details
 import uniffi.fe2o3_mobile_core.ListItem
+import uniffi.fe2o3_mobile_core.Rating
 import uniffi.fe2o3_mobile_core.chartKind
 import uniffi.fe2o3_mobile_core.filterSort
 import uniffi.fe2o3_mobile_core.genresOf
 import uniffi.fe2o3_mobile_core.mergeItems
+import uniffi.fe2o3_mobile_core.mergeRatings
 import uniffi.fe2o3_mobile_core.parseChart
 import uniffi.fe2o3_mobile_core.parseDetails
 import uniffi.fe2o3_mobile_core.parseSearch
+import uniffi.fe2o3_mobile_core.ratingFor
 import uniffi.fe2o3_mobile_core.tmdbChartUrl
 import uniffi.fe2o3_mobile_core.tmdbDetailsUrl
 import uniffi.fe2o3_mobile_core.tmdbSearchUrl
@@ -60,13 +64,61 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
     val detailsFlow: StateFlow<Map<String, Details>> = _details.asStateFlow()
     private val _search = MutableStateFlow(SearchState())
     val search: StateFlow<SearchState> = _search.asStateFlow()
+    /** My 1-10 scores, merged across every device writing into the shared
+     *  folder. Empty until a folder is picked in Settings. */
+    private val _ratings = MutableStateFlow<List<Rating>>(emptyList())
+    val ratings: StateFlow<List<Rating>> = _ratings.asStateFlow()
 
     init {
         movies = Repo.loadItems(app, "movies.json")
         series = Repo.loadItems(app, "series.json")
         Repo.loadDetails(app).forEach { details[it.id] = it }
         _details.value = HashMap(details)
+        reloadRatings()
         recompute()
+    }
+
+    /** Re-read the shared folder. Called on start and on every resume —
+     *  the desktop may have rated something while the app was backgrounded,
+     *  and Syncthing drops the file in without telling anyone. */
+    fun reloadRatings() {
+        val uri = settings.syncTreeUri
+        if (uri.isEmpty()) { _ratings.value = emptyList(); return }
+        viewModelScope.launch {
+            val loaded = withContext(Dispatchers.IO) {
+                RatingsRepo.loadAll(getApplication(), uri)
+            }
+            _ratings.value = loaded
+        }
+    }
+
+    /** My score for a title: by id, falling back to title+year (the
+     *  desktop catalog may key the same film by an IMDB tconst). */
+    fun myRating(item: ListItem): Int =
+        ratingFor(_ratings.value, item.id, item.title, item.year)
+
+    /** Score a title 1-10, or clear it with 0. The clear is stored as a
+     *  timestamped 0, not a deletion, so it survives the next merge. */
+    fun rate(item: ListItem, score: Int) {
+        val entry = Rating(
+            id = item.id,
+            score = score.coerceIn(0, 10),
+            ts = System.currentTimeMillis() / 1000,
+            title = item.title,
+            year = item.year,
+        )
+        // Merged, not appended: the entry may fold into one the desktop
+        // wrote under a different id for the same film.
+        val merged = mergeRatings(listOf(_ratings.value, listOf(entry)))
+        _ratings.value = merged
+        val uri = settings.syncTreeUri
+        if (uri.isEmpty()) {
+            recompute(status = "Pick a sync folder in Settings to keep ratings")
+            return
+        }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { RatingsRepo.saveMine(getApplication(), uri, merged) }
+        }
     }
 
     fun settingsObj() = settings

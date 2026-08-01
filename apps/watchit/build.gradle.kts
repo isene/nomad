@@ -113,8 +113,8 @@ android {
         applicationId = "com.isene.watchit"
         minSdk = 33
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.2.0"
         ndk { abiFilters += androidAbis.keys }
     }
 
@@ -175,6 +175,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.coil.compose)
+    // SAF access to the Syncthing folder holding the shared ratings.
+    implementation(libs.androidx.documentfile)
     implementation(libs.okhttp)
 
     // JNA — generated UniFFI bindings depend on com.sun.jna.*.

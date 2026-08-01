@@ -7,3 +7,4 @@
 pub mod models;
 pub mod tmdb;
 pub mod filter;
+pub mod ratings;

@@ -1,5 +1,8 @@
 package com.isene.watchit.ui
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -48,10 +51,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.isene.watchit.data.RatingsRepo
 import com.isene.watchit.viewmodel.WatchitViewModel
 import uniffi.fe2o3_mobile_core.ListItem
 
@@ -215,6 +220,23 @@ private fun SettingsDialog(vm: WatchitViewModel, onDismiss: () -> Unit) {
     var region by remember { mutableStateOf(s.region) }
     var movieLimit by remember { mutableStateOf(s.movieLimit.toString()) }
     var seriesLimit by remember { mutableStateOf(s.seriesLimit.toString()) }
+    val ctx = LocalContext.current
+    var syncUri by remember { mutableStateOf(s.syncTreeUri) }
+    // SAF, not a raw path: the shared folder lives on external storage and
+    // this is the only way to get durable write access to it.
+    val pickFolder = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            ctx.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+            s.syncTreeUri = uri.toString()
+            syncUri = uri.toString()
+            vm.reloadRatings()
+        }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
@@ -237,6 +259,19 @@ private fun SettingsDialog(vm: WatchitViewModel, onDismiss: () -> Unit) {
                     OutlinedTextField(movieLimit, { movieLimit = it }, label = { Text("Movie limit") }, singleLine = true, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                     OutlinedTextField(seriesLimit, { seriesLimit = it }, label = { Text("Series limit") }, singleLine = true, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 }
+                Text("Ratings sync", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                OutlinedButton(onClick = { pickFolder.launch(null) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        RatingsRepo.folderName(ctx, syncUri)?.let { "Folder: $it" }
+                            ?: "Pick the shared watchit folder",
+                    )
+                }
+                Text(
+                    "The Syncthing folder holding desktop watchit's ~/.watchit/sync/. " +
+                        "Each device writes only its own ratings file, so nothing collides.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
             }
         },
     )

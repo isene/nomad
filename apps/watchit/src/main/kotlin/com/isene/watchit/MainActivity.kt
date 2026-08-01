@@ -19,4 +19,11 @@ class MainActivity : ComponentActivity() {
             WatchitTheme { WatchitApp(vm) }
         }
     }
+
+    /** Syncthing drops a new ratings file in without telling anyone, so
+     *  re-read the shared folder whenever we come back to the front. */
+    override fun onResume() {
+        super.onResume()
+        vm.reloadRatings()
+    }
 }
