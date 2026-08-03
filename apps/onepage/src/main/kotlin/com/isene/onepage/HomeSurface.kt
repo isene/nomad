@@ -41,6 +41,9 @@ class HomeSurface(context: Context) : FrameLayout(context) {
     var onAddWidget: (() -> Unit)? = null
     var onSetupAgain: (() -> Unit)? = null
     var onPersist: (() -> Unit)? = null
+    /** Fired after the floating-home-button pref flips, so the host can
+     *  poke KeepAliveService to add/remove the overlay live. */
+    var onToggleHomeButton: (() -> Unit)? = null
 
     val entries = mutableListOf<Entry>()
     private var editMode = false
@@ -51,6 +54,18 @@ class HomeSurface(context: Context) : FrameLayout(context) {
 
     // ---- edit chrome (built once, attached only in EDIT mode) ----
 
+    /** Toggles the floating tap-to-home pill on/off (persisted). Declared
+     *  before [chrome] so it exists when the bar wires it in. */
+    private val homeBtnToggle: Button = chromeButton("") {
+        Prefs.setHomeButton(context, !Prefs.homeButton(context))
+        updateHomeBtnLabel()
+        onToggleHomeButton?.invoke()
+    }
+
+    private fun updateHomeBtnLabel() {
+        homeBtnToggle.text = if (Prefs.homeButton(context)) "Home btn: on" else "Home btn: off"
+    }
+
     private val chrome: LinearLayout = LinearLayout(context).apply {
         orientation = LinearLayout.HORIZONTAL
         setBackgroundColor(0xCC202428.toInt())
@@ -58,6 +73,7 @@ class HomeSurface(context: Context) : FrameLayout(context) {
         val pv = (4 * density).roundToInt()
         setPadding(ph, pv, ph, pv)
         addView(chromeButton("+ Widget") { onAddWidget?.invoke() })
+        addView(homeBtnToggle)
         addView(chromeButton("Setup") { onSetupAgain?.invoke() })
         addView(chromeButton("Done") { exitEdit() })
     }
@@ -84,6 +100,7 @@ class HomeSurface(context: Context) : FrameLayout(context) {
     private var bottomInset = 0
 
     init {
+        updateHomeBtnLabel()
         setOnApplyWindowInsetsListener { _, insets ->
             bottomInset = insets.getInsets(android.view.WindowInsets.Type.systemBars()).bottom
             if (chrome.parent === this) positionChrome()

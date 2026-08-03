@@ -49,11 +49,17 @@ class KeepAliveService : Service() {
             .setContentText("Keeping the launcher resident")
             .build()
         startForeground(1, n)
-        addHomeButton()
+        applyHomeButton()
+    }
+
+    /** Add or remove the pill to match the user's toggle (default on). */
+    private fun applyHomeButton() {
+        if (Prefs.homeButton(this)) addHomeButton() else removeHomeButton()
     }
 
     /** The always-on-top tap-to-home pill, bottom-center, above the nav bar. */
     private fun addHomeButton() {
+        if (!Prefs.homeButton(this)) return
         if (overlay != null) return
         if (!Settings.canDrawOverlays(this)) return
         val wm = getSystemService(WindowManager::class.java) ?: return
@@ -102,7 +108,7 @@ class KeepAliveService : Service() {
         }
     }
 
-    override fun onDestroy() {
+    private fun removeHomeButton() {
         overlay?.let {
             try {
                 getSystemService(WindowManager::class.java)?.removeView(it)
@@ -110,13 +116,18 @@ class KeepAliveService : Service() {
             }
         }
         overlay = null
+    }
+
+    override fun onDestroy() {
+        removeHomeButton()
         super.onDestroy()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // The activity re-fires this on every onCreate; if the overlay was
-        // lost (permission granted after first start), retry it here.
-        addHomeButton()
+        // The activity re-fires this on every onCreate, and the edit-mode
+        // toggle re-fires it too; reconcile the overlay to the current pref
+        // (adds it if permission was just granted, removes it if turned off).
+        applyHomeButton()
         return START_STICKY
     }
 

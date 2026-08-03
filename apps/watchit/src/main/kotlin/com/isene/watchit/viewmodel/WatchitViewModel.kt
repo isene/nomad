@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.isene.watchit.data.Net
 import com.isene.watchit.data.RatingsRepo
 import com.isene.watchit.data.Repo
+import com.isene.watchit.data.ShareRepo
 import com.isene.watchit.data.Settings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -13,12 +14,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import uniffi.fe2o3_mobile_core.Catalog
 import uniffi.fe2o3_mobile_core.Details
 import uniffi.fe2o3_mobile_core.ListItem
 import uniffi.fe2o3_mobile_core.Rating
 import uniffi.fe2o3_mobile_core.chartKind
 import uniffi.fe2o3_mobile_core.filterSort
 import uniffi.fe2o3_mobile_core.genresOf
+import uniffi.fe2o3_mobile_core.mergeCatalogs
 import uniffi.fe2o3_mobile_core.mergeItems
 import uniffi.fe2o3_mobile_core.mergeRatings
 import uniffi.fe2o3_mobile_core.parseChart
@@ -80,15 +83,41 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Re-read the shared folder. Called on start and on every resume —
      *  the desktop may have rated something while the app was backgrounded,
-     *  and Syncthing drops the file in without telling anyone. */
+     *  and Syncthing drops the file in without telling anyone.
+     *
+     *  Also picks up what else the folder carries: titles the desktop
+     *  added, and the TMDB key, so it never has to be typed in here. */
     fun reloadRatings() {
         val uri = settings.syncTreeUri
         if (uri.isEmpty()) { _ratings.value = emptyList(); return }
         viewModelScope.launch {
-            val loaded = withContext(Dispatchers.IO) {
-                RatingsRepo.loadAll(getApplication(), uri)
-            }
+            val ctx = getApplication<Application>()
+            val loaded = withContext(Dispatchers.IO) { RatingsRepo.loadAll(ctx, uri) }
             _ratings.value = loaded
+            // A key of our own always wins; this only fills an empty one.
+            if (settings.tmdbKey.isEmpty()) {
+                withContext(Dispatchers.IO) { ShareRepo.publishedKey(ctx, uri) }
+                    ?.let { settings.tmdbKey = it }
+            }
+            val merged = withContext(Dispatchers.IO) {
+                val theirs = ShareRepo.loadOthers(ctx, uri)
+                if (theirs.movies.isEmpty() && theirs.series.isEmpty()) null
+                else mergeCatalogs(Catalog(movies, series), theirs)
+            }
+            if (merged != null && (merged.movies.size != movies.size || merged.series.size != series.size)) {
+                val gained = merged.movies.size - movies.size + merged.series.size - series.size
+                movies = merged.movies
+                series = merged.series
+                withContext(Dispatchers.IO) {
+                    Repo.saveItems(ctx, "movies.json", movies)
+                    Repo.saveItems(ctx, "series.json", series)
+                }
+                recompute(status = "$gained title(s) from the desktop")
+            }
+            // Publish ours back, so the desktop sees what was added here.
+            withContext(Dispatchers.IO) {
+                ShareRepo.saveMine(ctx, uri, Catalog(movies, series))
+            }
         }
     }
 

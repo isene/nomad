@@ -31,6 +31,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.FolderOpen
@@ -44,6 +45,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -146,13 +148,22 @@ private fun ShelfScreen(vm: BooksViewModel) {
                         Text("books", style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold)
                         val n = vm.shelf.size
+                        val label = if (n == 1) "1 book" else "$n books"
                         Text(
-                            if (n == 1) "1 book" else "$n books",
+                            if (vm.sortByProgress) "$label · by progress" else label,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                 },
                 actions = {
+                    IconButton(onClick = { vm.toggleSort() }) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.Sort,
+                            contentDescription = "Sort by reading progress",
+                            tint = if (vm.sortByProgress) MaterialTheme.colorScheme.primary
+                                   else LocalContentColor.current,
+                        )
+                    }
                     IconButton(onClick = { searching = !searching; if (!searching) vm.search("") }) {
                         Icon(Icons.Filled.Search, contentDescription = "Search")
                     }
@@ -269,8 +280,11 @@ private sealed interface Entry {
     data class Item(val book: Book) : Entry
 }
 
-/** Group the (already query-filtered) shelf by category, first-seen order. */
-private fun entriesOf(books: List<Book>): List<Entry> {
+/** Group the (already query-filtered) shelf by category, first-seen order.
+ *  When [flat] (the reading-progress sort), skip the category headers and
+ *  render one continuous ranked list. */
+private fun entriesOf(books: List<Book>, flat: Boolean): List<Entry> {
+    if (flat) return books.map { Entry.Item(it) }
     val order = ArrayList<String>()
     val groups = LinkedHashMap<String, MutableList<Book>>()
     for (b in books) {
@@ -288,7 +302,7 @@ private fun entriesOf(books: List<Book>): List<Entry> {
 
 @Composable
 private fun ShelfList(vm: BooksViewModel, bottomInset: Dp) {
-    val entries = remember(vm.shelf.toList()) { entriesOf(vm.shelf) }
+    val entries = remember(vm.shelf.toList(), vm.sortByProgress) { entriesOf(vm.shelf, vm.sortByProgress) }
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = bottomInset + 24.dp),

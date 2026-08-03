@@ -48,6 +48,14 @@ class HomeActivity : Activity() {
             onSetupAgain = {
                 startActivity(Intent(this@HomeActivity, WizardActivity::class.java))
             }
+            onToggleHomeButton = {
+                // Re-fire the service; onStartCommand reconciles the overlay
+                // to the freshly-saved pref (adds or removes the pill).
+                try {
+                    startForegroundService(Intent(this@HomeActivity, KeepAliveService::class.java))
+                } catch (_: Exception) {
+                }
+            }
             onPersist = { LayoutStore.save(this@HomeActivity, snapshot()) }
         }
         setContentView(surface)

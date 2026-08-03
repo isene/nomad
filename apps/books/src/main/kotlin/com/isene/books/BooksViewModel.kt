@@ -34,6 +34,11 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
     val shelf = mutableStateListOf<Book>()
     var query by mutableStateOf(""); private set
 
+    /** When true, the shelf is a flat list ranked by reading progress —
+     *  most-read first, finished (100%) books at the very bottom — instead
+     *  of the default category grouping. Toggled from the top bar. */
+    var sortByProgress by mutableStateOf(false); private set
+
     /** Reading progress per book id (bookmark fraction 0..1), shown as a %
      *  beside bookmarked books on the shelf. Loaded in one directory listing
      *  off the UI thread; updated when a bookmark is saved. */
@@ -103,18 +108,34 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
 
     fun search(q: String) { query = q; applyQuery() }
 
+    /** Flip between the default shelf grouping and the reading-progress sort. */
+    fun toggleSort() { sortByProgress = !sortByProgress; applyQuery() }
+
     private fun applyQuery() {
         val q = query.trim().lowercase()
-        shelf.clear()
-        if (q.isEmpty()) { shelf.addAll(written); return }
-        shelf.addAll(written.filter { b ->
+        val base = if (q.isEmpty()) written.toList()
+        else written.filter { b ->
             b.title.lowercase().contains(q) ||
                 b.hook.lowercase().contains(q) ||
                 b.author.lowercase().contains(q) ||
                 b.category.lowercase().contains(q) ||
                 b.subcategory.lowercase().contains(q) ||
                 b.tags.any { it.lowercase().contains(q) }
-        })
+        }
+        shelf.clear()
+        shelf.addAll(if (sortByProgress) orderByProgress(base) else base)
+    }
+
+    /** Rank by bookmark fraction: most-read first (descending), then books
+     *  read to 100% sunk to the very bottom. Ties break on title. */
+    private fun orderByProgress(books: List<Book>): List<Book> {
+        fun frac(b: Book) = progress[b.id] ?: 0f
+        fun finished(b: Book) = frac(b) >= 0.995f
+        return books.sortedWith(
+            compareBy<Book> { finished(it) }        // unfinished (false) first
+                .thenByDescending { frac(it) }       // higher % first
+                .thenBy { it.title.lowercase() }
+        )
     }
 
     fun openBook(b: Book) {
