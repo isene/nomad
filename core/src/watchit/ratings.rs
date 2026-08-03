@@ -112,13 +112,26 @@ pub fn merge_ratings(sets: Vec<Vec<Rating>>) -> Vec<Rating> {
                     .map(|(_, id)| id.clone())
                     .unwrap_or_else(|| r.id.clone())
             };
-            let newer = by_id.get(&key).map(|old| r.ts > old.ts).unwrap_or(true);
+            // On a tie the TMDB-keyed id wins: the desktop is migrating
+            // off IMDB tconsts, and a device that has not synced since
+            // must not drag the old scheme back into the shared folder.
+            let newer = by_id.get(&key)
+                .map(|old| r.ts > old.ts
+                    || (r.ts == old.ts && key.starts_with("tt") && !r.id.starts_with("tt")))
+                .unwrap_or(true);
             if newer {
+                let winner = if key.starts_with("tt") && !r.id.starts_with("tt") {
+                    by_id.remove(&key);
+                    r.id.clone()
+                } else {
+                    key
+                };
                 if !r.title.is_empty() {
                     let slot = by_title.entry(title_key(&r.title)).or_default();
-                    if !slot.iter().any(|(_, id)| *id == key) { slot.push((r.year, key.clone())); }
+                    slot.retain(|(_, id)| *id != winner);
+                    slot.push((r.year, winner.clone()));
                 }
-                by_id.insert(key, r);
+                by_id.insert(winner, r);
             }
         }
     }
@@ -186,6 +199,19 @@ mod tests {
             "The Wheel of Time".into(), 0), 8);
         assert_eq!(rating_for(merged, "tt2261227".into(),
             "Altered Carbon (2018\u{2013}2020)".into(), 0), 0, "different show, no match");
+    }
+
+    #[test]
+    fn a_stale_device_does_not_resurrect_the_old_ids() {
+        // This phone last synced before the desktop migrated off IMDB
+        // ids, so its own file still keys everything by tconst. Merging
+        // must fold those into their TMDB twins rather than double them.
+        let merged = merge_ratings(vec![
+            vec![r("tt11126994", 9, 500, "Arcane: League of Legends", 2021)],
+            vec![r("94605", 9, 500, "Arcane: League of Legends", 2021)],
+        ]);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(merged[0].id, "94605", "kept under the TMDB id");
     }
 
     #[test]
