@@ -28,6 +28,7 @@ import uniffi.fe2o3_mobile_core.parseChart
 import uniffi.fe2o3_mobile_core.parseDetails
 import uniffi.fe2o3_mobile_core.parseSearch
 import uniffi.fe2o3_mobile_core.ratingFor
+import uniffi.fe2o3_mobile_core.ratingKey
 import uniffi.fe2o3_mobile_core.tmdbChartUrl
 import uniffi.fe2o3_mobile_core.tmdbDetailsUrl
 import uniffi.fe2o3_mobile_core.tmdbSearchUrl
@@ -121,16 +122,17 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** My score for a title: by id, falling back to title+year (the
-     *  desktop catalog may key the same film by an IMDB tconst). */
+    /** My score for a title: by key, falling back to title+year (the
+     *  desktop catalog may key the same film by an IMDB tconst). The key
+     *  is not the bare id — movie 745 and tv 745 are different titles. */
     fun myRating(item: ListItem): Int =
-        ratingFor(_ratings.value, item.id, item.title, item.year)
+        ratingFor(_ratings.value, ratingKey(item.id, item.kind), item.title, item.year)
 
     /** Score a title 1-10, or clear it with 0. The clear is stored as a
      *  timestamped 0, not a deletion, so it survives the next merge. */
     fun rate(item: ListItem, score: Int) {
         val entry = Rating(
-            id = item.id,
+            id = ratingKey(item.id, item.kind),
             score = score.coerceIn(0, 10),
             ts = System.currentTimeMillis() / 1000,
             title = item.title,

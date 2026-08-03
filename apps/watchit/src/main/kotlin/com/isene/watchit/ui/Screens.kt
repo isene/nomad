@@ -54,6 +54,7 @@ import com.isene.watchit.viewmodel.WatchitViewModel
 import uniffi.fe2o3_mobile_core.Details
 import uniffi.fe2o3_mobile_core.ListItem
 import uniffi.fe2o3_mobile_core.ratingFor
+import uniffi.fe2o3_mobile_core.ratingKey
 
 /** My own score is gold everywhere; TMDB's crowd score stays the theme's
  *  primary. Two ratings on one row need to be told apart at a glance. */
@@ -134,7 +135,7 @@ fun BrowseScreen(vm: WatchitViewModel, ui: UiState, modifier: Modifier, onOpen: 
             LazyColumn(Modifier.fillMaxSize()) {
                 items(ui.filtered, key = { it.id }) { item ->
                     MovieRow(item, details[item.id], vm.isWished(item.id), vm.isDumped(item.id),
-                        ratingFor(ratings, item.id, item.title, item.year)) { onOpen(item) }
+                        ratingFor(ratings, ratingKey(item.id, item.kind), item.title, item.year)) { onOpen(item) }
                 }
             }
         }
@@ -153,7 +154,7 @@ fun ListScreen(vm: WatchitViewModel, items: List<ListItem>, emptyMsg: String, mo
         LazyColumn(modifier.fillMaxSize()) {
             items(items, key = { it.id }) { item ->
                 MovieRow(item, details[item.id], vm.isWished(item.id), vm.isDumped(item.id),
-                    ratingFor(ratings, item.id, item.title, item.year)) { onOpen(item) }
+                    ratingFor(ratings, ratingKey(item.id, item.kind), item.title, item.year)) { onOpen(item) }
             }
         }
     }
@@ -209,7 +210,7 @@ fun DetailScreen(vm: WatchitViewModel, item: ListItem, onBack: () -> Unit) {
 
             // My rating: ten taps, and tapping the current score clears it.
             val ratings by vm.ratings.collectAsState()
-            val mine = ratingFor(ratings, item.id, item.title, item.year)
+            val mine = ratingFor(ratings, ratingKey(item.id, item.kind), item.title, item.year)
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     if (mine > 0) "My rating: $mine/10" else "My rating: not rated",

@@ -64,6 +64,19 @@ fn title_key(title: &str) -> String {
     t.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect()
 }
 
+/// The key a rating is stored under, matching the desktop's
+/// `data::cache_key`.
+///
+/// A TMDB id is not unique on its own — movie ids and tv ids are
+/// separate spaces, so 745 is both "The Sixth Sense" and "Spaced", and
+/// a shared ratings file keyed by bare id gives one's score to the
+/// other. Series take a `t` prefix; ids are numeric, so nothing else can
+/// look like one. IMDB ids are already unambiguous and are left alone.
+#[uniffi::export]
+pub fn rating_key(id: String, kind: String) -> String {
+    if kind == "tv" && !id.starts_with("tt") { format!("t{}", id) } else { id }
+}
+
 /// Same title? A year of 0 means "unknown" — the desktop's imported rows
 /// carry no year — and first-air vs release year differ often enough to
 /// allow a year of slack.
@@ -188,6 +201,20 @@ mod tests {
         ]);
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].score, 0, "the clear is newer, so it sticks");
+    }
+
+    #[test]
+    fn a_series_and_a_film_can_share_a_tmdb_id() {
+        assert_eq!(rating_key("745".into(), "tv".into()), "t745");
+        assert_eq!(rating_key("745".into(), "movie".into()), "745");
+        assert_eq!(rating_key("tt0167404".into(), "tv".into()), "tt0167404");
+        // And the two do not collide in a lookup.
+        let both = vec![
+            r("745", 8, 100, "The Sixth Sense", 1999),
+            r("t745", 6, 100, "Spaced", 1999),
+        ];
+        assert_eq!(rating_for(both.clone(), "745".into(), "The Sixth Sense".into(), 1999), 8);
+        assert_eq!(rating_for(both, "t745".into(), "Spaced".into(), 1999), 6);
     }
 
     #[test]
