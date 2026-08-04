@@ -45,6 +45,59 @@ pub fn filter_sort(
     out
 }
 
+/// Order by MY score, best first, unrated last, TMDB rating breaking
+/// ties — the desktop's third sort mode, so both ends agree on what "my
+/// ratings on top" means.
+///
+/// Kept apart from `filter_sort` because ratings live in the shared
+/// folder rather than in the catalog, and threading them through every
+/// filter call for the one sort that needs them would be noise.
+#[uniffi::export]
+pub fn sort_by_mine(items: Vec<ListItem>, ratings: Vec<crate::watchit::ratings::Rating>) -> Vec<ListItem> {
+    use crate::watchit::ratings::{rating_key, score_of};
+    // Score each row once, then sort: looking the rating up inside the
+    // comparator would repeat the work n log n times over.
+    let mut decorated: Vec<(i32, ListItem)> = items.into_iter()
+        .map(|it| {
+            let score = score_of(&ratings,
+                &rating_key(it.id.clone(), it.kind.clone()), &it.title, it.year);
+            (score, it)
+        })
+        .collect();
+    decorated.sort_by(|(sa, a), (sb, b)| {
+        sb.cmp(sa).then(b.rating.partial_cmp(&a.rating).unwrap_or(std::cmp::Ordering::Equal))
+    });
+    decorated.into_iter().map(|(_, it)| it).collect()
+}
+
+#[cfg(test)]
+mod mine_tests {
+    use super::*;
+    use crate::watchit::ratings::Rating;
+
+    fn item(id: &str, title: &str, kind: &str, rating: f64) -> ListItem {
+        ListItem { id: id.into(), title: title.into(), kind: kind.into(), rating, ..Default::default() }
+    }
+
+    #[test]
+    fn my_scores_lead_and_the_crowd_breaks_ties() {
+        let items = vec![
+            item("1", "Unrated but adored", "movie", 9.5),
+            item("2", "Mine, eight", "movie", 6.0),
+            item("3", "Mine, nine", "tv", 5.0),
+        ];
+        let ratings = vec![
+            Rating { id: "2".into(), score: 8, ts: 1, title: "Mine, eight".into(), year: 0 },
+            // The series keys with the t prefix, as everywhere else.
+            Rating { id: "t3".into(), score: 9, ts: 1, title: "Mine, nine".into(), year: 0 },
+        ];
+        let sorted = sort_by_mine(items, ratings);
+        assert_eq!(sorted[0].id, "3", "my 9 first");
+        assert_eq!(sorted[1].id, "2", "then my 8");
+        assert_eq!(sorted[2].id, "1", "unrated last, however loved by the crowd");
+    }
+}
+
 /// Sorted, de-duplicated genre names across the given items.
 #[uniffi::export]
 pub fn genres_of(items: Vec<ListItem>) -> Vec<String> {

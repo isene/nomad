@@ -154,12 +154,14 @@ pub fn merge_ratings(sets: Vec<Vec<Rating>>) -> Vec<Rating> {
 }
 
 /// My score for a title: by id, else by title+year. 0 means unrated.
-#[uniffi::export]
-pub fn rating_for(ratings: Vec<Rating>, id: String, title: String, year: i32) -> i32 {
+///
+/// Borrows, so a caller ordering a whole catalog does not clone the
+/// rating set once per comparison.
+pub fn score_of(ratings: &[Rating], id: &str, title: &str, year: i32) -> i32 {
     if let Some(r) = ratings.iter().find(|r| r.id == id) {
         return r.score;
     }
-    let want = title_key(&title);
+    let want = title_key(title);
     let by_title: Vec<&Rating> = ratings.iter()
         .filter(|r| !r.title.is_empty() && title_key(&r.title) == want)
         .collect();
@@ -167,6 +169,11 @@ pub fn rating_for(ratings: Vec<Rating>, id: String, title: String, year: i32) ->
         .or_else(|| by_title.iter().find(|r| same_year(r.year, year)))
         .map(|r| r.score)
         .unwrap_or(0)
+}
+
+#[uniffi::export]
+pub fn rating_for(ratings: Vec<Rating>, id: String, title: String, year: i32) -> i32 {
+    score_of(&ratings, &id, &title, year)
 }
 
 #[cfg(test)]

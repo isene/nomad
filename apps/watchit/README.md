@@ -19,7 +19,7 @@ Decide what to watch from the couch.
 - **Movies / Series** toggle (segmented control)
 - Top-rated and popular lists from [TMDB](https://www.themoviedb.org); merge keeps your catalog growing
 - Poster thumbnails captured at list-load (Coil, lazy + disk-cached)
-- Filter sheet — rating, year range, genre include/exclude, sort
+- Filter sheet — rating, year range, genre include/exclude, and sort by TMDB rating, A–Z or **★ Mine** (my own scores first, unrated last)
 - **Wish** and **Dump** lists (dump hides a title from Browse)
 - Detail screen — poster, cast, plot, runtime, content rating, seasons,
   streaming providers for your region, TMDB / IMDb links

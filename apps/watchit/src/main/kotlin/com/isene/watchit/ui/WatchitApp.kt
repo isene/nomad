@@ -157,9 +157,11 @@ private fun FilterSheet(vm: WatchitViewModel, ui: com.isene.watchit.viewmodel.Ui
             Text("Filters", fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Sort:", Modifier.width(64.dp))
-                FilterChip(selected = ui.sort == "rating", onClick = { if (ui.sort != "rating") vm.toggleSort() }, label = { Text("Rating") })
+                FilterChip(selected = ui.sort == "rating", onClick = { vm.setSort("rating") }, label = { Text("Rating") })
                 Spacer(Modifier.width(8.dp))
-                FilterChip(selected = ui.sort == "alpha", onClick = { if (ui.sort != "alpha") vm.toggleSort() }, label = { Text("A–Z") })
+                FilterChip(selected = ui.sort == "alpha", onClick = { vm.setSort("alpha") }, label = { Text("A–Z") })
+                Spacer(Modifier.width(8.dp))
+                FilterChip(selected = ui.sort == "mine", onClick = { vm.setSort("mine") }, label = { Text("★ Mine") })
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(rating, { rating = it; it.toDoubleOrNull()?.let(vm::setRatingMin) }, label = { Text("Min rating") }, singleLine = true, modifier = Modifier.weight(1f), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))

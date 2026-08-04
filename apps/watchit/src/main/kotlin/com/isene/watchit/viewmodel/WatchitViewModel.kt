@@ -27,6 +27,7 @@ import uniffi.fe2o3_mobile_core.mergeRatings
 import uniffi.fe2o3_mobile_core.parseChart
 import uniffi.fe2o3_mobile_core.parseDetails
 import uniffi.fe2o3_mobile_core.parseSearch
+import uniffi.fe2o3_mobile_core.sortByMine
 import uniffi.fe2o3_mobile_core.ratingFor
 import uniffi.fe2o3_mobile_core.ratingKey
 import uniffi.fe2o3_mobile_core.tmdbChartUrl
@@ -101,6 +102,9 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
             val ctx = getApplication<Application>()
             val loaded = withContext(Dispatchers.IO) { RatingsRepo.loadAll(ctx, uri) }
             _ratings.value = loaded
+            // The list is ordered by these when sort is "mine", so it has
+            // to be rebuilt now that they have landed.
+            if (settings.sort == "mine") recompute()
             // A key of our own always wins; this only fills an empty one.
             if (settings.tmdbKey.isEmpty()) {
                 withContext(Dispatchers.IO) { ShareRepo.publishedKey(ctx, uri) }
@@ -148,6 +152,7 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
         // wrote under a different id for the same film.
         val merged = mergeRatings(listOf(_ratings.value, listOf(entry)))
         _ratings.value = merged
+        if (settings.sort == "mine") recompute()
         val uri = settings.syncTreeUri
         if (uri.isEmpty()) {
             recompute(status = "Pick a sync folder in Settings to keep ratings")
@@ -166,10 +171,13 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
         val view = settings.view
         val cat = catalog(view)
         val dumpIds = if (view == "movies") settings.dumpMovies else settings.dumpSeries
-        val filtered = filterSort(
+        var filtered = filterSort(
             cat, settings.ratingMin, settings.yearMin, settings.yearMax,
             settings.genresInclude, settings.genresExclude, dumpIds, settings.sort,
         )
+        // "Mine" orders by my own score, so it needs the ratings — which
+        // live in the shared folder, not in the catalog filterSort sees.
+        if (settings.sort == "mine") filtered = sortByMine(filtered, _ratings.value)
         _ui.value = UiState(
             view = view,
             filtered = filtered,
@@ -191,7 +199,17 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---- view / filters ----
     fun toggleView() { settings.view = if (settings.view == "movies") "series" else "movies"; recompute() }
-    fun toggleSort() { settings.sort = if (settings.sort == "rating") "alpha" else "rating"; recompute() }
+    /** Cycles the same three the TUI does: TMDB rating, A-Z, my rating. */
+    fun toggleSort() {
+        settings.sort = when (settings.sort) {
+            "rating" -> "alpha"
+            "alpha" -> "mine"
+            else -> "rating"
+        }
+        recompute()
+    }
+
+    fun setSort(v: String) { settings.sort = v; recompute() }
     fun setRatingMin(v: Double) { settings.ratingMin = v.coerceIn(0.0, 10.0); recompute() }
     fun setYearMin(v: Int) { settings.yearMin = v; recompute() }
     fun setYearMax(v: Int) { settings.yearMax = v; recompute() }
