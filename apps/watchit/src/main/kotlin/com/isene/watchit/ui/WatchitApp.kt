@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.isene.watchit.BuildConfig
 import com.isene.watchit.data.RatingsRepo
 import com.isene.watchit.viewmodel.WatchitViewModel
 import uniffi.fe2o3_mobile_core.ListItem
@@ -282,7 +283,11 @@ private fun AboutDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-        title = { Text("watchit") },
+        title = {
+            // Which build is this? Without it, "did that install take?"
+            // is a question only Android's app info screen can answer.
+            Text("watchit ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
+        },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
