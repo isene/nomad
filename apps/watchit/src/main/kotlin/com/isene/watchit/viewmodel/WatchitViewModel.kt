@@ -364,6 +364,17 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
         Repo.saveItems(getApplication(), "series.json", series)
         recompute()
         fetchDetails(item.id, item.kind)
+        // Publish straight away: a title added here is exactly the kind of
+        // thing the desktop wants, and waiting for the next resume to say
+        // so is a delay with no purpose.
+        val uri = settings.syncTreeUri
+        if (uri.isNotEmpty()) {
+            viewModelScope.launch {
+                withContext(Dispatchers.IO) {
+                    ShareRepo.saveMine(getApplication(), uri, Catalog(movies, series))
+                }
+            }
+        }
     }
 
     fun clearStatus() { if (_ui.value.status != null) status(null) }
