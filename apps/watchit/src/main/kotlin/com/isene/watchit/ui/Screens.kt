@@ -277,7 +277,20 @@ fun DetailScreen(vm: WatchitViewModel, item: ListItem, onBack: () -> Unit) {
                         ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.imdb.com/title/${det.imdbId}/")))
                     }
                 }
-            } ?: Text("Loading details…", color = MaterialTheme.colorScheme.secondary)
+            } ?: run {
+                val stuck by vm.unfetchable.collectAsState()
+                if (item.id in stuck) {
+                    Text(
+                        if (item.id.startsWith("tt"))
+                            "No details: TMDB has no record under this title's old IMDB id. " +
+                                "Search for it (magnifier) and add it again to get a TMDB entry."
+                        else "No details: TMDB did not answer for this title.",
+                        color = MaterialTheme.colorScheme.secondary,
+                    )
+                } else {
+                    Text("Loading details…", color = MaterialTheme.colorScheme.secondary)
+                }
+            }
         }
     }
 }

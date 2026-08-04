@@ -66,6 +66,12 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
     val ui: StateFlow<UiState> = _ui.asStateFlow()
     private val _details = MutableStateFlow<Map<String, Details>>(emptyMap())
     val detailsFlow: StateFlow<Map<String, Details>> = _details.asStateFlow()
+    /** Titles TMDB would not answer for. Without this the detail screen
+     *  sits on "Loading details…" for ever — and some titles can never
+     *  load: the desktop shares rows whose IMDB id TMDB has no mapping
+     *  for (arcs and seasons like "Bleach: Sennen Kessen-hen"). */
+    private val _unfetchable = MutableStateFlow<Set<String>>(emptySet())
+    val unfetchable: StateFlow<Set<String>> = _unfetchable.asStateFlow()
     private val _search = MutableStateFlow(SearchState())
     val search: StateFlow<SearchState> = _search.asStateFlow()
     /** My 1-10 scores, merged across every device writing into the shared
@@ -313,12 +319,24 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
     fun fetchDetails(id: String, kind: String) {
         val key = settings.tmdbKey
         if (key.isEmpty()) return
+        // An IMDB id is not something TMDB answers to. Those rows come
+        // from a desktop catalog whose migration could not resolve them;
+        // asking anyway just spins.
+        if (id.startsWith("tt")) {
+            _unfetchable.value = _unfetchable.value + id
+            return
+        }
         val region = settings.region
         viewModelScope.launch(Dispatchers.IO) {
-            val d = Net.get(tmdbDetailsUrl(id, kind, key))?.let { parseDetails(it, id, kind, region) } ?: return@launch
+            val d = Net.get(tmdbDetailsUrl(id, kind, key))?.let { parseDetails(it, id, kind, region) }
             withContext(Dispatchers.Main) {
-                storeDetails(d)
-                persistAfterDetails()
+                if (d == null || d.error) {
+                    _unfetchable.value = _unfetchable.value + id
+                } else {
+                    _unfetchable.value = _unfetchable.value - id
+                    storeDetails(d)
+                    persistAfterDetails()
+                }
             }
         }
     }
