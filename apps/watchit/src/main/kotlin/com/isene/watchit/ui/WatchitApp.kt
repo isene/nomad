@@ -45,7 +45,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -141,7 +140,19 @@ fun WatchitApp(vm: WatchitViewModel) {
     }
 
     if (showFilters) FilterSheet(vm, ui) { showFilters = false }
-    if (showSearch) SearchSheet(vm) { showSearch = false }
+    if (showSearch) {
+        SearchSheet(
+            vm,
+            // Adding a title and then having to go and find it is two
+            // steps too many when the reason you searched was to rate it.
+            onOpen = { hit ->
+                vm.addToCatalog(hit)
+                detail = vm.catalogRow(hit.id, hit.kind) ?: hit
+                showSearch = false
+                vm.clearSearch()
+            },
+        ) { showSearch = false }
+    }
     if (showSettings) SettingsDialog(vm) { showSettings = false }
     if (showAbout) AboutDialog { showAbout = false }
 }
@@ -191,9 +202,8 @@ private fun FilterSheet(vm: WatchitViewModel, ui: com.isene.watchit.viewmodel.Ui
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SearchSheet(vm: WatchitViewModel, onDismiss: () -> Unit) {
+private fun SearchSheet(vm: WatchitViewModel, onOpen: (ListItem) -> Unit, onDismiss: () -> Unit) {
     val s by vm.search.collectAsState()
-    val added = remember { mutableStateListOf<String>() }
     ModalBottomSheet(onDismissRequest = { vm.clearSearch(); onDismiss() }) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Search TMDB", fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -203,13 +213,22 @@ private fun SearchSheet(vm: WatchitViewModel, onDismiss: () -> Unit) {
             }
             if (s.busy) CircularProgressIndicator(strokeWidth = 2.dp)
             s.results.forEach { r ->
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                // The whole row: tapping a hit takes you to it, adding it
+                // on the way if the catalog does not have it yet.
+                val held = vm.catalogRow(r.id, r.kind) != null
+                Row(
+                    Modifier.fillMaxWidth().clickable { onOpen(r) }.padding(vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Column(Modifier.weight(1f)) {
                         Text(r.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 1)
                         Text("${if (r.year > 0) r.year.toString() else "—"} · ${r.kind} · ★ ${"%.1f".format(r.rating)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.secondary)
                     }
-                    if (r.id in added) Text("added", color = MaterialTheme.colorScheme.secondary, fontSize = 12.sp)
-                    else OutlinedButton(onClick = { vm.addToCatalog(r); added.add(r.id) }) { Text("Add") }
+                    Text(
+                        if (held) "in list  ›" else "add  ›",
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 13.sp,
+                    )
                 }
             }
         }

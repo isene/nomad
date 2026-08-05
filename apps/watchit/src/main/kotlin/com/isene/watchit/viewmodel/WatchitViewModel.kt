@@ -390,12 +390,14 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
     fun clearSearch() { _search.value = SearchState() }
 
     /** Add a search hit to the catalog (by its kind) and fetch its details. */
+    /** The catalog's own row for a title, which carries the year and
+     *  genres a search hit does not. */
+    fun catalogRow(id: String, kind: String): ListItem? =
+        (if (kind == "movie") movies else series).find { it.id == id }
+
     fun addToCatalog(item: ListItem) {
-        if (item.kind == "movie") {
-            if (movies.none { it.id == item.id }) movies = movies + item
-        } else {
-            if (series.none { it.id == item.id }) series = series + item
-        }
+        if (catalogRow(item.id, item.kind) != null) return
+        if (item.kind == "movie") movies = movies + item else series = series + item
         Repo.saveItems(getApplication(), "movies.json", movies)
         Repo.saveItems(getApplication(), "series.json", series)
         recompute()
