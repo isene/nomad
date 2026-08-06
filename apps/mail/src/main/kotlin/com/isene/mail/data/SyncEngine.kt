@@ -1,6 +1,10 @@
 package com.isene.mail.data
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import uniffi.fe2o3_mobile_core.Mail
 
 /**
@@ -29,17 +33,43 @@ object SyncEngine {
         var out = stored
         var failed = 0
 
-        for (a in accounts) {
-            val got = ImapRepo.headers(a, settings.days)
+        // The accounts in parallel. Three sequential IMAP sessions —
+        // TLS handshake, login, search, fetch — is three times the wait
+        // for no reason; they share nothing.
+        val results = runBlocking {
+            accounts.map { a ->
+                async(Dispatchers.IO) {
+                    val c = settings.cursor(a.address)
+                    a to ImapRepo.headers(
+                        a, settings.days,
+                        c?.let { ImapRepo.Cursor(it.first, it.second) },
+                    )
+                }
+            }.awaitAll()
+        }
+
+        for ((a, got) in results) {
             if (got == null) { failed++; continue }
             // A body already downloaded stays downloaded.
-            val withBodies = got.map { m ->
+            val withBodies = got.mails.map { m ->
                 val old = kept[m.messageId]
                 if (old != null && old.raw.isNotEmpty()) m.copy(raw = old.raw) else m
             }
-            out = out.filter { it.account != a.address } + withBodies
+            out = if (got.incremental) {
+                // Only the new ones came back, so keep what we hold and
+                // add to it. A full fetch replaces instead.
+                val fresh = withBodies.map { it.messageId }.toSet()
+                out.filter { it.account != a.address || it.messageId !in fresh } + withBodies
+            } else {
+                out.filter { it.account != a.address } + withBodies
+            }
+            settings.setCursor(a.address, got.cursor.uidValidity, got.cursor.lastUid)
         }
-        out = out.sortedByDescending { it.date }
+
+        // Incremental fetching never drops anything, so the window has to
+        // be enforced here or the store grows for ever.
+        val oldest = System.currentTimeMillis() / 1000 - settings.days.toLong() * 86_400
+        out = out.filter { it.date == 0L || it.date >= oldest }.sortedByDescending { it.date }
 
         if (failed == 0) {
             val live = out.map { it.messageId }.toSet()

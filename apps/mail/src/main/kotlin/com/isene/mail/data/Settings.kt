@@ -56,6 +56,23 @@ class Settings(ctx: Context) {
         get() = p.getInt("sync_minutes", 15)
         set(v) = p.edit().putInt("sync_minutes", v).apply()
 
+    /**
+     * Per-account IMAP cursor: `address -> "<uidvalidity>:<lastuid>"`.
+     * With it, a fetch asks only for what arrived since — the difference
+     * between a handful of messages and a month of envelopes, every time.
+     */
+    fun cursor(address: String): Pair<Long, Long>? {
+        val v = p.getString("uid_$address", null) ?: return null
+        val parts = v.split(":")
+        if (parts.size != 2) return null
+        val a = parts[0].toLongOrNull() ?: return null
+        val b = parts[1].toLongOrNull() ?: return null
+        return a to b
+    }
+
+    fun setCursor(address: String, uidValidity: Long, lastUid: Long) =
+        p.edit().putString("uid_$address", "$uidValidity:$lastUid").apply()
+
     /** "all" | "unread" */
     var filter: String
         get() = p.getString("filter", "all") ?: "all"

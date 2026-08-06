@@ -35,6 +35,6 @@ class MainActivity : ComponentActivity() {
      *  if the change that moved the count never triggered a push. */
     override fun onStop() {
         super.onStop()
-        WidgetPush.now(this)
+        WidgetPush.durably(this)
     }
 }

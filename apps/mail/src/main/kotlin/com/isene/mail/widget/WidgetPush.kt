@@ -1,19 +1,37 @@
 package com.isene.mail.widget
 
 import android.content.Context
+import androidx.glance.appwidget.updateAll
 import com.isene.mail.work.WidgetPushWorker
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * Redraw the widget.
  *
- * This used to run in `viewModelScope`, cancelled the moment the
- * ViewModel cleared, then on an application scope — which still dies
- * with the process, and the process goes away moments after you leave
- * the app. That is exactly when the redraw was queued, so the widget
- * kept showing the old state.
+ * Two paths, because neither alone is both fast and certain:
  *
- * WorkManager owns the callback now, so it happens either way.
+ * * [now] pushes straight away on an app-lifetime scope. While the app
+ *   is alive this lands in milliseconds, so by the time you press home
+ *   the launcher already has the new view.
+ * * [durably] hands it to WorkManager, which owns the callback and so
+ *   survives the process being torn down — which Android does moments
+ *   after you leave. Called from `onStop`, where the direct push is
+ *   exactly the one at risk.
+ *
+ * Doing only the WorkManager one (the previous attempt) was reliable but
+ * visibly late: enqueue, JobScheduler, dispatch — seconds, and the
+ * launcher meanwhile shows the old state.
  */
 object WidgetPush {
-    fun now(context: Context) = WidgetPushWorker.enqueue(context.applicationContext)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    fun now(context: Context) {
+        val app = context.applicationContext
+        scope.launch { runCatching { MailWidget().updateAll(app) } }
+    }
+
+    fun durably(context: Context) = WidgetPushWorker.enqueue(context.applicationContext)
 }
