@@ -79,7 +79,7 @@ fun MailApp(vm: MailViewModel) {
                 TopAppBar(
                     title = {
                         Text(
-                            if (ui.unread > 0) "mail  ${ui.unread}" else "mail",
+                            if (ui.unread > 0) "kastrup  ${ui.unread}" else "kastrup",
                             fontWeight = FontWeight.Bold,
                         )
                     },
@@ -254,7 +254,7 @@ private fun AboutDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
-        title = { Text("mail ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") },
+        title = { Text("kastrup ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") },
         text = {
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),

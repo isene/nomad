@@ -2,6 +2,7 @@ package com.isene.mail.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -13,7 +14,6 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
-import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -26,8 +26,16 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
 import com.isene.mail.MainActivity
 import com.isene.mail.data.WidgetStore
+
+// Fixed colours rather than GlanceTheme's. With no panel behind it the
+// text sits directly on the wallpaper, where a colour that follows the
+// system light/dark theme is invisible half the time.
+private val ACCENT = ColorProvider(Color(0xFF7FC8E8))
+private val NAME = ColorProvider(Color(0xFFCFE3F0))
+private val BODY = ColorProvider(Color.White)
 
 /**
  * Unread mail on the home screen: a count and who it is from.
@@ -57,7 +65,8 @@ private fun WidgetContent(
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            .background(GlanceTheme.colors.background)
+            // No background: the wallpaper shows through. A launcher
+            // widget that paints its own panel looks pasted on.
             .padding(8.dp)
             .clickable(openApp),
         contentAlignment = Alignment.TopStart,
@@ -69,25 +78,25 @@ private fun WidgetContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "mail",
+                    "kastrup",
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
-                        color = GlanceTheme.colors.primary,
+                        color = ACCENT,
                     ),
                 )
                 Spacer(GlanceModifier.padding(4.dp))
                 Text(
                     if (unread == 0) "Nothing unread" else "Open the app",
-                    style = TextStyle(color = GlanceTheme.colors.onBackground),
+                    style = TextStyle(color = BODY),
                 )
             }
         } else {
             Column(modifier = GlanceModifier.fillMaxSize()) {
                 Text(
-                    "mail  $unread",
+                    "kastrup  $unread",
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
-                        color = GlanceTheme.colors.primary,
+                        color = ACCENT,
                     ),
                     modifier = GlanceModifier.padding(bottom = 4.dp).clickable(openApp),
                 )
@@ -106,14 +115,14 @@ private fun WidgetContent(
                                 text = row.from,
                                 style = TextStyle(
                                     fontWeight = FontWeight.Medium,
-                                    color = GlanceTheme.colors.secondary,
+                                    color = NAME,
                                 ),
                                 modifier = GlanceModifier.width(96.dp),
                                 maxLines = 1,
                             )
                             Text(
                                 text = row.subject,
-                                style = TextStyle(color = GlanceTheme.colors.onBackground),
+                                style = TextStyle(color = BODY),
                                 maxLines = 1,
                                 modifier = GlanceModifier.fillMaxWidth(),
                             )

@@ -37,7 +37,7 @@ prompt the changes that fit *your* phone.
 | <img src="apps/gazette/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**gazette**](apps/gazette/) | Reader for your personal daily news digest — browse the last 7 daily issues (and the typeset PDF) synced into `~/.news`, open source links | [gazette](https://github.com/isene/gazette) |
 | <img src="apps/books/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**books**](apps/books/) | The library on your phone: read the books you grabbed and had written on the laptop, grouped by shelf, with inline figures (only finished books appear) | [library](https://github.com/isene/library) |
 | <img src="apps/onepage/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**onepage**](apps/onepage/) | Minimal home-screen launcher: one screen, widgets placed freely, zero idle cost | — |
-| <img src="apps/mail/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**mail**](apps/mail/) | Your Gmail inboxes, decoded by the same crate kastrup uses — bodies on demand, and an explicit Mark READ that reaches the laptop | [kastrup](https://github.com/isene/kastrup) |
+| <img src="apps/mail/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**kastrup**](apps/mail/) | Your Gmail inboxes, decoded by the same crate kastrup uses — bodies on demand, and an explicit Mark READ that reaches the laptop | [kastrup](https://github.com/isene/kastrup) |
 
 Each ships as its own signed APK with its own launcher icon, sideloaded from a
 Syncthing-synced folder.
