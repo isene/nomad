@@ -107,7 +107,7 @@ fun MailApp(vm: MailViewModel) {
                     FilterChip(
                         selected = ui.filter == "unread",
                         onClick = { vm.setFilter(if (ui.filter == "unread") "all" else "unread") },
-                        label = { Text("Unread") },
+                        label = { Text(if (ui.unread > 0) "Unread ${ui.unread}" else "Unread") },
                     )
                     FilterChip(
                         selected = ui.accountFilter.isEmpty(),
