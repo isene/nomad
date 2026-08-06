@@ -87,7 +87,9 @@ object ImapRepo {
 
         found.mapNotNull { msg ->
             runCatching {
-                val id = (msg.getHeader("Message-ID")?.firstOrNull()?.trim())
+                // Bare, without the angle brackets — the form kastrup
+                // stores, and read state is keyed on it at both ends.
+                val id = (msg.getHeader("Message-ID")?.firstOrNull()?.trim()?.trim('<', '>'))
                     ?.takeIf { it.isNotEmpty() }
                     ?: "uid:${a.address}:${inbox.getUID(msg)}"
                 val when_ = msg.receivedDate ?: msg.sentDate
