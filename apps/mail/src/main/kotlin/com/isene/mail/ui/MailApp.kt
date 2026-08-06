@@ -121,7 +121,7 @@ fun MailApp(vm: MailViewModel) {
                 ui.status?.let { s ->
                     Surface(
                         color = MaterialTheme.colorScheme.surfaceVariant,
-                        modifier = Modifier.fillMaxWidth().clickable { vm.clearStatus() },
+                        modifier = Modifier.fillMaxWidth().clickable { vm.undoDismiss() },
                     ) {
                         Text(
                             s,

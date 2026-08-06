@@ -126,6 +126,13 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 all = fresh.sortedByDescending { it.date }
                 recompute()
             }
+            // A dismissal only has to hold as long as the message could
+            // come back on the next fetch. Past the window it is dead
+            // weight, so drop it.
+            if (failed == 0) {
+                val live = all.map { it.messageId }.toSet()
+                settings.dismissed = settings.dismissed.intersect(live)
+            }
             withContext(Dispatchers.IO) { Store.save(ctx, all) }
             _ui.value = _ui.value.copy(
                 busy = false,
@@ -168,6 +175,31 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- filters ----------
 
+    /**
+     * Take a message off this phone's list. Local only: the laptop is
+     * the archive and never hears about it, which is the whole point —
+     * clearing the phone must not cost you the mail.
+     */
+    fun dismiss(m: Mail) {
+        settings.dismissed = settings.dismissed + m.messageId
+        undoable = m.messageId
+        recompute()
+        status("Removed here only — tap to undo")
+    }
+
+    /** Also the status line's tap target, so it clears when there is
+     *  nothing to take back. */
+    fun undoDismiss() {
+        val id = undoable ?: run { status(null); return }
+        settings.dismissed = settings.dismissed - id
+        undoable = null
+        recompute()
+        status(null)
+    }
+
+    /** The last dismissal, while the status line still offers it back. */
+    private var undoable: String? = null
+
     fun setFilter(f: String) { settings.filter = f; recompute() }
 
     fun setAccountFilter(a: String) { settings.accountFilter = a; recompute() }
@@ -183,7 +215,9 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         // set membership. Asking the core per message would rebuild the
         // whole map once per row.
         val readIds = marks.filter { it.read }.map { it.messageId }.toSet()
-        val shown = all
+        val gone = settings.dismissed
+        val here = all.filter { it.messageId !in gone }
+        val shown = here
             .filter { acct.isEmpty() || it.account == acct }
             .filter { filter != "unread" || it.messageId !in readIds }
         _ui.value = _ui.value.copy(
@@ -192,7 +226,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             accounts = settings.accounts().map { it.address },
             accountFilter = acct,
             filter = filter,
-            unread = all.count { it.messageId !in readIds },
+            unread = here.count { it.messageId !in readIds },
         )
     }
 }

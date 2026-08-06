@@ -55,6 +55,19 @@ class Settings(ctx: Context) {
         set(v) = p.edit().putString("account_filter", v).apply()
 
     /**
+     * Message-IDs swiped away on this phone. Deliberately local — not in
+     * the shared folder, not published, not merged. Clearing the phone's
+     * list is a phone decision; the laptop keeps the mail.
+     *
+     * Pruned to the fetch window after each sync, so it cannot grow
+     * without bound.
+     */
+    var dismissed: Set<String>
+        get() = p.getString("dismissed", "")?.takeIf { it.isNotEmpty() }?.split("\n")?.toSet()
+            ?: emptySet()
+        set(v) = p.edit().putString("dismissed", v.joinToString("\n")).apply()
+
+    /**
      * The accounts, parsed. A malformed paste yields none rather than a
      * crash — the Settings screen is then still reachable to fix it.
      *

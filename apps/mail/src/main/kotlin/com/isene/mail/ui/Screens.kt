@@ -1,5 +1,6 @@
 package com.isene.mail.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,15 +19,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -58,7 +62,7 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
     if (ui.mails.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                if (ui.accounts.isEmpty()) "Paste your accounts in Settings, then pull down to fetch."
+                if (ui.accounts.isEmpty()) "Add your accounts in Settings, then tap ↻."
                 else "Nothing here. Tap ↻ to fetch.",
                 Modifier.padding(32.dp),
                 color = MaterialTheme.colorScheme.secondary,
@@ -69,35 +73,58 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
     LazyColumn(modifier.fillMaxSize()) {
         items(ui.mails, key = { it.messageId }) { m ->
             val read = m.messageId in ui.readIds
-            Column(Modifier.fillMaxWidth().clickable { onOpen(m) }.padding(horizontal = 14.dp, vertical = 8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        shortFrom(m.from),
-                        Modifier.weight(1f),
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        fontWeight = if (read) FontWeight.Normal else FontWeight.Bold,
-                        color = if (read) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
-                    )
-                    if (m.hasAttachments) {
-                        Text("📎", fontSize = 12.sp)
-                        Spacer(Modifier.width(6.dp))
+            // Swipe takes the message off this phone. Nothing leaves the
+            // device: the laptop is the archive and never hears about it.
+            val swipe = rememberSwipeToDismissBoxState(
+                confirmValueChange = { v ->
+                    if (v == SwipeToDismissBoxValue.Settled) false else { vm.dismiss(m); true }
+                },
+            )
+            SwipeToDismissBox(
+                state = swipe,
+                backgroundContent = {
+                    Box(
+                        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.CenterEnd,
+                    ) {
+                        Text("remove here", fontSize = 12.sp, color = MaterialTheme.colorScheme.tertiary)
+                    }
+                },
+            ) {
+                Column(
+                    Modifier.background(MaterialTheme.colorScheme.background)
+                        .fillMaxWidth().clickable { onOpen(m) }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            shortFrom(m.from),
+                            Modifier.weight(1f),
+                            fontSize = 14.sp,
+                            maxLines = 1,
+                            fontWeight = if (read) FontWeight.Normal else FontWeight.Bold,
+                            color = if (read) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.primary,
+                        )
+                        if (m.hasAttachments) {
+                            Text("📎", fontSize = 12.sp)
+                            Spacer(Modifier.width(6.dp))
+                        }
+                        Text(
+                            if (m.date > 0) dayFmt.format(Date(m.date * 1000)) else "",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
                     }
                     Text(
-                        if (m.date > 0) dayFmt.format(Date(m.date * 1000)) else "",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.secondary,
+                        m.subject,
+                        fontSize = 13.sp,
+                        maxLines = 2,
+                        fontWeight = if (read) FontWeight.Normal else FontWeight.SemiBold,
+                        color = if (read) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
                     )
                 }
-                Text(
-                    m.subject,
-                    fontSize = 13.sp,
-                    maxLines = 2,
-                    fontWeight = if (read) FontWeight.Normal else FontWeight.SemiBold,
-                    color = if (read) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.onSurface,
-                )
             }
-            Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
         }
     }
 }
@@ -131,7 +158,9 @@ fun MessageScreen(vm: MailViewModel, mail: Mail, onBack: () -> Unit) {
                 Button(onClick = { vm.setRead(mail, !read) }, modifier = Modifier.weight(1f)) {
                     Text(if (read) "Mark unread" else "Mark READ")
                 }
-                OutlinedButton(onClick = { vm.closeBody(); onBack() }) { Text("Close") }
+                OutlinedButton(onClick = { vm.dismiss(mail); vm.closeBody(); onBack() }) {
+                    Text("Remove")
+                }
             }
         },
     ) { pad ->
@@ -144,7 +173,7 @@ fun MessageScreen(vm: MailViewModel, mail: Mail, onBack: () -> Unit) {
             HeaderRow("Date", if (mail.date > 0) fullFmt.format(Date(mail.date * 1000)) else "—")
             HeaderRow("Account", mail.account)
             Spacer(Modifier.width(8.dp))
-            Divider(color = MaterialTheme.colorScheme.surfaceVariant)
+            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             Spacer(Modifier.width(8.dp))
             if (body == null) {
                 CircularProgressIndicator(strokeWidth = 2.dp)
