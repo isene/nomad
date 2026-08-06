@@ -29,7 +29,8 @@ import kotlin.math.roundToInt
  * and Android composites the wallpaper without involving us.
  *
  * EDIT mode: the surface intercepts all widget-area touches. Drag moves,
- * two-finger pinch resizes (per-axis), long-press a widget to Remove, a
+ * two-finger pinch resizes (per-axis), the ✕ badge on each widget removes
+ * it (long-press still offers the same), a
  * bottom chrome bar offers Add widget / Setup / Done. Done persists and leaves.
  */
 class HomeSurface(context: Context) : FrameLayout(context) {
@@ -127,6 +128,47 @@ class HomeSurface(context: Context) : FrameLayout(context) {
         color = 0xAAFFFFFF.toInt()
     }
 
+    // ---- delete badge ----
+    // Removing used to be long-press-only, which is to say invisible: an
+    // edit mode that shows a border and a chrome bar and nothing about
+    // getting rid of a widget reads as "you cannot". So each widget wears
+    // an ✕ while editing.
+
+    private val badgeFill = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.FILL
+        color = 0xEEB03030.toInt()
+    }
+    private val badgeGlyph = Paint().apply {
+        isAntiAlias = true
+        style = Paint.Style.STROKE
+        strokeWidth = 2.5f * density
+        color = 0xFFFFFFFF.toInt()
+    }
+
+    private val badgeRadius = 13 * density
+    /** Generous next to the drawn circle: a fingertip is wider than an icon. */
+    private val badgeTouchRadius = 24 * density
+
+    private fun badgeCx(v: android.view.View) = v.right - badgeRadius
+    private fun badgeCy(v: android.view.View) = v.top + badgeRadius
+
+    /** The widget whose ✕ was touched, while the touch could still be one. */
+    private var pendingBadge: Entry? = null
+
+    private fun badgeAt(x: Float, y: Float): Entry? {
+        // Back-to-front, so the topmost widget's badge wins where they overlap.
+        for (i in childCount - 1 downTo 0) {
+            val v = getChildAt(i)
+            if (v === chrome) continue
+            val e = entries.firstOrNull { it.view === v } ?: continue
+            val dx = x - badgeCx(v)
+            val dy = y - badgeCy(v)
+            if (dx * dx + dy * dy <= badgeTouchRadius * badgeTouchRadius) return e
+        }
+        return null
+    }
+
     // ---- VIEW-mode gesture: long-press on empty space enters EDIT ----
 
     private val viewModeDetector = GestureDetector(
@@ -216,6 +258,14 @@ class HomeSurface(context: Context) : FrameLayout(context) {
                 resizing = false
                 downX = ev.x
                 downY = ev.y
+                pendingBadge = badgeAt(ev.x, ev.y)
+                if (pendingBadge != null) {
+                    // The ✕ takes the whole gesture: no drag, no long-press
+                    // menu. Removal happens on UP, so sliding off it is
+                    // still a way out.
+                    active = null
+                    return true
+                }
                 active = topEntryAt(ev.x, ev.y)
                 active?.let { e ->
                     val lp = e.view.layoutParams as LayoutParams
@@ -250,6 +300,12 @@ class HomeSurface(context: Context) : FrameLayout(context) {
                 }
             }
             MotionEvent.ACTION_MOVE -> {
+                if (pendingBadge != null) {
+                    if (abs(ev.x - downX) > touchSlop || abs(ev.y - downY) > touchSlop) {
+                        pendingBadge = null
+                    }
+                    return true
+                }
                 val e = active
                 if (e == null) {
                     // Empty-space gesture: drifting past slop cancels the
@@ -298,6 +354,10 @@ class HomeSurface(context: Context) : FrameLayout(context) {
             }
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 removeCallbacks(longPress)
+                pendingBadge?.let { e ->
+                    pendingBadge = null
+                    if (ev.actionMasked == MotionEvent.ACTION_UP) confirmRemove(e)
+                }
                 active = null
                 resizing = false
             }
@@ -397,6 +457,17 @@ class HomeSurface(context: Context) : FrameLayout(context) {
     private fun dialogContext(): Context =
         android.view.ContextThemeWrapper(context, android.R.style.Theme_DeviceDefault_Dialog_Alert)
 
+    /** Deleting a widget also drops whatever it was configured with, and
+     *  setting that up again is the tedious part. One tap to confirm. */
+    private fun confirmRemove(e: Entry) {
+        android.app.AlertDialog.Builder(dialogContext())
+            .setTitle("Remove widget?")
+            .setMessage(e.provider.substringAfterLast('/').substringAfterLast('.'))
+            .setPositiveButton("Remove") { _, _ -> removeWidget(e) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
     private fun showWidgetMenu(e: Entry) {
         val menu = PopupMenu(dialogContext(), e.view)
         menu.menu.add("Remove")
@@ -419,6 +490,12 @@ class HomeSurface(context: Context) : FrameLayout(context) {
                 v.right.toFloat(), v.bottom.toFloat(),
                 borderPaint,
             )
+            val cx = badgeCx(v)
+            val cy = badgeCy(v)
+            canvas.drawCircle(cx, cy, badgeRadius, badgeFill)
+            val arm = badgeRadius * 0.42f
+            canvas.drawLine(cx - arm, cy - arm, cx + arm, cy + arm, badgeGlyph)
+            canvas.drawLine(cx + arm, cy - arm, cx - arm, cy + arm, badgeGlyph)
         }
     }
 }
