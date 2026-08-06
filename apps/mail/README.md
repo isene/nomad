@@ -22,6 +22,8 @@ Part of the [nomad](../../) mobile suite.
   crate kastrup uses, so quoted-printable, base64, RFC 2047 headers,
   multipart and HTML mail all come out the way they do on the desktop
 - An explicit **Mark READ** that reaches the laptop
+- Swipe a row (or **Remove** in a message) to take it off this phone —
+  local only, the laptop keeps the mail
 
 ## Read state
 
@@ -44,6 +46,12 @@ identically.
 The server's `\Seen` flag is not consulted. The laptop's fetcher marks
 everything seen as it delivers, so the server has no opinion worth
 having.
+
+Removing is the one thing that stays put. A swipe writes a Message-ID to
+this phone's own prefs and nowhere else: no shared file, no IMAP delete,
+no server round trip. Clearing the phone's list must never cost you the
+mail. The status line offers it back with a tap, and the list is pruned
+to the fetch window on every sync so it cannot grow without bound.
 
 ## Setup
 
