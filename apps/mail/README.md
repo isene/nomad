@@ -73,6 +73,8 @@ to the fetch window on every sync so it cannot grow without bound.
 3. **↻** fetches headers. Bodies download when you open a message, not
    before: a month of full bodies is minutes of radio for mail that
    mostly never gets read on a phone.
+4. **Fetch every (min)** in Settings runs the same fetch in the
+   background. 15 minutes by default, 0 turns it off.
 
 ## The widget
 
@@ -81,10 +83,19 @@ file the app writes when the count moves, and declares no update period
 at all — a widget nobody looks at wakes nothing. The flip side: with no
 push yet, it is as fresh as the last time the app ran.
 
+## Background fetch
+
+WorkManager, not a timer: it batches with whatever else the phone was
+going to wake for, respects Doze and App Standby, and survives reboot. A
+network constraint means a fetch is never attempted with the radio off,
+which is the expensive way to fail.
+
+Fifteen minutes is Android's floor for periodic work. Real push would
+mean holding a socket open all day — a different trade, and not this one.
+
 ## Not yet
 
-No push, no compose. Both wait until the reading half has earned its
-keep.
+No push (the fetch is periodic, not instant) and no compose.
 
 ## License
 
