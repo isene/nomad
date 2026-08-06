@@ -31,13 +31,40 @@ class TaskRepository(private val context: Context) {
         // Inbox to the top: it's the capture target (vox / relay / kastrup),
         // so new tasks should be the first thing seen. inbox_first keeps every
         // other category's order; a later save just writes Inbox-first too.
+        // Keep the widget's local copy honest when the file changed
+        // underneath us (Syncthing, or an edit on the laptop).
+        cacheForWidget(context, text)
         return inboxFirst(parse(text))
     }
 
     fun save(uri: Uri, hl: Hyperlist) {
-        val payload = serialize(hl).toByteArray(Charsets.UTF_8)
-        context.contentResolver.openOutputStream(uri, "wt")?.use { it.write(payload) }
-            ?: throw IOException("could not open $uri for write")
+        val text = serialize(hl)
+        context.contentResolver.openOutputStream(uri, "wt")?.use {
+            it.write(text.toByteArray(Charsets.UTF_8))
+        } ?: throw IOException("could not open $uri for write")
+        cacheForWidget(context, text)
+    }
+
+    companion object {
+        private const val WIDGET_CACHE = "widget-src.hl"
+
+        /**
+         * A copy of the list in the app's own filesDir, for the widget.
+         *
+         * Reading the real file means a SAF round trip through the
+         * documents provider on a Syncthing folder — hundreds of
+         * milliseconds, paid on every launcher redraw. This is a plain
+         * local read.
+         */
+        fun cacheForWidget(context: Context, text: String) {
+            runCatching { java.io.File(context.filesDir, WIDGET_CACHE).writeText(text) }
+        }
+
+        fun widgetCache(context: Context): String? =
+            runCatching {
+                java.io.File(context.filesDir, WIDGET_CACHE)
+                    .takeIf { it.exists() }?.readText()
+            }.getOrNull()
     }
 
     fun lastModified(uri: Uri): Long {

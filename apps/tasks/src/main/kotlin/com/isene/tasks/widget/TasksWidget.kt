@@ -28,6 +28,7 @@ import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import com.isene.tasks.MainActivity
+import com.isene.tasks.data.TaskRepository
 import uniffi.fe2o3_mobile_core.WidgetRow
 import uniffi.fe2o3_mobile_core.parse
 import uniffi.fe2o3_mobile_core.widgetRows
@@ -60,6 +61,12 @@ class TasksWidget : GlanceAppWidget() {
     }
 
     private fun loadRows(context: Context): List<WidgetRow> {
+        // The local copy first: a SAF read of the synced file costs a
+        // documents-provider round trip on every launcher redraw. Fall
+        // back to SAF only before the app has ever saved.
+        TaskRepository.widgetCache(context)?.let {
+            return runCatching { widgetRows(parse(it), MAX_ROWS) }.getOrDefault(emptyList())
+        }
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val uriStr = prefs.getString(KEY_URI, null) ?: return emptyList()
         val uri = Uri.parse(uriStr)
@@ -67,6 +74,7 @@ class TasksWidget : GlanceAppWidget() {
             val text = context.contentResolver.openInputStream(uri)?.use { input ->
                 input.bufferedReader(Charsets.UTF_8).readText()
             } ?: return emptyList()
+            TaskRepository.cacheForWidget(context, text)
             widgetRows(parse(text), MAX_ROWS)
         } catch (_: Exception) {
             // SAF permission may have been revoked, or Syncthing moved the
