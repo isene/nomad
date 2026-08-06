@@ -1,6 +1,8 @@
 package com.isene.mail.data
 
 import android.content.Context
+import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
 import org.json.JSONArray
 
 private const val PREFS = "mail_prefs"
@@ -79,4 +81,23 @@ class Settings(ctx: Context) {
         val a = accounts()
         return if (a.isEmpty()) "No accounts configured" else a.joinToString("\n") { it.address }
     }
+}
+
+/**
+ * The `mail-accounts.json` the laptop's `mail-accounts` script drops in
+ * the shared folder. Imported once into this app's own prefs, after
+ * which the file should be deleted — a refresh token is the whole
+ * credential and has no business sitting in a synced folder.
+ *
+ * Typing or clipboard-pasting a few KB of JSON on a phone is the kind
+ * of chore that gets done wrong once and debugged for an hour.
+ */
+fun readAccountsFile(ctx: Context, treeUri: String): String? {
+    if (treeUri.isEmpty()) return null
+    val dir = runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri)) }.getOrNull()
+        ?: return null
+    val f = dir.findFile("mail-accounts.json")?.takeIf { it.isFile } ?: return null
+    return runCatching {
+        ctx.contentResolver.openInputStream(f.uri)?.use { it.bufferedReader().readText() }
+    }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
 }
