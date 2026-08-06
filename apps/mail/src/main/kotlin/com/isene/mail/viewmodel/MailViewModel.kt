@@ -7,6 +7,9 @@ import com.isene.mail.data.ImapRepo
 import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.Settings
 import com.isene.mail.data.Store
+import com.isene.mail.data.WidgetRow
+import com.isene.mail.data.WidgetStore
+import com.isene.mail.widget.MailWidgetReceiver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -220,13 +223,30 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         val shown = here
             .filter { acct.isEmpty() || it.account == acct }
             .filter { filter != "unread" || it.messageId !in readIds }
+        val unread = here.filter { it.messageId !in readIds }
         _ui.value = _ui.value.copy(
             mails = shown,
             readIds = readIds,
             accounts = settings.accounts().map { it.address },
             accountFilter = acct,
             filter = filter,
-            unread = here.count { it.messageId !in readIds },
+            unread = unread.size,
         )
+        publishWidget(unread)
+    }
+
+    /** Feed the home screen. Writes and redraws only when the summary
+     *  actually moved, so this is a string compare on most passes. */
+    private fun publishWidget(unread: List<Mail>) {
+        val ctx = getApplication<Application>()
+        val rows = unread.map {
+            WidgetRow(
+                from = it.from.substringBefore('<').trim().trim('"')
+                    .ifEmpty { it.from.trim().trim('<', '>') },
+                subject = it.subject,
+            )
+        }
+        if (!WidgetStore.save(ctx, unread.size, rows)) return
+        viewModelScope.launch { MailWidgetReceiver.update(ctx) }
     }
 }

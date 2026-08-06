@@ -24,6 +24,7 @@ Part of the [nomad](../../) mobile suite.
 - An explicit **Mark READ** that reaches the laptop
 - Swipe a row (or **Remove** in a message) to take it off this phone —
   local only, the laptop keeps the mail
+- A **home-screen widget**: unread count and who it is from, tap to open
 
 ## Read state
 
@@ -67,6 +68,13 @@ to the fetch window on every sync so it cannot grow without bound.
 3. **↻** fetches headers. Bodies download when you open a message, not
    before: a month of full bodies is minutes of radio for mail that
    mostly never gets read on a phone.
+
+## The widget
+
+Unread count and senders on the home screen. It reads a small summary
+file the app writes when the count moves, and declares no update period
+at all — a widget nobody looks at wakes nothing. The flip side: with no
+push yet, it is as fresh as the last time the app ran.
 
 ## Not yet
 

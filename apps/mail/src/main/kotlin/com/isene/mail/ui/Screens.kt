@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -70,6 +71,9 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
         }
         return
     }
+    // No navigationBarsPadding here: the Scaffold's content padding
+    // already carries the system bar inset, and adding it again would
+    // leave a second gap the height of the nav bar.
     LazyColumn(modifier.fillMaxSize()) {
         items(ui.mails, key = { it.messageId }) { m ->
             val read = m.messageId in ui.readIds
@@ -149,8 +153,10 @@ fun MessageScreen(vm: MailViewModel, mail: Mail, onBack: () -> Unit) {
             )
         },
         bottomBar = {
+            // Scaffold insets its content but not its bars, so this is
+            // what keeps the buttons clear of the system navigation.
             Row(
-                Modifier.fillMaxWidth().padding(12.dp),
+                Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // The explicit act. Nothing else on this phone publishes

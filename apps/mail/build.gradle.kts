@@ -113,8 +113,8 @@ android {
         applicationId = "com.isene.mail"
         minSdk = 33
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.2.0"
         ndk { abiFilters += androidAbis.keys }
     }
 
@@ -181,8 +181,11 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
-    // SAF access to the Syncthing folder holding the shared ratings.
+    // SAF access to the Syncthing folder holding the shared read state.
     implementation(libs.androidx.documentfile)
+    // Home-screen widget.
+    implementation(libs.glance.appwidget)
+    implementation(libs.glance.material3)
     implementation(libs.okhttp)
     // IMAP with XOAUTH2. The Android-flavoured build of Jakarta Mail;
     // the Rust core never touches a socket.
