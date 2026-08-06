@@ -47,12 +47,13 @@ having.
 
 ## Setup
 
-1. **⋮ → Settings → Accounts JSON**. A list of
-   `{address, client_id, client_secret, refresh_token}`, one per Gmail
-   account. It stays in this app's private prefs, never in the shared
-   folder.
-2. **Pick the shared folder** — the Syncthing folder the laptop writes
-   its read state into.
+1. On the laptop, run `mail-accounts`. It gathers every Gmail account's
+   client id, secret and refresh token into `mail-accounts.json` in the
+   folder Syncthing shares with the phone.
+2. **⋮ → Settings → Pick the shared folder**, then **Import
+   mail-accounts.json**. Delete the file afterwards: a refresh token is
+   the whole credential and has no business sitting in a synced folder.
+   (The field is editable, if you would rather type it.)
 3. **↻** fetches headers. Bodies download when you open a message, not
    before: a month of full bodies is minutes of radio for mail that
    mostly never gets read on a phone.

@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.isene.mail.BuildConfig
 import com.isene.mail.data.ReadStateRepo
+import com.isene.mail.data.readAccountsFile
 import com.isene.mail.viewmodel.MailViewModel
 import uniffi.fe2o3_mobile_core.Mail
 
@@ -147,6 +148,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
     var accounts by remember { mutableStateOf(s.accountsJson) }
     var days by remember { mutableStateOf(s.days.toString()) }
     var syncUri by remember { mutableStateOf(s.syncTreeUri) }
+    var imported by remember { mutableStateOf<String?>(null) }
 
     // SAF, not a raw path: the shared folder lives on external storage
     // and this is the only way to get durable write access to it.
@@ -181,32 +183,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("Accounts", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                OutlinedTextField(
-                    accounts,
-                    { accounts = it },
-                    label = { Text("Accounts JSON") },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 4,
-                    maxLines = 8,
-                )
-                Text(
-                    "A list of {address, client_id, client_secret, refresh_token}. " +
-                        "Kept in this app only, never in the shared folder.",
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.secondary,
-                )
-                Text(s.accountSummary(), fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
-                OutlinedTextField(
-                    days,
-                    { days = it },
-                    label = { Text("Days to fetch") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                )
-                Spacer(Modifier.width(4.dp))
-                Text("Read state sync", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                Text("Shared folder", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 OutlinedButton(onClick = { pickFolder.launch(null) }, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         ReadStateRepo.folderName(ctx, syncUri)?.let { "Folder: $it" }
@@ -218,6 +195,50 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                         "Each device writes only its own file, so nothing collides.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.secondary,
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("Accounts", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                // Run `mail-accounts` on the laptop, tap this, delete the
+                // file. Beats pasting a few KB of JSON on a phone keyboard.
+                OutlinedButton(
+                    onClick = {
+                        val text = readAccountsFile(ctx, syncUri)
+                        if (text == null) {
+                            imported = "No mail-accounts.json in that folder"
+                        } else {
+                            accounts = text
+                            s.accountsJson = text
+                            imported = "Imported: " + s.accountSummary().replace("\n", ", ")
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text("Import mail-accounts.json from folder") }
+                imported?.let {
+                    Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                }
+                OutlinedTextField(
+                    accounts,
+                    { accounts = it },
+                    label = { Text("Accounts JSON") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 6,
+                )
+                Text(
+                    "A list of {address, client_id, client_secret, refresh_token}. " +
+                        "Kept in this app only — delete the file from the shared " +
+                        "folder once imported.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Text(s.accountSummary(), fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                OutlinedTextField(
+                    days,
+                    { days = it },
+                    label = { Text("Days to fetch") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 )
             }
         },
