@@ -32,3 +32,7 @@
 # members survive too.
 -keep class * extends androidx.glance.appwidget.GlanceAppWidget { *; }
 -keep class * extends androidx.glance.appwidget.GlanceAppWidgetReceiver { *; }
+
+# ---- WorkManager ----
+# Workers are instantiated reflectively by class name.
+-keep class * extends androidx.work.ListenableWorker { *; }

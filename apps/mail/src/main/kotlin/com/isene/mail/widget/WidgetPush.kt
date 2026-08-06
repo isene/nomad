@@ -1,25 +1,19 @@
 package com.isene.mail.widget
 
 import android.content.Context
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
+import com.isene.mail.work.WidgetPushWorker
 
 /**
- * Pushing a widget refresh must outlive the screen that triggered it.
+ * Redraw the widget.
  *
- * The push used to run in `viewModelScope`, which is cancelled the moment
- * the ViewModel clears — so marking a message read and immediately
- * leaving the app killed the refresh in flight. Worse, the summary file
- * had already been written, so the "nothing changed, skip the push" guard
- * meant the widget stayed stale until the count moved again.
+ * This used to run in `viewModelScope`, cancelled the moment the
+ * ViewModel cleared, then on an application scope — which still dies
+ * with the process, and the process goes away moments after you leave
+ * the app. That is exactly when the redraw was queued, so the widget
+ * kept showing the old state.
+ *
+ * WorkManager owns the callback now, so it happens either way.
  */
 object WidgetPush {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
-    fun now(context: Context) {
-        val app = context.applicationContext
-        scope.launch { MailWidgetReceiver.update(app) }
-    }
+    fun now(context: Context) = WidgetPushWorker.enqueue(context.applicationContext)
 }

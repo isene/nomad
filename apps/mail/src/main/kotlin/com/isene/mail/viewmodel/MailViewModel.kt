@@ -7,6 +7,7 @@ import com.isene.mail.data.ImapRepo
 import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.Settings
 import com.isene.mail.data.Store
+import com.isene.mail.data.SyncEngine
 import com.isene.mail.data.WidgetRow
 import com.isene.mail.data.WidgetStore
 import com.isene.mail.widget.WidgetPush
@@ -101,45 +102,24 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun sync() {
         val ctx = getApplication<Application>()
-        val accounts = settings.accounts()
-        if (accounts.isEmpty()) {
-            status("Paste your accounts in Settings first")
+        if (settings.accounts().isEmpty()) {
+            status("Add your accounts in Settings first")
             return
         }
         if (_ui.value.busy) return
         _ui.value = _ui.value.copy(busy = true, status = "Fetching…")
         viewModelScope.launch {
-            val days = settings.days
-            val kept = all.associateBy { it.messageId }
-            var failed = 0
-            var fresh = all
-            for (a in accounts) {
-                val got = withContext(Dispatchers.IO) { ImapRepo.headers(a, days) }
-                if (got == null) {
-                    failed++
-                    continue
-                }
-                // A body already downloaded stays downloaded, so a mail
-                // read once is still readable offline.
-                val withBodies = got.map { m ->
-                    val old = kept[m.messageId]
-                    if (old != null && old.raw.isNotEmpty()) m.copy(raw = old.raw) else m
-                }
-                fresh = fresh.filter { it.account != a.address } + withBodies
-                all = fresh.sortedByDescending { it.date }
-                recompute()
-            }
-            // A dismissal only has to hold as long as the message could
-            // come back on the next fetch. Past the window it is dead
-            // weight, so drop it.
-            if (failed == 0) {
-                val live = all.map { it.messageId }.toSet()
-                settings.dismissed = settings.dismissed.intersect(live)
-            }
-            withContext(Dispatchers.IO) { Store.save(ctx, all) }
+            // The same engine the background worker runs, so the two
+            // cannot drift.
+            val out = withContext(Dispatchers.IO) { SyncEngine.fetch(ctx) }
+            all = out?.mails ?: all
             _ui.value = _ui.value.copy(
                 busy = false,
-                status = if (failed > 0) "$failed account(s) failed" else "${all.size} messages",
+                status = when {
+                    out == null -> "No accounts"
+                    out.failed > 0 -> "${out.failed} account(s) failed"
+                    else -> "${all.size} messages"
+                },
             )
             reloadReadState()
         }

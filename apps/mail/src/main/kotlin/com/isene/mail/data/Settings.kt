@@ -44,6 +44,18 @@ class Settings(ctx: Context) {
         get() = p.getString("sync_tree_uri", "") ?: ""
         set(v) = p.edit().putString("sync_tree_uri", v).apply()
 
+    /**
+     * Minutes between background fetches. Zero is off; WorkManager's
+     * floor is 15, so anything lower is treated as 15.
+     *
+     * Every tick is a radio wake and three IMAP logins, so this is the
+     * one setting here with a real battery cost. The default matches
+     * what a mail app does; turn it off and ↻ still works.
+     */
+    var syncMinutes: Int
+        get() = p.getInt("sync_minutes", 15)
+        set(v) = p.edit().putInt("sync_minutes", v).apply()
+
     /** "all" | "unread" */
     var filter: String
         get() = p.getString("filter", "all") ?: "all"

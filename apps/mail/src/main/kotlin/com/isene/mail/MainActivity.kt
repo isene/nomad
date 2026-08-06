@@ -9,6 +9,7 @@ import com.isene.mail.ui.MailApp
 import com.isene.mail.ui.theme.MailTheme
 import com.isene.mail.viewmodel.MailViewModel
 import com.isene.mail.widget.WidgetPush
+import com.isene.mail.work.MailSyncWorker
 
 class MainActivity : ComponentActivity() {
     private val vm: MailViewModel by viewModels()
@@ -19,6 +20,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             MailTheme { MailApp(vm) }
         }
+        // Idempotent, and cheap when already scheduled.
+        MailSyncWorker.schedule(this)
     }
 
     /** Syncthing drops in a new read-state file without telling anyone,

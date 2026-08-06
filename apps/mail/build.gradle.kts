@@ -113,8 +113,8 @@ android {
         applicationId = "com.isene.mail"
         minSdk = 33
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.4.1"
+        versionCode = 10
+        versionName = "0.5.0"
         ndk { abiFilters += androidAbis.keys }
     }
 
@@ -186,6 +186,9 @@ dependencies {
     // Home-screen widget.
     implementation(libs.glance.appwidget)
     implementation(libs.glance.material3)
+    // Background fetch, and the widget push — both need to survive the
+    // app process going away, which a plain coroutine does not.
+    implementation(libs.androidx.work.runtime)
     implementation(libs.okhttp)
     // IMAP with XOAUTH2. The Android-flavoured build of Jakarta Mail;
     // the Rust core never touches a socket.

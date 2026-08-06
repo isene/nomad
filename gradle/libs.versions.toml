@@ -10,6 +10,7 @@ reorderable = "2.4.0"
 
 # Glance (home-screen widgets via RemoteViews).
 glance = "1.1.1"
+work = "2.9.1"
 
 # astro: image loading (APOD/starchart) + HTTP.
 coil = "2.7.0"
@@ -37,6 +38,7 @@ androidx-material-icons-extended = { group = "androidx.compose.material", name =
 # Glance widget surface.
 glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
 glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
+androidx-work-runtime = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "work" }
 
 # astro image loading + HTTP.
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }

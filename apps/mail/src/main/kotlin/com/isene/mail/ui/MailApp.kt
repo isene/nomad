@@ -52,6 +52,7 @@ import com.isene.mail.BuildConfig
 import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.readAccountsFile
 import com.isene.mail.viewmodel.MailViewModel
+import com.isene.mail.work.MailSyncWorker
 import uniffi.fe2o3_mobile_core.Mail
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -187,6 +188,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
     var accounts by remember { mutableStateOf(s.accountsJson) }
     var days by remember { mutableStateOf(s.days.toString()) }
+    var every by remember { mutableStateOf(s.syncMinutes.toString()) }
     var syncUri by remember { mutableStateOf(s.syncTreeUri) }
     var imported by remember { mutableStateOf<String?>(null) }
 
@@ -212,6 +214,8 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
             TextButton(onClick = {
                 s.accountsJson = accounts.trim()
                 days.toIntOrNull()?.let { s.days = it.coerceIn(1, 365) }
+                every.toIntOrNull()?.let { s.syncMinutes = if (it <= 0) 0 else it.coerceIn(15, 1440) }
+                MailSyncWorker.schedule(ctx)
                 vm.reloadReadState()
                 onDismiss()
             }) { Text("Save") }
@@ -272,13 +276,30 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                     color = MaterialTheme.colorScheme.secondary,
                 )
                 Text(s.accountSummary(), fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
-                OutlinedTextField(
-                    days,
-                    { days = it },
-                    label = { Text("Days to fetch") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        days,
+                        { days = it },
+                        label = { Text("Days to fetch") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                    OutlinedTextField(
+                        every,
+                        { every = it },
+                        label = { Text("Fetch every (min)") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    )
+                }
+                Text(
+                    "Background fetch: 0 turns it off, 15 minutes is Android's " +
+                        "floor. Each tick is a radio wake and a login per account, " +
+                        "so this is the setting with a real battery cost.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.secondary,
                 )
             }
         },
