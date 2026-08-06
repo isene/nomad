@@ -90,6 +90,12 @@ going to wake for, respects Doze and App Standby, and survives reboot. A
 network constraint means a fetch is never attempted with the radio off,
 which is the expensive way to fail.
 
+A fetch asks only for UIDs above the last one it saw, and asks every
+account at once. The first fetch reads the whole window; after that it
+is a handful of messages over three parallel sessions rather than a
+month of envelopes over three sequential ones. If the server renumbers
+(UIDVALIDITY changes) it falls back to the full window by itself.
+
 Fifteen minutes is Android's floor for periodic work. Real push would
 mean holding a socket open all day — a different trade, and not this one.
 

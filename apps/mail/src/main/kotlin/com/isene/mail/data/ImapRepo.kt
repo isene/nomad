@@ -64,16 +64,36 @@ object ImapRepo {
         }.getOrNull()
     }
 
+    /** What we last saw, so the next fetch can ask only for what is new. */
+    data class Cursor(val uidValidity: Long, val lastUid: Long)
+
+    data class Fetched(val mails: List<Mail>, val cursor: Cursor, val incremental: Boolean)
+
     /**
-     * Everything in the account's INBOX from the last `days` days, as
-     * headers. `raw` stays empty until the message is opened.
+     * Headers from the account's INBOX. `raw` stays empty until the
+     * message is opened.
+     *
+     * With a cursor whose UIDVALIDITY still matches, this asks only for
+     * UIDs above the last one seen — a handful of messages instead of a
+     * month's worth of envelopes on every single fetch. Without one (or
+     * when the server has renumbered), it falls back to the whole
+     * window and the caller replaces its copy.
      *
      * `null` means the fetch failed — distinct from an empty inbox, so a
      * dropped connection never looks like "your mail is gone".
      */
-    fun headers(a: Account, days: Int): List<Mail>? = withInbox(a) { inbox ->
-        val since = Date(System.currentTimeMillis() - days.toLong() * 86_400_000L)
-        val found = inbox.search(ReceivedDateTerm(ComparisonTerm.GE, since))
+    fun headers(a: Account, days: Int, cursor: Cursor? = null): Fetched? = withInbox(a) { inbox ->
+        val validity = inbox.uidValidity
+        val incremental = cursor != null && cursor.uidValidity == validity && cursor.lastUid > 0
+        val found: Array<javax.mail.Message> = if (incremental) {
+            inbox.getMessagesByUID(cursor!!.lastUid + 1, javax.mail.UIDFolder.LASTUID)
+                .filterNotNull()
+                .filter { inbox.getUID(it) > cursor.lastUid }   // LASTUID re-includes it
+                .toTypedArray()
+        } else {
+            val since = Date(System.currentTimeMillis() - days.toLong() * 86_400_000L)
+            inbox.search(ReceivedDateTerm(ComparisonTerm.GE, since))
+        }
 
         // One round trip for the whole batch instead of one per message.
         // CONTENT_INFO brings the BODYSTRUCTURE, which is what tells us
@@ -85,13 +105,16 @@ object ImapRepo {
         }
         inbox.fetch(found, profile)
 
-        found.mapNotNull { msg ->
+        var maxUid = cursor?.lastUid ?: 0L
+        val mails = found.mapNotNull { msg ->
             runCatching {
+                val uid = inbox.getUID(msg)
+                if (uid > maxUid) maxUid = uid
                 // Bare, without the angle brackets — the form kastrup
                 // stores, and read state is keyed on it at both ends.
                 val id = (msg.getHeader("Message-ID")?.firstOrNull()?.trim()?.trim('<', '>'))
                     ?.takeIf { it.isNotEmpty() }
-                    ?: "uid:${a.address}:${inbox.getUID(msg)}"
+                    ?: "uid:${a.address}:$uid"
                 val when_ = msg.receivedDate ?: msg.sentDate
                 Mail(
                     messageId = id,
@@ -110,6 +133,7 @@ object ImapRepo {
                 )
             }.getOrNull()
         }.sortedByDescending { it.date }
+        Fetched(mails, Cursor(validity, maxUid), incremental)
     }
 
     /** The full RFC822 source of one message, for the reader. */
