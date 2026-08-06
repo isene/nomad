@@ -62,6 +62,9 @@ fun MailApp(vm: MailViewModel) {
     var menuOpen by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    // Bulk actions confirm first: they touch everything on screen, and
+    // marking read reaches the laptop.
+    var confirmBulk by remember { mutableStateOf<String?>(null) }
 
     open?.let { m ->
         // System back belongs to the app while a message is open: it goes
@@ -93,6 +96,14 @@ fun MailApp(vm: MailViewModel) {
                         IconButton(onClick = { vm.sync() }) { Icon(Icons.Filled.Refresh, "Fetch") }
                         IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, "Menu") }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Mark all read (${ui.mails.count { m -> m.messageId !in ui.readIds }})") },
+                                onClick = { menuOpen = false; confirmBulk = "read" },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Remove all (${ui.mails.size})") },
+                                onClick = { menuOpen = false; confirmBulk = "remove" },
+                            )
                             DropdownMenuItem(text = { Text("Settings") }, onClick = { menuOpen = false; showSettings = true })
                             DropdownMenuItem(text = { Text("About") }, onClick = { menuOpen = false; showAbout = true })
                         }
@@ -143,6 +154,31 @@ fun MailApp(vm: MailViewModel) {
 
     if (showSettings) SettingsDialog(vm) { showSettings = false }
     if (showAbout) AboutDialog { showAbout = false }
+    confirmBulk?.let { kind ->
+        val read = kind == "read"
+        val n = if (read) ui.mails.count { m -> m.messageId !in ui.readIds } else ui.mails.size
+        AlertDialog(
+            onDismissRequest = { confirmBulk = null },
+            title = { Text(if (read) "Mark $n read?" else "Remove $n from this phone?") },
+            text = {
+                Text(
+                    // Say which messages, because a filter is often on and
+                    // "all" then means something narrower than it sounds.
+                    (if (ui.accountFilter.isEmpty()) "Everything the list is showing. "
+                     else "Everything showing for ${ui.accountFilter}. ") +
+                        if (read) "This reaches the laptop too."
+                        else "Local only — the laptop keeps the mail, and the status line offers it back."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (read) vm.markAllRead() else vm.dismissAll()
+                    confirmBulk = null
+                }) { Text(if (read) "Mark read" else "Remove") }
+            },
+            dismissButton = { TextButton(onClick = { confirmBulk = null }) { Text("Cancel") } },
+        )
+    }
 }
 
 @Composable

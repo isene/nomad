@@ -185,23 +185,69 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun dismiss(m: Mail) {
         settings.dismissed = settings.dismissed + m.messageId
-        undoable = m.messageId
+        undoable = setOf(m.messageId)
         recompute()
         status("Removed here only — tap to undo")
+    }
+
+    /** Everything the list is showing. Bulk actions act on what you can
+     *  see, never on what a filter is hiding. */
+    fun dismissAll() {
+        val ids = _ui.value.mails.map { it.messageId }.toSet()
+        if (ids.isEmpty()) return
+        settings.dismissed = settings.dismissed + ids
+        undoable = ids
+        recompute()
+        status("${ids.size} removed here only — tap to undo")
+    }
+
+    /**
+     * Mark everything on screen read. This publishes, like every other
+     * explicit mark here, so it reaches the laptop too.
+     *
+     * The upsert is done in Kotlin rather than through [setReadMark] per
+     * message: that call marshals the whole list across the FFI each
+     * time, so a few hundred messages would cost tens of thousands of
+     * conversions for a single tap.
+     */
+    fun markAllRead() {
+        val ctx = getApplication<Application>()
+        val readIds = _ui.value.readIds
+        val ids = _ui.value.mails.map { it.messageId }.filter { it !in readIds }
+        if (ids.isEmpty()) { status("Nothing unread here"); return }
+        val now = System.currentTimeMillis() / 1000
+
+        fun upsert(into: List<ReadMark>): List<ReadMark> {
+            val by = into.associateByTo(LinkedHashMap()) { it.messageId }
+            ids.forEach { by[it] = ReadMark(it, true, now) }
+            return by.values.sortedByDescending { it.ts }
+        }
+        mine = upsert(mine)
+        marks = upsert(marks)
+        recompute()
+
+        val snapshot = mine
+        viewModelScope.launch {
+            val ok = withContext(Dispatchers.IO) {
+                ReadStateRepo.saveMine(ctx, settings.syncTreeUri, snapshot)
+            }
+            status(if (ok) "${ids.size} marked read" else "Marked here only — no sync folder set")
+        }
     }
 
     /** Also the status line's tap target, so it clears when there is
      *  nothing to take back. */
     fun undoDismiss() {
-        val id = undoable ?: run { status(null); return }
-        settings.dismissed = settings.dismissed - id
-        undoable = null
+        if (undoable.isEmpty()) { status(null); return }
+        settings.dismissed = settings.dismissed - undoable
+        undoable = emptySet()
         recompute()
         status(null)
     }
 
-    /** The last dismissal, while the status line still offers it back. */
-    private var undoable: String? = null
+    /** The last dismissal — a batch, so an accidental Remove all is as
+     *  reversible as an accidental swipe. */
+    private var undoable: Set<String> = emptySet()
 
     fun setFilter(f: String) { settings.filter = f; recompute() }
 
