@@ -25,6 +25,8 @@ Part of the [nomad](../../) mobile suite.
 - Swipe a row (or **Remove** in a message) to take it off this phone —
   local only, the laptop keeps the mail
 - An **Unread** chip that hides everything already dealt with
+- **Mark all read** and **Remove all** in the ⋮ menu, acting on what the
+  list is showing — so a filter narrows them
 - A **home-screen widget**: the same unread list at a glance, through the
   same account filter, tap to open
 
