@@ -1,6 +1,7 @@
 package com.isene.mail.ui
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -63,6 +64,9 @@ fun MailApp(vm: MailViewModel) {
     var showAbout by remember { mutableStateOf(false) }
 
     open?.let { m ->
+        // System back belongs to the app while a message is open: it goes
+        // back to the list, not out of mail altogether.
+        BackHandler { vm.closeBody(); open = null }
         // The stored copy, so a body fetched a moment ago is used rather
         // than fetched again.
         MessageScreen(vm, vm.current(m.messageId) ?: m, onBack = { open = null })

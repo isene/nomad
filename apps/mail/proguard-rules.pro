@@ -25,3 +25,10 @@
 -dontwarn javax.activation.**
 -dontwarn java.beans.**
 -dontwarn javax.security.sasl.**
+
+# ---- Glance widget ----
+# The receiver is instantiated by the system from the manifest; AGP keeps
+# manifest classes, but keep the Glance subclasses explicitly so their
+# members survive too.
+-keep class * extends androidx.glance.appwidget.GlanceAppWidget { *; }
+-keep class * extends androidx.glance.appwidget.GlanceAppWidgetReceiver { *; }

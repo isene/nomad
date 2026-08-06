@@ -1,0 +1,126 @@
+package com.isene.mail.widget
+
+import android.content.Context
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.unit.dp
+import androidx.glance.GlanceId
+import androidx.glance.GlanceModifier
+import androidx.glance.GlanceTheme
+import androidx.glance.action.actionStartActivity
+import androidx.glance.action.clickable
+import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.lazy.LazyColumn
+import androidx.glance.appwidget.lazy.items
+import androidx.glance.appwidget.provideContent
+import androidx.glance.background
+import androidx.glance.layout.Alignment
+import androidx.glance.layout.Box
+import androidx.glance.layout.Column
+import androidx.glance.layout.Row
+import androidx.glance.layout.Spacer
+import androidx.glance.layout.fillMaxSize
+import androidx.glance.layout.fillMaxWidth
+import androidx.glance.layout.padding
+import androidx.glance.layout.width
+import androidx.glance.text.FontWeight
+import androidx.glance.text.Text
+import androidx.glance.text.TextStyle
+import com.isene.mail.MainActivity
+import com.isene.mail.data.WidgetStore
+
+/**
+ * Unread mail on the home screen: a count and who it is from.
+ *
+ * Reads only the small summary file the app writes when the count moves,
+ * so a launcher redraw costs one short file read. Tapping anywhere opens
+ * the app.
+ */
+class MailWidget : GlanceAppWidget() {
+
+    override val sizeMode: SizeMode = SizeMode.Exact
+
+    override suspend fun provideGlance(context: Context, id: GlanceId) {
+        val state = WidgetStore.load(context)
+        provideContent {
+            GlanceTheme { WidgetContent(state.unread, state.rows) }
+        }
+    }
+}
+
+@Composable
+private fun WidgetContent(
+    unread: Int,
+    rows: List<com.isene.mail.data.WidgetRow>,
+) {
+    val openApp = actionStartActivity<MainActivity>()
+    Box(
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .background(GlanceTheme.colors.background)
+            .padding(8.dp)
+            .clickable(openApp),
+        contentAlignment = Alignment.TopStart,
+    ) {
+        if (rows.isEmpty()) {
+            Column(
+                modifier = GlanceModifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(
+                    "mail",
+                    style = TextStyle(
+                        fontWeight = FontWeight.Bold,
+                        color = GlanceTheme.colors.primary,
+                    ),
+                )
+                Spacer(GlanceModifier.padding(4.dp))
+                Text(
+                    if (unread == 0) "Nothing unread" else "Open the app",
+                    style = TextStyle(color = GlanceTheme.colors.onBackground),
+                )
+            }
+        } else {
+            Column(modifier = GlanceModifier.fillMaxSize()) {
+                Text(
+                    "mail  $unread",
+                    style = TextStyle(
+                        fontWeight = FontWeight.Bold,
+                        color = GlanceTheme.colors.primary,
+                    ),
+                    modifier = GlanceModifier.padding(bottom = 4.dp).clickable(openApp),
+                )
+                LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
+                    items(rows.size) { idx ->
+                        val row = rows[idx]
+                        Row(
+                            // A Glance LazyColumn row swallows the parent
+                            // Box's click, so each one needs its own.
+                            modifier = GlanceModifier
+                                .fillMaxWidth()
+                                .padding(vertical = 2.dp)
+                                .clickable(openApp),
+                        ) {
+                            Text(
+                                text = row.from,
+                                style = TextStyle(
+                                    fontWeight = FontWeight.Medium,
+                                    color = GlanceTheme.colors.secondary,
+                                ),
+                                modifier = GlanceModifier.width(96.dp),
+                                maxLines = 1,
+                            )
+                            Text(
+                                text = row.subject,
+                                style = TextStyle(color = GlanceTheme.colors.onBackground),
+                                maxLines = 1,
+                                modifier = GlanceModifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

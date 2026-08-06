@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- updatePeriodMillis="0": no periodic wake-ups. The app pushes a
+     redraw when the unread summary changes, which is the only thing
+     that moves it. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="180dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="3"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:description="@string/widget_label"
+    android:previewLayout="@layout/glance_default_loading_layout"
+    android:widgetCategory="home_screen" />
