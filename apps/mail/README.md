@@ -58,10 +58,12 @@ to the fetch window on every sync so it cannot grow without bound.
 1. On the laptop, run `mail-accounts`. It gathers every Gmail account's
    client id, secret and refresh token into `mail-accounts.json` in the
    folder Syncthing shares with the phone.
-2. **⋮ → Settings → Pick the shared folder**, then **Import
-   mail-accounts.json**. Delete the file afterwards: a refresh token is
-   the whole credential and has no business sitting in a synced folder.
-   (The field is editable, if you would rather type it.)
+2. **⋮ → Settings → Pick the shared folder** — the Syncthing folder
+   carrying kastrup's `~/.kastrup/sync`. Then **Import
+   mail-accounts.json** (drop that file in the folder first). Delete it
+   afterwards: a refresh token is the whole credential and has no
+   business sitting in a synced folder. The field is editable, if you
+   would rather type it.
 3. **↻** fetches headers. Bodies download when you open a message, not
    before: a month of full bodies is minutes of radio for mail that
    mostly never gets read on a phone.
