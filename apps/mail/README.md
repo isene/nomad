@@ -2,7 +2,7 @@
 
 <img src="src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="100" height="100">
 
-# mail
+# kastrup
 
 ![version](https://img.shields.io/badge/version-0.1.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
@@ -12,7 +12,7 @@ Part of the [nomad](../../) mobile suite.
 
 </div>
 
-`com.isene.mail` · pairs with [kastrup](https://github.com/isene/kastrup)
+`com.isene.mail` (module `apps/mail`) · pairs with [kastrup](https://github.com/isene/kastrup)
 
 ## What it does
 
