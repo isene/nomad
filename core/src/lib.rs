@@ -9,6 +9,7 @@ uniffi::setup_scaffolding!();
 
 pub mod crypto;
 pub mod hyperlist;
+pub mod mail;
 pub mod hyperlist_doc;
 pub mod hyperlist_hl;
 pub mod reminder;
