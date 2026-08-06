@@ -35,4 +35,11 @@ class MainActivity : ComponentActivity() {
             TasksTheme { TasksScreen(vm) }
         }
     }
+
+    /** Leaving the app should always leave a current widget behind, even
+     *  if the edit that changed things never triggered a push. */
+    override fun onStop() {
+        super.onStop()
+        vm.pokeWidget()
+    }
 }

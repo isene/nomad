@@ -9,7 +9,7 @@ import com.isene.mail.data.Settings
 import com.isene.mail.data.Store
 import com.isene.mail.data.WidgetRow
 import com.isene.mail.data.WidgetStore
-import com.isene.mail.widget.MailWidgetReceiver
+import com.isene.mail.widget.WidgetPush
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -299,6 +299,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         if (!WidgetStore.save(ctx, unread.size, rows)) return
-        viewModelScope.launch { MailWidgetReceiver.update(ctx) }
+        // App-lifetime scope: leaving the app must not cancel the push.
+        WidgetPush.now(ctx)
     }
 }

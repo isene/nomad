@@ -8,6 +8,7 @@ import androidx.activity.viewModels
 import com.isene.mail.ui.MailApp
 import com.isene.mail.ui.theme.MailTheme
 import com.isene.mail.viewmodel.MailViewModel
+import com.isene.mail.widget.WidgetPush
 
 class MainActivity : ComponentActivity() {
     private val vm: MailViewModel by viewModels()
@@ -25,5 +26,12 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         vm.reloadReadState()
+    }
+
+    /** Leaving the app should always leave a current widget behind, even
+     *  if the change that moved the count never triggered a push. */
+    override fun onStop() {
+        super.onStop()
+        WidgetPush.now(this)
     }
 }

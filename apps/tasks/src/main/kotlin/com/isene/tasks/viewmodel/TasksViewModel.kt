@@ -9,7 +9,7 @@ import com.isene.tasks.data.Row
 import com.isene.tasks.data.TaskRepository
 import com.isene.tasks.data.flatRows
 import com.isene.tasks.reminder.ReminderScheduler
-import com.isene.tasks.widget.TasksWidgetReceiver
+import com.isene.tasks.widget.WidgetPush
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -256,11 +256,10 @@ class TasksViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun pokeWidget() {
+    fun pokeWidget() {
         // Best-effort: tell any installed widget to refresh. Glance handles
         // its own coroutine + RemoteViews build; we just kick the trigger.
-        viewModelScope.launch(Dispatchers.IO) {
-            TasksWidgetReceiver.update(getApplication())
-        }
+        // On an app-lifetime scope, so leaving the app cannot cancel it.
+        WidgetPush.now(getApplication())
     }
 }
