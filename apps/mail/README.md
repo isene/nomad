@@ -24,7 +24,9 @@ Part of the [nomad](../../) mobile suite.
 - An explicit **Mark READ** that reaches the laptop
 - Swipe a row (or **Remove** in a message) to take it off this phone —
   local only, the laptop keeps the mail
-- A **home-screen widget**: unread count and who it is from, tap to open
+- An **Unread** chip that hides everything already dealt with
+- A **home-screen widget**: the same unread list at a glance, through the
+  same account filter, tap to open
 
 ## Read state
 
@@ -34,6 +36,7 @@ it is what each side *writes*:
 | Event | Effect |
 |---|---|
 | Read on the laptop | Read here too |
+| Deleted on the laptop | Read here too |
 | Merely opened here | Nothing at all |
 | **Mark READ** tapped here | Read on the laptop too |
 

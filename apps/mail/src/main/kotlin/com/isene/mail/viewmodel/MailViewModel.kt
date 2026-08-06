@@ -223,7 +223,13 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         val shown = here
             .filter { acct.isEmpty() || it.account == acct }
             .filter { filter != "unread" || it.messageId !in readIds }
-        val unread = here.filter { it.messageId !in readIds }
+        // Unread, through the same account filter the list uses — the
+        // widget is meant to be the list at a glance, not a second view
+        // with its own opinion. The read/unread filter is deliberately
+        // NOT mirrored: the widget is always the unread ones.
+        val unread = here
+            .filter { acct.isEmpty() || it.account == acct }
+            .filter { it.messageId !in readIds }
         _ui.value = _ui.value.copy(
             mails = shown,
             readIds = readIds,
