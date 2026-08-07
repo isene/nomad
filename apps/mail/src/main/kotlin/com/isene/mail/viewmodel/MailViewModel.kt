@@ -30,6 +30,9 @@ data class UiState(
     val accountFilter: String = "",
     val filter: String = "all", // "all" | "unread"
     val unread: Int = 0,
+    /** Held in the store but hidden by a swipe or Remove all. Counted so
+     *  the app can never claim messages it is not showing. */
+    val hidden: Int = 0,
     val busy: Boolean = false,
     val status: String? = null,
 )
@@ -110,7 +113,14 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 status = when {
                     out == null -> "No accounts"
                     out.failed > 0 -> "${out.failed} account(s) failed"
-                    else -> "${all.size} messages"
+                    // Say what is on screen, not what is in the store —
+                    // "561 messages" over an empty list is a puzzle, not
+                    // a status.
+                    else -> {
+                        val h = settings.dismissed.size
+                        if (h > 0) "${all.size - h} shown, $h removed here"
+                        else "${all.size} messages"
+                    }
                 },
             )
             refresh()
@@ -191,6 +201,20 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         status("${ids.size} marked read here")
     }
 
+    /**
+     * Bring back everything removed on this phone. The messages were
+     * never gone — a swipe only adds an id to a local set — so this is
+     * just emptying it.
+     */
+    fun restoreRemoved() {
+        val n = settings.dismissed.size
+        if (n == 0) { status("Nothing removed"); return }
+        settings.dismissed = emptySet()
+        undoable = emptySet()
+        recompute()
+        status("$n restored")
+    }
+
     /** Also the status line's tap target, so it clears when there is
      *  nothing to take back. */
     fun undoDismiss() {
@@ -237,6 +261,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             accountFilter = acct,
             filter = filter,
             unread = unread.size,
+            hidden = all.size - here.size,
         )
         publishWidget(unread)
     }

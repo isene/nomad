@@ -105,6 +105,12 @@ fun MailApp(vm: MailViewModel) {
                                 text = { Text("Remove all (${ui.mails.size})") },
                                 onClick = { menuOpen = false; confirmBulk = "remove" },
                             )
+                            if (ui.hidden > 0) {
+                                DropdownMenuItem(
+                                    text = { Text("Restore removed (${ui.hidden})") },
+                                    onClick = { menuOpen = false; vm.restoreRemoved() },
+                                )
+                            }
                             DropdownMenuItem(text = { Text("Settings") }, onClick = { menuOpen = false; showSettings = true })
                             DropdownMenuItem(text = { Text("About") }, onClick = { menuOpen = false; showAbout = true })
                         }
