@@ -101,10 +101,12 @@ fun MailApp(vm: MailViewModel) {
                                 text = { Text("Mark all read (${ui.mails.count { m -> m.messageId !in ui.readIds }})") },
                                 onClick = { menuOpen = false; confirmBulk = "read" },
                             )
-                            DropdownMenuItem(
-                                text = { Text("Remove all (${ui.mails.size})") },
-                                onClick = { menuOpen = false; confirmBulk = "remove" },
-                            )
+                            if (ui.filter != "removed") {
+                                DropdownMenuItem(
+                                    text = { Text("Remove all (${ui.mails.size})") },
+                                    onClick = { menuOpen = false; confirmBulk = "remove" },
+                                )
+                            }
                             if (ui.hidden > 0) {
                                 DropdownMenuItem(
                                     text = { Text("Restore removed (${ui.hidden})") },
@@ -127,6 +129,13 @@ fun MailApp(vm: MailViewModel) {
                         onClick = { vm.setFilter(if (ui.filter == "unread") "all" else "unread") },
                         label = { Text(if (ui.unread > 0) "Unread ${ui.unread}" else "Unread") },
                     )
+                    if (ui.hidden > 0) {
+                        FilterChip(
+                            selected = ui.filter == "removed",
+                            onClick = { vm.setFilter(if (ui.filter == "removed") "all" else "removed") },
+                            label = { Text("Removed ${ui.hidden}") },
+                        )
+                    }
                     FilterChip(
                         selected = ui.accountFilter.isEmpty(),
                         onClick = { vm.setAccountFilter("") },
