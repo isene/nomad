@@ -6,8 +6,9 @@
 
 ![version](https://img.shields.io/badge/version-0.1.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
-Your Gmail inboxes on the phone, sharing one decoder and one notion of
-"read" with [kastrup](https://github.com/isene/kastrup) on the laptop.
+Your Gmail inboxes on the phone, sharing one decoder with
+[kastrup](https://github.com/isene/kastrup) on the laptop and taking its
+word for what has been read.
 Part of the [nomad](../../) mobile suite.
 
 </div>
@@ -39,15 +40,17 @@ it is what each side *writes*:
 |---|---|
 | Read on the laptop | Read here too |
 | Deleted on the laptop | Read here too |
-| Merely opened here | Nothing at all |
-| **Mark READ** tapped here | Read on the laptop too |
+| Anything done here | Stays here |
 
-Storage is one file per device (`mail-read-<device>.json`) in a folder
-shared over Syncthing, keyed by RFC822 `Message-ID`. Each device writes
-only its own file and reads them all, so Syncthing never has two writers
-to leave a `.sync-conflict-` copy of. Newest timestamp wins, and the
-merge lives in the Rust core so both ends resolve a disagreement
-identically.
+The arrow points one way. This phone **writes nothing** into the shared
+folder — it reads the laptop's `mail-read-*.json` (keyed by RFC822
+`Message-ID`, newest timestamp wins, merged by the Rust core) and keeps
+its own marks in its own prefs, where they override the laptop's for
+display and reach nobody.
+
+So marking read, marking unread, and removing are all free: none of them
+can cost you anything on the laptop, which is the machine that has the
+mail.
 
 The server's `\Seen` flag is not consulted. The laptop's fetcher marks
 everything seen as it delivers, so the server has no opinion worth

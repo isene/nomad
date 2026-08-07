@@ -204,7 +204,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
             )
             s.syncTreeUri = uri.toString()
             syncUri = uri.toString()
-            vm.reloadReadState()
+            vm.refresh()
         }
     }
 
@@ -216,7 +216,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 days.toIntOrNull()?.let { s.days = it.coerceIn(1, 365) }
                 every.toIntOrNull()?.let { s.syncMinutes = if (it <= 0) 0 else it.coerceIn(15, 1440) }
                 MailSyncWorker.schedule(ctx)
-                vm.reloadReadState()
+                vm.refresh()
                 onDismiss()
             }) { Text("Save") }
         },

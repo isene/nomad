@@ -24,11 +24,13 @@ class MainActivity : ComponentActivity() {
         MailSyncWorker.schedule(this)
     }
 
-    /** Syncthing drops in a new read-state file without telling anyone,
-     *  so re-read the shared folder whenever we come back to the front. */
+    /** Two things change behind this screen's back: Syncthing drops in a
+     *  new read-state file, and the background worker fetches into the
+     *  store. Re-read both on the way in — without the second, a mail
+     *  that had reached the widget was missing from the list. */
     override fun onResume() {
         super.onResume()
-        vm.reloadReadState()
+        vm.refresh()
     }
 
     /** Leaving the app should always leave a current widget behind, even
