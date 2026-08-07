@@ -4,7 +4,7 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.1.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.8.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes on the phone, sharing one decoder with
 [kastrup](https://github.com/isene/kastrup) on the laptop and taking its
@@ -22,7 +22,7 @@ Part of the [nomad](../../) mobile suite.
 - Bodies decoded by [fe2o3-mail](https://github.com/isene/mail) — the same
   crate kastrup uses, so quoted-printable, base64, RFC 2047 headers,
   multipart and HTML mail all come out the way they do on the desktop
-- An explicit **Mark READ** that reaches the laptop
+- **Mark READ** / **Mark unread**, on this phone only
 - Swipe a row (or **Remove** in a message) to take it off this phone —
   local only, the laptop keeps the mail
 - An **Unread** chip that hides everything already dealt with
@@ -102,8 +102,9 @@ and the file can always be written again.
 
 Unread count and senders on the home screen. It reads a small summary
 file the app writes when the count moves, and declares no update period
-at all — a widget nobody looks at wakes nothing. The flip side: with no
-push yet, it is as fresh as the last time the app ran.
+at all — a widget nobody looks at wakes nothing. The background fetch
+keeps it current; without one it is as fresh as the last time the app
+ran.
 
 ## Background fetch
 
