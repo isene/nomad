@@ -73,6 +73,25 @@ class Settings(ctx: Context) {
     fun setCursor(address: String, uidValidity: Long, lastUid: Long) =
         p.edit().putString("uid_$address", "$uidValidity:$lastUid").apply()
 
+    /**
+     * This phone's own read decisions, `messageId -> read`.
+     *
+     * Local, and deliberately so: the phone writes nothing to the shared
+     * folder, so marking or clearing something here cannot change what
+     * the laptop shows. The laptop still reaches the phone; the arrow
+     * only points one way.
+     */
+    var localMarks: Map<String, Boolean>
+        get() = runCatching {
+            val o = org.json.JSONObject(p.getString("local_marks", "{}") ?: "{}")
+            o.keys().asSequence().associateWith { o.optBoolean(it) }
+        }.getOrDefault(emptyMap())
+        set(v) {
+            val o = org.json.JSONObject()
+            v.forEach { (k, read) -> o.put(k, read) }
+            p.edit().putString("local_marks", o.toString()).apply()
+        }
+
     /** "all" | "unread" */
     var filter: String
         get() = p.getString("filter", "all") ?: "all"

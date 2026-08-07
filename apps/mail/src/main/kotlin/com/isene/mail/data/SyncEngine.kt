@@ -77,8 +77,7 @@ object SyncEngine {
         }
         Store.save(ctx, out)
 
-        val readIds = ReadStateRepo.loadAll(ctx, settings.syncTreeUri)
-            .filter { it.read }.map { it.messageId }.toSet()
+        val readIds = ReadState.effective(ctx, settings)
         val gone = settings.dismissed
         val acct = settings.accountFilter
         val unread = out

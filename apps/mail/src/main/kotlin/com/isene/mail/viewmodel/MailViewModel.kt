@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.isene.mail.data.ImapRepo
+import com.isene.mail.data.ReadState
 import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.Settings
 import com.isene.mail.data.Store
@@ -18,9 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.fe2o3_mobile_core.Mail
-import uniffi.fe2o3_mobile_core.ReadMark
 import uniffi.fe2o3_mobile_core.mailBodyText
-import uniffi.fe2o3_mobile_core.setReadMark
 
 data class UiState(
     val mails: List<Mail> = emptyList(),
@@ -41,11 +40,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     /** Every header we hold, newest first. */
     private var all: List<Mail> = emptyList()
 
-    /** Every device's marks, merged — what the list colours itself by. */
-    private var marks: List<ReadMark> = emptyList()
-
-    /** This phone's own file. Only ever grows by an explicit mark. */
-    private var mine: List<ReadMark> = emptyList()
+    /** What the laptop says, merged. Read-only to this phone. */
+    private var laptopRead: Set<String> = emptySet()
 
     private val _ui = MutableStateFlow(UiState())
     val ui: StateFlow<UiState> = _ui.asStateFlow()
@@ -56,22 +52,29 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         all = Store.load(app)
-        reloadReadState()
+        refresh()
     }
 
     fun settingsObj() = settings
 
     // ---------- read state ----------
 
-    fun reloadReadState() {
+    /**
+     * Re-read both halves of the world.
+     *
+     * The store too, not just the read state: the background worker
+     * fetches into it while this ViewModel sits in memory, so a mail
+     * that reached the widget was missing from the list until the next
+     * manual sync.
+     */
+    fun refresh() {
         val ctx = getApplication<Application>()
         viewModelScope.launch {
-            val (merged, own) = withContext(Dispatchers.IO) {
-                ReadStateRepo.loadAll(ctx, settings.syncTreeUri) to
-                    ReadStateRepo.loadMine(ctx, settings.syncTreeUri)
+            val (stored, marks) = withContext(Dispatchers.IO) {
+                Store.load(ctx) to ReadStateRepo.loadAll(ctx, settings.syncTreeUri)
             }
-            marks = merged
-            mine = own
+            all = stored
+            laptopRead = marks.filter { it.read }.map { it.messageId }.toSet()
             recompute()
         }
     }
@@ -79,23 +82,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     fun isRead(m: Mail): Boolean = m.messageId in _ui.value.readIds
 
     /**
-     * The one thing that writes read state from this phone. Opening a
-     * message deliberately does not call it: the laptop stays the device
-     * that decides what has been read, unless explicitly overruled here.
+     * Mark it read, or unread, on this phone only. Nothing is written to
+     * the shared folder, so the laptop never hears about it.
      */
     fun setRead(m: Mail, read: Boolean) {
-        val ctx = getApplication<Application>()
-        val now = System.currentTimeMillis() / 1000
-        mine = setReadMark(mine, m.messageId, read, now)
-        marks = setReadMark(marks, m.messageId, read, now)
+        settings.localMarks = settings.localMarks + (m.messageId to read)
         recompute()
-        val snapshot = mine
-        viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                ReadStateRepo.saveMine(ctx, settings.syncTreeUri, snapshot)
-            }
-            if (!ok) status("Marked here only — no sync folder set")
-        }
     }
 
     // ---------- fetching ----------
@@ -121,7 +113,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                     else -> "${all.size} messages"
                 },
             )
-            reloadReadState()
+            refresh()
         }
     }
 
@@ -191,28 +183,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
      * conversions for a single tap.
      */
     fun markAllRead() {
-        val ctx = getApplication<Application>()
         val readIds = _ui.value.readIds
         val ids = _ui.value.mails.map { it.messageId }.filter { it !in readIds }
         if (ids.isEmpty()) { status("Nothing unread here"); return }
-        val now = System.currentTimeMillis() / 1000
-
-        fun upsert(into: List<ReadMark>): List<ReadMark> {
-            val by = into.associateByTo(LinkedHashMap()) { it.messageId }
-            ids.forEach { by[it] = ReadMark(it, true, now) }
-            return by.values.sortedByDescending { it.ts }
-        }
-        mine = upsert(mine)
-        marks = upsert(marks)
+        settings.localMarks = settings.localMarks + ids.associateWith { true }
         recompute()
-
-        val snapshot = mine
-        viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                ReadStateRepo.saveMine(ctx, settings.syncTreeUri, snapshot)
-            }
-            status(if (ok) "${ids.size} marked read" else "Marked here only — no sync folder set")
-        }
+        status("${ids.size} marked read here")
     }
 
     /** Also the status line's tap target, so it clears when there is
@@ -240,10 +216,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     private fun recompute() {
         val acct = settings.accountFilter
         val filter = settings.filter
-        // `marks` is already the merged view, so the lookup is a plain
-        // set membership. Asking the core per message would rebuild the
-        // whole map once per row.
-        val readIds = marks.filter { it.read }.map { it.messageId }.toSet()
+        // The laptop's view, with this phone's own overrides on top.
+        val readIds = ReadState.merge(laptopRead, settings.localMarks)
         val gone = settings.dismissed
         val here = all.filter { it.messageId !in gone }
         val shown = here
