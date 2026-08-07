@@ -26,9 +26,10 @@ Part of the [nomad](../../) mobile suite.
 - Swipe a row (or **Remove** in a message) to take it off this phone —
   local only, the laptop keeps the mail
 - An **Unread** chip that hides everything already dealt with
+- A **Removed** chip to look through what a swipe hid, and swipe there to
+  put one back
 - **Mark all read** and **Remove all** in the ⋮ menu, acting on what the
-  list is showing — so a filter narrows them, and **Restore removed**
-  brings back everything a swipe hid
+  list is showing — so a filter narrows them
 - A **home-screen widget**: the same unread list at a glance, through the
   same account filter, tap to open
 
@@ -60,9 +61,11 @@ having.
 Removing is the one thing that stays put. A swipe writes a Message-ID to
 this phone's own prefs and nowhere else: no shared file, no IMAP delete,
 no server round trip. Clearing the phone's list must never cost you the
-mail. The status line offers the last one back with a tap, **Restore
-removed** in the ⋮ menu brings back all of them, and the list is pruned
-to the fetch window on every sync so it cannot grow without bound.
+mail. Nothing is deleted: a swipe adds a Message-ID to a local list, so
+the **Removed** chip can show you exactly what is on it and a swipe there
+takes one back off. The status line offers the last one back with a tap,
+and the list is pruned to the fetch window on every sync so it cannot
+grow without bound.
 
 ## Setup
 

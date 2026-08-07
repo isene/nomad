@@ -63,8 +63,11 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
     if (ui.mails.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
-                if (ui.accounts.isEmpty()) "Add your accounts in Settings, then tap ↻."
-                else "Nothing here. Tap ↻ to fetch.",
+                when {
+                    ui.accounts.isEmpty() -> "Add your accounts in Settings, then tap ↻."
+                    ui.filter == "removed" -> "Nothing removed on this phone."
+                    else -> "Nothing here. Tap ↻ to fetch."
+                },
                 Modifier.padding(32.dp),
                 color = MaterialTheme.colorScheme.secondary,
             )
@@ -77,11 +80,14 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
     LazyColumn(modifier.fillMaxSize()) {
         items(ui.mails, key = { it.messageId }) { m ->
             val read = m.messageId in ui.readIds
-            // Swipe takes the message off this phone. Nothing leaves the
-            // device: the laptop is the archive and never hears about it.
+            // Swipe takes the message off this phone — or puts it back,
+            // when this IS the list of the ones taken off. Nothing leaves
+            // the device either way: the laptop never hears about it.
+            val removedView = ui.filter == "removed"
             val swipe = rememberSwipeToDismissBoxState(
                 confirmValueChange = { v ->
-                    if (v == SwipeToDismissBoxValue.Settled) false else { vm.dismiss(m); true }
+                    if (v == SwipeToDismissBoxValue.Settled) false
+                    else { if (removedView) vm.restore(m) else vm.dismiss(m); true }
                 },
             )
             SwipeToDismissBox(
@@ -91,7 +97,11 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
                         Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
                         contentAlignment = Alignment.CenterEnd,
                     ) {
-                        Text("remove here", fontSize = 12.sp, color = MaterialTheme.colorScheme.tertiary)
+                        Text(
+                            if (removedView) "put back" else "remove here",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.tertiary,
+                        )
                     }
                 },
             ) {

@@ -28,7 +28,7 @@ data class UiState(
     val readIds: Set<String> = emptySet(),
     val accounts: List<String> = emptyList(),
     val accountFilter: String = "",
-    val filter: String = "all", // "all" | "unread"
+    val filter: String = "all", // "all" | "unread" | "removed"
     val unread: Int = 0,
     /** Held in the store but hidden by a swipe or Remove all. Counted so
      *  the app can never claim messages it is not showing. */
@@ -215,6 +215,15 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         status("$n restored")
     }
 
+    /** Put one back on the list. The swipe action while looking at the
+     *  removed ones — the same gesture, the other way. */
+    fun restore(m: Mail) {
+        settings.dismissed = settings.dismissed - m.messageId
+        undoable = emptySet()
+        recompute()
+        status("Restored")
+    }
+
     /** Also the status line's tap target, so it clears when there is
      *  nothing to take back. */
     fun undoDismiss() {
@@ -244,7 +253,11 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         val readIds = ReadState.merge(laptopRead, settings.localMarks)
         val gone = settings.dismissed
         val here = all.filter { it.messageId !in gone }
-        val shown = here
+        // The removed view is the same list read the other way round: it
+        // is the only one that looks at what a swipe hid. Everything else
+        // — the counts, the widget — still means the visible ones.
+        val base = if (filter == "removed") all.filter { it.messageId in gone } else here
+        val shown = base
             .filter { acct.isEmpty() || it.account == acct }
             .filter { filter != "unread" || it.messageId !in readIds }
         // Unread, through the same account filter the list uses — the
