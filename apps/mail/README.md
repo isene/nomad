@@ -26,6 +26,8 @@ Part of the [nomad](../../) mobile suite.
 - Swipe a row (or **Remove** in a message) to take it off this phone —
   local only, the laptop keeps the mail
 - An **Unread** chip that hides everything already dealt with
+- **Attachments** listed under the headers; tap one to open it in
+  whatever app handles the type
 - A **Removed** chip to look through what a swipe hid, and swipe there to
   put one back
 - **Mark all read** and **Remove all** in the ⋮ menu, acting on what the
@@ -83,6 +85,18 @@ grow without bound.
    mostly never gets read on a phone.
 4. **Fetch every (min)** in Settings runs the same fetch in the
    background. 15 minutes by default, 0 turns it off.
+
+## Attachments
+
+Listed under the headers once the message is open, with name and size.
+Tapping one writes it to the app's cache and hands a one-read URI to
+whatever app can show it — the chooser's own share sheet is where you
+save it somewhere permanent.
+
+The listing is cheap and the bytes are not, so they are separate calls:
+drawing a row of nine photos never decodes a megabyte, and only the one
+you tap gets written. Cache, because the message is still on the phone
+and the file can always be written again.
 
 ## The widget
 
