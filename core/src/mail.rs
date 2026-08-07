@@ -54,6 +54,30 @@ pub fn mail_decode_header(s: String) -> String {
     mail::decode_rfc2047(&s)
 }
 
+/// One attachment, without its contents.
+#[derive(Debug, Clone, PartialEq, Default, uniffi::Record)]
+pub struct MailAttachment {
+    pub filename: String,
+    pub mime_type: String,
+    /// Decoded size in bytes.
+    pub size: u64,
+}
+
+/// What a message carries, names and sizes only.
+#[uniffi::export]
+pub fn mail_attachments(raw: String) -> Vec<MailAttachment> {
+    mail::attach::list(&raw).into_iter()
+        .map(|a| MailAttachment { filename: a.filename, mime_type: a.mime_type, size: a.size })
+        .collect()
+}
+
+/// The contents of one, by its index in [`mail_attachments`]. Kept
+/// separate so drawing a list never marshals a 10 MB photo.
+#[uniffi::export]
+pub fn mail_attachment_bytes(raw: String, index: u32) -> Vec<u8> {
+    mail::attach::bytes(&raw, index as usize).unwrap_or_default()
+}
+
 /// One device's read-state file, flattened for the FFI.
 #[derive(Debug, Clone, PartialEq, Default, uniffi::Record)]
 pub struct ReadMark {
@@ -140,6 +164,18 @@ mod tests {
             r#"{"a@x": {"read": false, "ts": 300}}"#.into(),
         ]);
         assert!(!is_mail_read(merged, "a@x".into()), "the newer state wins");
+    }
+
+    #[test]
+    fn attachments_are_listed_then_fetched() {
+        let raw = "Content-Type: multipart/mixed; boundary=b\r\n\r\n\
+            --b\r\nContent-Type: text/plain\r\n\r\nSee attached.\r\n\
+            --b\r\nContent-Disposition: attachment; filename=\"a.txt\"\r\n\
+            Content-Transfer-Encoding: base64\r\n\r\naGkh\r\n--b--\r\n";
+        let list = mail_attachments(raw.into());
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].filename, "a.txt");
+        assert_eq!(mail_attachment_bytes(raw.into(), 0), b"hi!".to_vec());
     }
 
     #[test]

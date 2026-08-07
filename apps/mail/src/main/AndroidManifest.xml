@@ -23,6 +23,18 @@
             </intent-filter>
         </activity>
 
+        <!-- Hands a saved attachment to another app for one read, and
+             exposes nothing else. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- Home-screen widget. The provider XML sets no update period:
              the app pushes a redraw when the unread count moves, so an
              idle widget wakes nothing. -->

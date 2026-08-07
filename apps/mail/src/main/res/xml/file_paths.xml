@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Attachments are written into cacheDir/attachments and handed to
+     whatever app can open them, one grant at a time. Nothing else in the
+     app's storage is exposed. -->
+<paths>
+    <cache-path name="attachments" path="attachments/" />
+</paths>

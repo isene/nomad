@@ -36,12 +36,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.isene.mail.data.Attachments
 import com.isene.mail.viewmodel.MailViewModel
 import com.isene.mail.viewmodel.UiState
 import java.text.SimpleDateFormat
@@ -191,6 +194,12 @@ fun MessageScreen(vm: MailViewModel, mail: Mail, onBack: () -> Unit) {
             Spacer(Modifier.width(8.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
             Spacer(Modifier.width(8.dp))
+            // Only once the body is here: the attachments live in the same
+            // raw message, so before it arrives there is nothing to list.
+            val held = vm.current(mail.messageId) ?: mail
+            if (body != null && held.raw.isNotEmpty()) {
+                AttachmentRows(held.raw) { msg -> vm.status(msg) }
+            }
             if (body == null) {
                 CircularProgressIndicator(strokeWidth = 2.dp)
             } else {
@@ -198,6 +207,54 @@ fun MessageScreen(vm: MailViewModel, mail: Mail, onBack: () -> Unit) {
             }
         }
     }
+}
+
+/**
+ * A row per attachment; tapping writes it to the cache and hands it to
+ * whatever app can open it.
+ */
+@Composable
+private fun AttachmentRows(raw: String, onStatus: (String) -> Unit) {
+    val ctx = LocalContext.current
+    // Parsing walks the whole message, so do it once per message rather
+    // than on every recomposition.
+    val list = remember(raw) { Attachments.list(raw) }
+    if (list.isEmpty()) return
+
+    list.forEachIndexed { i, a ->
+        Row(
+            Modifier.fillMaxWidth()
+                .clickable {
+                    val uri = Attachments.save(ctx, raw, i, a.filename)
+                    when {
+                        uri == null -> onStatus("Could not read ${a.filename}")
+                        !Attachments.open(ctx, uri, a.mimeType) ->
+                            onStatus("Nothing here opens ${a.mimeType}")
+                        else -> {}
+                    }
+                }
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("📎", fontSize = 14.sp)
+            Spacer(Modifier.width(8.dp))
+            Text(
+                a.filename,
+                Modifier.weight(1f),
+                fontSize = 13.sp,
+                maxLines = 1,
+                color = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                Attachments.humanSize(a.size),
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        }
+    }
+    Spacer(Modifier.width(8.dp))
+    HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+    Spacer(Modifier.width(8.dp))
 }
 
 @Composable
