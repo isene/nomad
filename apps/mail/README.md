@@ -4,7 +4,7 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.9.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.10.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -21,15 +21,14 @@ Part of the [nomad](../../) mobile suite.
 - **RSS and Atom feeds** in the same list, parsed by
   [fe2o3-feed](https://github.com/isene/feed) — the same parser kastrup
   uses — with **Open** to read the whole thing in a browser
-- **Mail / Feeds** chips once both are in play
-- Unread and per-account filter chips
+- One **scope menu**: All, all mail or one mailbox, all feeds or one feed
+- An **Unread** chip that hides everything already dealt with
 - Bodies decoded by [fe2o3-mail](https://github.com/isene/mail) — the same
   crate kastrup uses, so quoted-printable, base64, RFC 2047 headers,
   multipart and HTML mail all come out the way they do on the desktop
 - **Mark READ** / **Mark unread**, on this phone only
 - Swipe a row (or **Remove** in a message) to take it off this phone —
   local only, the laptop keeps the mail
-- An **Unread** chip that hides everything already dealt with
 - **Attachments** listed under the headers; tap one to open it in
   whatever app handles the type
 - A **Removed** chip to look through what a swipe hid, and swipe there to
@@ -87,8 +86,10 @@ grow without bound.
 3. **↻** fetches headers. Bodies download when you open a message, not
    before: a month of full bodies is minutes of radio for mail that
    mostly never gets read on a phone.
-4. **Feeds** in Settings, one `Title | https://…/feed.xml` per line. A
-   bare URL works too, taking its host as the name.
+4. **Feeds** come across with the accounts: `mail-accounts` also writes
+   `feeds.txt` from kastrup's own RSS source, and **Import accounts +
+   feeds** takes both. The Settings field is editable — one
+   `Title | https://…/feed.xml` per line, or a bare URL.
 5. **Fetch every (min)** in Settings runs the same fetch in the
    background. 15 minutes by default, 0 turns it off.
 
@@ -133,8 +134,17 @@ mean holding a socket open all day — a different trade, and not this one.
 A feed entry is not mail, but it is a message: something with a sender, a
 time, a subject and a body, which is all the list, the widget and the
 read state ever ask of it. So there is one record with a `source`, one
-list, one set of filters — and the next channel is a fetcher and a chip
+list, one scope — and the next channel is a fetcher and a menu entry
 rather than another screen.
+
+The scope is a single string (`""`, `mail`, `mail:<address>`, `rss`,
+`rss:<url>`) rather than a source filter and an account filter, because
+those were never independent: an account only means anything within
+mail. As two fields, picking a mailbox silently hid every feed.
+
+Feeds served over plain `http` are fetched over `https` instead. Android
+forbids cleartext by default and a feed reader is not worth opting out
+for; everything worth subscribing to redirects there anyway.
 
 ## Not yet
 

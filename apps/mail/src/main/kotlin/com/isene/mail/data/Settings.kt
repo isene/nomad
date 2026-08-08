@@ -121,15 +121,19 @@ class Settings(ctx: Context) {
         get() = p.getString("filter", "all") ?: "all"
         set(v) = p.edit().putString("filter", v).apply()
 
-    /** Empty means every channel; else "mail" or "rss". */
-    var sourceFilter: String
-        get() = p.getString("source_filter", "") ?: ""
-        set(v) = p.edit().putString("source_filter", v).apply()
-
-    /** Empty means every account. */
-    var accountFilter: String
-        get() = p.getString("account_filter", "") ?: ""
-        set(v) = p.edit().putString("account_filter", v).apply()
+    /**
+     * What the list is scoped to. One field rather than a source filter
+     * and an account filter, because they were never independent: an
+     * account only means anything within mail, and a feed only within
+     * feeds.
+     *
+     *   ""            everything
+     *   "mail"        all mail        "mail:<address>"  one mailbox
+     *   "rss"         all feeds       "rss:<url>"       one feed
+     */
+    var scope: String
+        get() = p.getString("scope", "") ?: ""
+        set(v) = p.edit().putString("scope", v).apply()
 
     /**
      * Message-IDs swiped away on this phone. Deliberately local — not in
@@ -182,11 +186,20 @@ class Settings(ctx: Context) {
  * Typing or clipboard-pasting a few KB of JSON on a phone is the kind
  * of chore that gets done wrong once and debugged for an hour.
  */
-fun readAccountsFile(ctx: Context, treeUri: String): String? {
+fun readAccountsFile(ctx: Context, treeUri: String): String? =
+    readSharedFile(ctx, treeUri, "mail-accounts.json")
+
+/** The feed list the same script writes, straight out of kastrup's own
+ *  RSS source — so the phone subscribes to what the laptop does without
+ *  either being retyped. Harmless to leave in the folder. */
+fun readFeedsFile(ctx: Context, treeUri: String): String? =
+    readSharedFile(ctx, treeUri, "feeds.txt")
+
+private fun readSharedFile(ctx: Context, treeUri: String, name: String): String? {
     if (treeUri.isEmpty()) return null
     val dir = runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri)) }.getOrNull()
         ?: return null
-    val f = dir.findFile("mail-accounts.json")?.takeIf { it.isFile } ?: return null
+    val f = dir.findFile(name)?.takeIf { it.isFile } ?: return null
     return runCatching {
         ctx.contentResolver.openInputStream(f.uri)?.use { it.bufferedReader().readText() }
     }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
