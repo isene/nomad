@@ -10,7 +10,7 @@ import javax.mail.internet.MimeMessage
 import javax.mail.search.ComparisonTerm
 import javax.mail.search.MessageIDTerm
 import javax.mail.search.ReceivedDateTerm
-import uniffi.fe2o3_mobile_core.Mail
+import uniffi.fe2o3_mobile_core.Message
 import uniffi.fe2o3_mobile_core.mailDecodeHeader
 
 /**
@@ -67,7 +67,7 @@ object ImapRepo {
     /** What we last saw, so the next fetch can ask only for what is new. */
     data class Cursor(val uidValidity: Long, val lastUid: Long)
 
-    data class Fetched(val mails: List<Mail>, val cursor: Cursor, val incremental: Boolean)
+    data class Fetched(val mails: List<Message>, val cursor: Cursor, val incremental: Boolean)
 
     /**
      * Headers from the account's INBOX. `raw` stays empty until the
@@ -116,8 +116,10 @@ object ImapRepo {
                     ?.takeIf { it.isNotEmpty() }
                     ?: "uid:${a.address}:$uid"
                 val when_ = msg.receivedDate ?: msg.sentDate
-                Mail(
+                Message(
                     messageId = id,
+                    source = "mail",
+                    link = "",
                     account = a.address,
                     folder = "INBOX",
                     from = msg.from?.firstOrNull()?.toString()?.let(::mailDecodeHeader) ?: "",

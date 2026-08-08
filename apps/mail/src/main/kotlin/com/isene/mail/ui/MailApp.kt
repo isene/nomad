@@ -53,13 +53,13 @@ import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.readAccountsFile
 import com.isene.mail.viewmodel.MailViewModel
 import com.isene.mail.work.MailSyncWorker
-import uniffi.fe2o3_mobile_core.Mail
+import uniffi.fe2o3_mobile_core.Message
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MailApp(vm: MailViewModel) {
     val ui by vm.ui.collectAsState()
-    var open by remember { mutableStateOf<Mail?>(null) }
+    var open by remember { mutableStateOf<Message?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
@@ -136,6 +136,15 @@ fun MailApp(vm: MailViewModel) {
                             label = { Text("Removed ${ui.hidden}") },
                         )
                     }
+                    if (ui.sources.size > 1) {
+                        ui.sources.forEach { src ->
+                            FilterChip(
+                                selected = ui.sourceFilter == src,
+                                onClick = { vm.setSourceFilter(if (ui.sourceFilter == src) "" else src) },
+                                label = { Text(if (src == "rss") "Feeds" else "Mail") },
+                            )
+                        }
+                    }
                     FilterChip(
                         selected = ui.accountFilter.isEmpty(),
                         onClick = { vm.setAccountFilter("") },
@@ -204,6 +213,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
     var accounts by remember { mutableStateOf(s.accountsJson) }
     var days by remember { mutableStateOf(s.days.toString()) }
     var every by remember { mutableStateOf(s.syncMinutes.toString()) }
+    var feeds by remember { mutableStateOf(s.feedsText) }
     var syncUri by remember { mutableStateOf(s.syncTreeUri) }
     var imported by remember { mutableStateOf<String?>(null) }
 
@@ -230,6 +240,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 s.accountsJson = accounts.trim()
                 days.toIntOrNull()?.let { s.days = it.coerceIn(1, 365) }
                 every.toIntOrNull()?.let { s.syncMinutes = if (it <= 0) 0 else it.coerceIn(15, 1440) }
+                s.feedsText = feeds.trim()
                 MailSyncWorker.schedule(ctx)
                 vm.refresh()
                 onDismiss()
@@ -242,6 +253,22 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Text("Feeds", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                OutlinedTextField(
+                    feeds,
+                    { feeds = it },
+                    label = { Text("One per line") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 6,
+                )
+                Text(
+                    "`Title | https://example.com/feed.xml`, or just the URL. " +
+                        "Blank lines and # comments are skipped.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Spacer(Modifier.width(4.dp))
                 Text("Shared folder", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 OutlinedButton(onClick = { pickFolder.launch(null) }, modifier = Modifier.fillMaxWidth()) {
                     Text(

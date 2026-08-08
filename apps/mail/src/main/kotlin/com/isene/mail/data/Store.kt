@@ -2,9 +2,9 @@ package com.isene.mail.data
 
 import android.content.Context
 import java.io.File
-import uniffi.fe2o3_mobile_core.Mail
-import uniffi.fe2o3_mobile_core.parseMails
-import uniffi.fe2o3_mobile_core.serializeMails
+import uniffi.fe2o3_mobile_core.Message
+import uniffi.fe2o3_mobile_core.parseMessages
+import uniffi.fe2o3_mobile_core.serializeMessages
 
 /**
  * The fetched headers, on disk, so the app opens on a full list instead
@@ -14,9 +14,9 @@ import uniffi.fe2o3_mobile_core.serializeMails
 object Store {
     private fun file(ctx: Context) = File(ctx.filesDir, "mails.json")
 
-    fun load(ctx: Context): List<Mail> =
-        file(ctx).takeIf { it.exists() }?.let { parseMails(it.readText()) } ?: emptyList()
+    fun load(ctx: Context): List<Message> =
+        file(ctx).takeIf { it.exists() }?.let { parseMessages(it.readText()) } ?: emptyList()
 
-    fun save(ctx: Context, mails: List<Mail>) =
-        file(ctx).writeText(serializeMails(mails))
+    fun save(ctx: Context, mails: List<Message>) =
+        file(ctx).writeText(serializeMessages(mails))
 }

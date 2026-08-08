@@ -18,16 +18,21 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import uniffi.fe2o3_mobile_core.Mail
+import uniffi.fe2o3_mobile_core.Message
 import uniffi.fe2o3_mobile_core.mailBodyText
 
 data class UiState(
-    val mails: List<Mail> = emptyList(),
+    val mails: List<Message> = emptyList(),
     /** Message-IDs everyone agrees are read. In the state, not behind a
      *  lookup call, so a row repaints the moment a mark changes. */
     val readIds: Set<String> = emptySet(),
     val accounts: List<String> = emptyList(),
     val accountFilter: String = "",
+    /** "" for every channel, else "mail" or "rss". */
+    val sourceFilter: String = "",
+    /** Which channels the store actually holds, so a chip only appears
+     *  once there is something behind it. */
+    val sources: List<String> = emptyList(),
     val filter: String = "all", // "all" | "unread" | "removed"
     val unread: Int = 0,
     /** Held in the store but hidden by a swipe or Remove all. Counted so
@@ -41,7 +46,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     private val settings = Settings(app)
 
     /** Every header we hold, newest first. */
-    private var all: List<Mail> = emptyList()
+    private var all: List<Message> = emptyList()
 
     /** What the laptop says, merged. Read-only to this phone. */
     private var laptopRead: Set<String> = emptySet()
@@ -82,13 +87,13 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun isRead(m: Mail): Boolean = m.messageId in _ui.value.readIds
+    fun isRead(m: Message): Boolean = m.messageId in _ui.value.readIds
 
     /**
      * Mark it read, or unread, on this phone only. Nothing is written to
      * the shared folder, so the laptop never hears about it.
      */
-    fun setRead(m: Mail, read: Boolean) {
+    fun setRead(m: Message, read: Boolean) {
         settings.localMarks = settings.localMarks + (m.messageId to read)
         recompute()
     }
@@ -97,8 +102,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun sync() {
         val ctx = getApplication<Application>()
-        if (settings.accounts().isEmpty()) {
-            status("Add your accounts in Settings first")
+        if (settings.accounts().isEmpty() && settings.feeds().isEmpty()) {
+            status("Add an account or a feed in Settings first")
             return
         }
         if (_ui.value.busy) return
@@ -111,7 +116,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             _ui.value = _ui.value.copy(
                 busy = false,
                 status = when {
-                    out == null -> "No accounts"
+                    out == null -> "Nothing configured"
                     out.failed > 0 -> "${out.failed} account(s) failed"
                     // Say what is on screen, not what is in the store —
                     // "561 messages" over an empty list is a puzzle, not
@@ -128,11 +133,17 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Decode a message for reading, fetching the body if this is the first time. */
-    fun open(m: Mail) {
+    fun open(m: Message) {
         _body.value = null
         val ctx = getApplication<Application>()
         if (m.raw.isNotEmpty()) {
             _body.value = mailBodyText(m.raw, m.html)
+            return
+        }
+        if (m.source != "mail") {
+            // A feed entry arrived whole; there is no second half to go
+            // and get. An empty one is an empty one.
+            _body.value = mailBodyText("", m.html).ifBlank { "(no content in this entry)" }
             return
         }
         val account = settings.accounts().firstOrNull { it.address == m.account }
@@ -156,7 +167,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     fun closeBody() { _body.value = null }
 
     /** The stored copy, which may have gained a body since the list was built. */
-    fun current(messageId: String): Mail? = all.firstOrNull { it.messageId == messageId }
+    fun current(messageId: String): Message? = all.firstOrNull { it.messageId == messageId }
 
     // ---------- filters ----------
 
@@ -165,7 +176,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
      * the archive and never hears about it, which is the whole point —
      * clearing the phone must not cost you the mail.
      */
-    fun dismiss(m: Mail) {
+    fun dismiss(m: Message) {
         settings.dismissed = settings.dismissed + m.messageId
         undoable = setOf(m.messageId)
         recompute()
@@ -217,7 +228,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Put one back on the list. The swipe action while looking at the
      *  removed ones — the same gesture, the other way. */
-    fun restore(m: Mail) {
+    fun restore(m: Message) {
         settings.dismissed = settings.dismissed - m.messageId
         undoable = emptySet()
         recompute()
@@ -242,6 +253,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setAccountFilter(a: String) { settings.accountFilter = a; recompute() }
 
+    fun setSourceFilter(s: String) { settings.sourceFilter = s; recompute() }
+
     fun status(s: String?) { _ui.value = _ui.value.copy(status = s) }
 
     fun clearStatus() = status(null)
@@ -256,8 +269,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         // The removed view is the same list read the other way round: it
         // is the only one that looks at what a swipe hid. Everything else
         // — the counts, the widget — still means the visible ones.
+        val src = settings.sourceFilter
         val base = if (filter == "removed") all.filter { it.messageId in gone } else here
         val shown = base
+            .filter { src.isEmpty() || it.source == src }
             .filter { acct.isEmpty() || it.account == acct }
             .filter { filter != "unread" || it.messageId !in readIds }
         // Unread, through the same account filter the list uses — the
@@ -265,6 +280,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         // with its own opinion. The read/unread filter is deliberately
         // NOT mirrored: the widget is always the unread ones.
         val unread = here
+            .filter { src.isEmpty() || it.source == src }
             .filter { acct.isEmpty() || it.account == acct }
             .filter { it.messageId !in readIds }
         _ui.value = _ui.value.copy(
@@ -272,6 +288,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             readIds = readIds,
             accounts = settings.accounts().map { it.address },
             accountFilter = acct,
+            sourceFilter = src,
+            sources = all.map { it.source }.distinct().sorted(),
             filter = filter,
             unread = unread.size,
             hidden = all.size - here.size,
@@ -281,7 +299,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Feed the home screen. Writes and redraws only when the summary
      *  actually moved, so this is a string compare on most passes. */
-    private fun publishWidget(unread: List<Mail>) {
+    private fun publishWidget(unread: List<Message>) {
         val ctx = getApplication<Application>()
         val rows = unread.map {
             WidgetRow(

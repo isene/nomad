@@ -4,11 +4,11 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.8.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.9.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
-Your Gmail inboxes on the phone, sharing one decoder with
-[kastrup](https://github.com/isene/kastrup) on the laptop and taking its
-word for what has been read.
+Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
+with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
+its word for what has been read.
 Part of the [nomad](../../) mobile suite.
 
 </div>
@@ -18,6 +18,10 @@ Part of the [nomad](../../) mobile suite.
 ## What it does
 
 - Every configured Gmail account's INBOX, last N days, newest first
+- **RSS and Atom feeds** in the same list, parsed by
+  [fe2o3-feed](https://github.com/isene/feed) — the same parser kastrup
+  uses — with **Open** to read the whole thing in a browser
+- **Mail / Feeds** chips once both are in play
 - Unread and per-account filter chips
 - Bodies decoded by [fe2o3-mail](https://github.com/isene/mail) — the same
   crate kastrup uses, so quoted-printable, base64, RFC 2047 headers,
@@ -83,7 +87,9 @@ grow without bound.
 3. **↻** fetches headers. Bodies download when you open a message, not
    before: a month of full bodies is minutes of radio for mail that
    mostly never gets read on a phone.
-4. **Fetch every (min)** in Settings runs the same fetch in the
+4. **Feeds** in Settings, one `Title | https://…/feed.xml` per line. A
+   bare URL works too, taking its host as the name.
+5. **Fetch every (min)** in Settings runs the same fetch in the
    background. 15 minutes by default, 0 turns it off.
 
 ## Attachments
@@ -122,9 +128,18 @@ month of envelopes over three sequential ones. If the server renumbers
 Fifteen minutes is Android's floor for periodic work. Real push would
 mean holding a socket open all day — a different trade, and not this one.
 
+## One list, many channels
+
+A feed entry is not mail, but it is a message: something with a sender, a
+time, a subject and a body, which is all the list, the widget and the
+read state ever ask of it. So there is one record with a `source`, one
+list, one set of filters — and the next channel is a fetcher and a chip
+rather than another screen.
+
 ## Not yet
 
-No push (the fetch is periodic, not instant) and no compose.
+No push (the fetch is periodic, not instant) and no compose. Discord and
+Dualog Workspace are the obvious next channels.
 
 ## License
 

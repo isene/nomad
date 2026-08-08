@@ -50,7 +50,7 @@ import com.isene.mail.viewmodel.UiState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import uniffi.fe2o3_mobile_core.Mail
+import uniffi.fe2o3_mobile_core.Message
 
 private val dayFmt = SimpleDateFormat("d MMM", Locale.getDefault())
 private val fullFmt = SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.getDefault())
@@ -62,7 +62,7 @@ private fun shortFrom(from: String): String {
 }
 
 @Composable
-fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOpen: (Mail) -> Unit) {
+fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOpen: (Message) -> Unit) {
     if (ui.mails.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
@@ -133,7 +133,7 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
                         )
                     }
                     Text(
-                        m.subject,
+                        (if (ui.sources.size > 1 && m.source == "rss") "◆ " else "") + m.subject,
                         fontSize = 13.sp,
                         maxLines = 2,
                         fontWeight = if (read) FontWeight.Normal else FontWeight.SemiBold,
@@ -148,7 +148,7 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MessageScreen(vm: MailViewModel, mail: Mail, onBack: () -> Unit) {
+fun MessageScreen(vm: MailViewModel, mail: Message, onBack: () -> Unit) {
     val body by vm.body.collectAsState()
     val ui by vm.ui.collectAsState()
     LaunchedEffect(mail.messageId) { vm.open(mail) }
@@ -176,6 +176,19 @@ fun MessageScreen(vm: MailViewModel, mail: Mail, onBack: () -> Unit) {
                 // read state, so the laptop keeps its say.
                 Button(onClick = { vm.setRead(mail, !read) }, modifier = Modifier.weight(1f)) {
                     Text(if (read) "Mark unread" else "Mark READ")
+                }
+                if (mail.link.isNotEmpty()) {
+                    val ctx = LocalContext.current
+                    OutlinedButton(onClick = {
+                        runCatching {
+                            ctx.startActivity(
+                                android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse(mail.link),
+                                )
+                            )
+                        }
+                    }) { Text("Open") }
                 }
                 OutlinedButton(onClick = { vm.dismiss(mail); vm.closeBody(); onBack() }) {
                     Text("Remove")
