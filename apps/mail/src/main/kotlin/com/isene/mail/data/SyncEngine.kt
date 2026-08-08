@@ -106,10 +106,20 @@ object SyncEngine {
 
         val readIds = ReadState.effective(ctx, settings)
         val gone = settings.dismissed
-        val acct = settings.accountFilter
+        // Through the same scope the list uses: the widget is meant to be
+        // the list at a glance, not a second view with its own opinion.
+        val scope = settings.scope
         val unread = out
             .filter { it.messageId !in gone }
-            .filter { acct.isEmpty() || it.account == acct }
+            .filter {
+                when {
+                    scope.isEmpty() -> true
+                    scope == "mail" || scope == "rss" -> it.source == scope
+                    scope.startsWith("mail:") -> it.source == "mail" && it.account == scope.removePrefix("mail:")
+                    scope.startsWith("rss:") -> it.source == "rss" && it.folder == scope.removePrefix("rss:")
+                    else -> true
+                }
+            }
             .filter { it.messageId !in readIds }
 
         // Keep the home screen in step with what was just fetched.

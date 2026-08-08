@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -51,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import com.isene.mail.BuildConfig
 import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.readAccountsFile
+import com.isene.mail.data.readFeedsFile
 import com.isene.mail.viewmodel.MailViewModel
 import com.isene.mail.work.MailSyncWorker
 import uniffi.fe2o3_mobile_core.Message
@@ -124,6 +126,10 @@ fun MailApp(vm: MailViewModel) {
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    // One grouped menu rather than a chip per account and
+                    // per feed: the row ran off the screen at three
+                    // mailboxes, and thirteen feeds would have been absurd.
+                    ScopeMenu(ui) { vm.setScope(it) }
                     FilterChip(
                         selected = ui.filter == "unread",
                         onClick = { vm.setFilter(if (ui.filter == "unread") "all" else "unread") },
@@ -134,27 +140,6 @@ fun MailApp(vm: MailViewModel) {
                             selected = ui.filter == "removed",
                             onClick = { vm.setFilter(if (ui.filter == "removed") "all" else "removed") },
                             label = { Text("Removed ${ui.hidden}") },
-                        )
-                    }
-                    if (ui.sources.size > 1) {
-                        ui.sources.forEach { src ->
-                            FilterChip(
-                                selected = ui.sourceFilter == src,
-                                onClick = { vm.setSourceFilter(if (ui.sourceFilter == src) "" else src) },
-                                label = { Text(if (src == "rss") "Feeds" else "Mail") },
-                            )
-                        }
-                    }
-                    FilterChip(
-                        selected = ui.accountFilter.isEmpty(),
-                        onClick = { vm.setAccountFilter("") },
-                        label = { Text("All") },
-                    )
-                    ui.accounts.forEach { a ->
-                        FilterChip(
-                            selected = ui.accountFilter == a,
-                            onClick = { vm.setAccountFilter(if (ui.accountFilter == a) "" else a) },
-                            label = { Text(a.substringBefore('@').ifEmpty { a } + "@" + a.substringAfter('@').substringBefore('.')) },
                         )
                     }
                 }
@@ -187,11 +172,11 @@ fun MailApp(vm: MailViewModel) {
             title = { Text(if (read) "Mark $n read?" else "Remove $n from this phone?") },
             text = {
                 Text(
-                    // Say which messages, because a filter is often on and
+                    // Say which messages, because a scope is often set and
                     // "all" then means something narrower than it sounds.
-                    (if (ui.accountFilter.isEmpty()) "Everything the list is showing. "
-                     else "Everything showing for ${ui.accountFilter}. ") +
-                        if (read) "This reaches the laptop too."
+                    (if (ui.scope.isEmpty()) "Everything the list is showing. "
+                     else "Everything showing in this scope. ") +
+                        if (read) "Marked on this phone only."
                         else "Local only — the laptop keeps the mail, and the status line offers it back."
                 )
             },
@@ -204,6 +189,54 @@ fun MailApp(vm: MailViewModel) {
             dismissButton = { TextButton(onClick = { confirmBulk = null }) { Text("Cancel") } },
         )
     }
+}
+
+/** Everything, one mailbox, or one feed — grouped the way they group. */
+@Composable
+private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val label = when {
+        ui.scope.isEmpty() -> "All"
+        ui.scope == "mail" -> "Mail"
+        ui.scope == "rss" -> "Feeds"
+        ui.scope.startsWith("mail:") -> ui.scope.removePrefix("mail:").substringBefore('@')
+        else -> ui.feeds.firstOrNull { it.second == ui.scope.removePrefix("rss:") }?.first ?: "Feed"
+    }
+    Box {
+        FilterChip(
+            selected = ui.scope.isNotEmpty(),
+            onClick = { open = true },
+            label = { Text("$label ▾") },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text("All") }, onClick = { open = false; onPick("") })
+            if (ui.accounts.isNotEmpty()) {
+                SectionLabel("Mail")
+                DropdownMenuItem(text = { Text("All mail") }, onClick = { open = false; onPick("mail") })
+                ui.accounts.forEach { a ->
+                    DropdownMenuItem(text = { Text(a) }, onClick = { open = false; onPick("mail:$a") })
+                }
+            }
+            if (ui.feeds.isNotEmpty()) {
+                SectionLabel("Feeds")
+                DropdownMenuItem(text = { Text("All feeds") }, onClick = { open = false; onPick("rss") })
+                ui.feeds.forEach { (title, url) ->
+                    DropdownMenuItem(text = { Text(title) }, onClick = { open = false; onPick("rss:$url") })
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Text(
+        text,
+        Modifier.padding(start = 12.dp, top = 8.dp, bottom = 2.dp),
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.secondary,
+    )
 }
 
 @Composable
@@ -288,17 +321,20 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 // file. Beats pasting a few KB of JSON on a phone keyboard.
                 OutlinedButton(
                     onClick = {
-                        val text = readAccountsFile(ctx, syncUri)
-                        if (text == null) {
-                            imported = "No mail-accounts.json in that folder"
-                        } else {
-                            accounts = text
-                            s.accountsJson = text
-                            imported = "Imported: " + s.accountSummary().replace("\n", ", ")
+                        val acc = readAccountsFile(ctx, syncUri)
+                        val fed = readFeedsFile(ctx, syncUri)
+                        acc?.let { accounts = it; s.accountsJson = it }
+                        fed?.let { feeds = it; s.feedsText = it }
+                        imported = when {
+                            acc == null && fed == null -> "Nothing to import from that folder"
+                            else -> listOfNotNull(
+                                acc?.let { s.accounts().size.toString() + " accounts" },
+                                fed?.let { s.feeds().size.toString() + " feeds" },
+                            ).joinToString(", ", prefix = "Imported ")
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Import mail-accounts.json from folder") }
+                ) { Text("Import accounts + feeds from folder") }
                 imported?.let {
                     Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                 }

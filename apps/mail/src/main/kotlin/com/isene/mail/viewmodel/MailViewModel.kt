@@ -26,13 +26,12 @@ data class UiState(
     /** Message-IDs everyone agrees are read. In the state, not behind a
      *  lookup call, so a row repaints the moment a mark changes. */
     val readIds: Set<String> = emptySet(),
+    /** What the list is scoped to; see [Settings.scope]. */
+    val scope: String = "",
+    /** Mail addresses held, for the scope menu. */
     val accounts: List<String> = emptyList(),
-    val accountFilter: String = "",
-    /** "" for every channel, else "mail" or "rss". */
-    val sourceFilter: String = "",
-    /** Which channels the store actually holds, so a chip only appears
-     *  once there is something behind it. */
-    val sources: List<String> = emptyList(),
+    /** Feeds held, as title to url, for the scope menu. */
+    val feeds: List<Pair<String, String>> = emptyList(),
     val filter: String = "all", // "all" | "unread" | "removed"
     val unread: Int = 0,
     /** Held in the store but hidden by a swipe or Remove all. Counted so
@@ -251,16 +250,22 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setFilter(f: String) { settings.filter = f; recompute() }
 
-    fun setAccountFilter(a: String) { settings.accountFilter = a; recompute() }
-
-    fun setSourceFilter(s: String) { settings.sourceFilter = s; recompute() }
+    fun setScope(s: String) { settings.scope = s; recompute() }
 
     fun status(s: String?) { _ui.value = _ui.value.copy(status = s) }
 
     fun clearStatus() = status(null)
 
+    /** One scope, read against one message. See [Settings.scope]. */
+    private fun inScope(m: Message, scope: String): Boolean = when {
+        scope.isEmpty() -> true
+        scope == "mail" || scope == "rss" -> m.source == scope
+        scope.startsWith("mail:") -> m.source == "mail" && m.account == scope.removePrefix("mail:")
+        scope.startsWith("rss:") -> m.source == "rss" && m.folder == scope.removePrefix("rss:")
+        else -> true
+    }
+
     private fun recompute() {
-        val acct = settings.accountFilter
         val filter = settings.filter
         // The laptop's view, with this phone's own overrides on top.
         val readIds = ReadState.merge(laptopRead, settings.localMarks)
@@ -269,30 +274,27 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         // The removed view is the same list read the other way round: it
         // is the only one that looks at what a swipe hid. Everything else
         // — the counts, the widget — still means the visible ones.
-        val src = settings.sourceFilter
+        val scope = settings.scope
         val base = if (filter == "removed") all.filter { it.messageId in gone } else here
         val shown = base
-            .filter { src.isEmpty() || it.source == src }
-            // An account chip names a mailbox, so it can only speak for
-            // mail. Letting it filter everything silently hid every feed
-            // entry the moment one was selected.
-            .filter { acct.isEmpty() || it.source != "mail" || it.account == acct }
+            .filter { inScope(it, scope) }
             .filter { filter != "unread" || it.messageId !in readIds }
         // Unread, through the same account filter the list uses — the
         // widget is meant to be the list at a glance, not a second view
         // with its own opinion. The read/unread filter is deliberately
         // NOT mirrored: the widget is always the unread ones.
         val unread = here
-            .filter { src.isEmpty() || it.source == src }
-            .filter { acct.isEmpty() || it.source != "mail" || it.account == acct }
+            .filter { inScope(it, scope) }
             .filter { it.messageId !in readIds }
         _ui.value = _ui.value.copy(
             mails = shown,
             readIds = readIds,
-            accounts = settings.accounts().map { it.address },
-            accountFilter = acct,
-            sourceFilter = src,
-            sources = all.map { it.source }.distinct().sorted(),
+            scope = scope,
+            accounts = all.filter { it.source == "mail" }.map { it.account }.distinct().sorted(),
+            // A feed carries its title in `account` and its url in
+            // `folder`; the url is the identity, the title is the label.
+            feeds = all.filter { it.source == "rss" }
+                .map { it.account to it.folder }.distinct().sortedBy { it.first },
             filter = filter,
             unread = unread.size,
             hidden = all.size - here.size,

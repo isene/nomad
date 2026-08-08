@@ -24,8 +24,12 @@ object FeedRepo {
 
     /** `null` on a failed fetch — distinct from a feed with no entries. */
     fun fetch(f: Feed): List<Message>? {
+        // Android forbids cleartext by default and the app is not going
+        // to opt out for a feed reader. Everything worth subscribing to
+        // serves https, and most of these redirect there anyway.
+        val url = if (f.url.startsWith("http://")) "https://" + f.url.removePrefix("http://") else f.url
         val xml = runCatching {
-            val req = Request.Builder().url(f.url)
+            val req = Request.Builder().url(url)
                 .header("User-Agent", "kastrup-nomad/1.0")
                 .build()
             client.newCall(req).execute().use { r ->
