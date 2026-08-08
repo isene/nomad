@@ -22,8 +22,15 @@ pub struct Message {
     /// on), or the feed entry's own id.
     pub message_id: String,
     /// Which channel this came down. "mail" or "rss".
+    ///
+    /// Defaulted, like every field added after the first release: the
+    /// store on disk was written before this existed, and a field serde
+    /// cannot find fails the whole parse — which empties the store, and
+    /// with it the read marks, the removed list and the lot.
+    #[serde(default = "default_source")]
     pub source: String,
     /// Where to go to read the whole thing. Feeds only; mail is here.
+    #[serde(default)]
     pub link: String,
     /// Which account it arrived in, so a reply can go back out the same way.
     pub account: String,
@@ -41,6 +48,9 @@ pub struct Message {
     #[serde(default)]
     pub has_attachments: bool,
 }
+
+/// Anything written before there were channels was mail.
+fn default_source() -> String { "mail".to_string() }
 
 #[uniffi::export]
 pub fn parse_messages(json: String) -> Vec<Message> {
@@ -199,6 +209,19 @@ mod tests {
             r#"{"a@x": {"read": false, "ts": 300}}"#.into(),
         ]);
         assert!(!is_mail_read(merged, "a@x".into()), "the newer state wins");
+    }
+
+    #[test]
+    fn a_store_written_before_channels_existed_still_loads() {
+        // The regression that emptied a phone: source and link were added
+        // without defaults, so every message already on disk failed to
+        // parse and the store came back empty.
+        let old = r#"[{"message_id":"a@x","account":"me@x","folder":"INBOX",
+            "from":"S","to":"me@x","subject":"Hi","date":100,"raw":"Hei"}]"#;
+        let back = parse_messages(old.into());
+        assert_eq!(back.len(), 1, "an older store must still load");
+        assert_eq!(back[0].source, "mail");
+        assert_eq!(back[0].subject, "Hi");
     }
 
     #[test]
