@@ -273,7 +273,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         val base = if (filter == "removed") all.filter { it.messageId in gone } else here
         val shown = base
             .filter { src.isEmpty() || it.source == src }
-            .filter { acct.isEmpty() || it.account == acct }
+            // An account chip names a mailbox, so it can only speak for
+            // mail. Letting it filter everything silently hid every feed
+            // entry the moment one was selected.
+            .filter { acct.isEmpty() || it.source != "mail" || it.account == acct }
             .filter { filter != "unread" || it.messageId !in readIds }
         // Unread, through the same account filter the list uses — the
         // widget is meant to be the list at a glance, not a second view
@@ -281,7 +284,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         // NOT mirrored: the widget is always the unread ones.
         val unread = here
             .filter { src.isEmpty() || it.source == src }
-            .filter { acct.isEmpty() || it.account == acct }
+            .filter { acct.isEmpty() || it.source != "mail" || it.account == acct }
             .filter { it.messageId !in readIds }
         _ui.value = _ui.value.copy(
             mails = shown,

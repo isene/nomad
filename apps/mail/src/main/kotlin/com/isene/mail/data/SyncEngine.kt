@@ -40,7 +40,13 @@ object SyncEngine {
         val results = runBlocking {
             accounts.map { a ->
                 async(Dispatchers.IO) {
-                    val c = settings.cursor(a.address)
+                    // Only trust the cursor while we still hold that
+                    // account's mail. If the store was lost, the cursor
+                    // would say "you have everything up to N" and the
+                    // window would never be read again — the mail would
+                    // simply be gone. Holding nothing means start over.
+                    val c = if (stored.any { m -> m.account == a.address && m.source == "mail" })
+                        settings.cursor(a.address) else null
                     a to ImapRepo.headers(
                         a, settings.days,
                         c?.let { ImapRepo.Cursor(it.first, it.second) },
