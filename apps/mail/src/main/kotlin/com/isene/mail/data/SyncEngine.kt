@@ -83,8 +83,14 @@ object SyncEngine {
 
         // Incremental fetching never drops anything, so the window has to
         // be enforced here or the store grows for ever.
+        //
+        // Mail only. A feed is already bounded — it publishes its last N
+        // entries and no more — and pruning one by age would drop an old
+        // post that the very next fetch puts back, for ever.
         val oldest = System.currentTimeMillis() / 1000 - settings.days.toLong() * 86_400
-        out = out.filter { it.date == 0L || it.date >= oldest }.sortedByDescending { it.date }
+        out = out
+            .filter { it.source != "mail" || it.date == 0L || it.date >= oldest }
+            .sortedByDescending { it.date }
 
         if (failed == 0) {
             val live = out.map { it.messageId }.toSet()
