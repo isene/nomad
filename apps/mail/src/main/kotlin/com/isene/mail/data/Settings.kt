@@ -19,6 +19,9 @@ data class Account(
     val refreshToken: String,
 )
 
+/** One subscribed feed. */
+data class Feed(val url: String, val title: String)
+
 /**
  * Config, kept on the phone only. Credentials are pasted in once and
  * live in this app's private prefs — deliberately NOT in the Syncthing
@@ -92,10 +95,36 @@ class Settings(ctx: Context) {
             p.edit().putString("local_marks", o.toString()).apply()
         }
 
-    /** "all" | "unread" */
+    /**
+     * Subscribed feeds, one `Title | url` per line. Plain text rather
+     * than JSON: this is the one setting typed by hand on a phone
+     * keyboard, and a missing brace should not cost the lot. Blank lines
+     * and `#` comments are skipped; a bare URL takes its host as a name.
+     */
+    var feedsText: String
+        get() = p.getString("feeds", "") ?: ""
+        set(v) = p.edit().putString("feeds", v).apply()
+
+    fun feeds(): List<Feed> = feedsText.lines().mapNotNull { line ->
+        val t = line.trim()
+        if (t.isEmpty() || t.startsWith("#")) return@mapNotNull null
+        val (title, url) = if (t.contains('|')) {
+            t.substringBefore('|').trim() to t.substringAfter('|').trim()
+        } else {
+            t.substringAfter("//").substringBefore('/') to t
+        }
+        if (url.startsWith("http")) Feed(url, title.ifEmpty { url }) else null
+    }
+
+    /** "all" | "unread" | "removed" */
     var filter: String
         get() = p.getString("filter", "all") ?: "all"
         set(v) = p.edit().putString("filter", v).apply()
+
+    /** Empty means every channel; else "mail" or "rss". */
+    var sourceFilter: String
+        get() = p.getString("source_filter", "") ?: ""
+        set(v) = p.edit().putString("source_filter", v).apply()
 
     /** Empty means every account. */
     var accountFilter: String

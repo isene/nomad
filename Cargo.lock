@@ -357,6 +357,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "fe2o3-feed"
+version = "0.1.0"
+
+[[package]]
 name = "fe2o3-mail"
 version = "0.2.1"
 dependencies = [
@@ -373,6 +377,7 @@ dependencies = [
  "base64",
  "cbc",
  "cipher",
+ "fe2o3-feed",
  "fe2o3-mail",
  "fe2o3-orbit",
  "getrandom",

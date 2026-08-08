@@ -1,19 +1,30 @@
-// Mail for the phone: a thin UniFFI skin over the fe2o3-mail crate.
+// Messages for the phone: a thin UniFFI skin over fe2o3-mail and
+// fe2o3-feed.
 //
-// Nothing is decided here. Decoding a body, deciding what has been read
-// — that logic is shared with desktop kastrup so the two cannot drift,
-// and this file only makes it reachable from Kotlin.
+// Nothing is decided here. Decoding a body, deciding what has been read,
+// pulling entries out of a feed — that logic is shared with desktop
+// kastrup so the two cannot drift, and this file only makes it reachable
+// from Kotlin.
+//
+// One record covers every channel. A feed item is not mail, but it is a
+// message: something with a sender, a time, a subject and a body, which
+// is all the list and the widget ever ask of it.
 
 use std::collections::HashMap;
 
-/// One message as the phone stores and shows it. Bodies are kept raw so
-/// the decode happens on display and a re-decode costs nothing if the
-/// rules improve.
+/// One message as the phone stores and shows it, whatever channel it
+/// came from. Bodies are kept raw so the decode happens on display and a
+/// re-decode costs nothing if the rules improve.
 #[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize, uniffi::Record)]
-pub struct Mail {
-    /// RFC822 Message-ID — the identity that survives maildir, IMAP and
-    /// this phone, and the key read state is agreed on.
+pub struct Message {
+    /// The identity: an RFC822 Message-ID for mail (which survives
+    /// maildir, IMAP and this phone, and is the key read state is agreed
+    /// on), or the feed entry's own id.
     pub message_id: String,
+    /// Which channel this came down. "mail" or "rss".
+    pub source: String,
+    /// Where to go to read the whole thing. Feeds only; mail is here.
+    pub link: String,
     /// Which account it arrived in, so a reply can go back out the same way.
     pub account: String,
     pub folder: String,
@@ -32,13 +43,13 @@ pub struct Mail {
 }
 
 #[uniffi::export]
-pub fn parse_mails(json: String) -> Vec<Mail> {
+pub fn parse_messages(json: String) -> Vec<Message> {
     serde_json::from_str(&json).unwrap_or_default()
 }
 
 #[uniffi::export]
-pub fn serialize_mails(mails: Vec<Mail>) -> String {
-    serde_json::to_string(&mails).unwrap_or_else(|_| "[]".into())
+pub fn serialize_messages(messages: Vec<Message>) -> String {
+    serde_json::to_string(&messages).unwrap_or_else(|_| "[]".into())
 }
 
 /// The readable text of a message.
@@ -52,6 +63,29 @@ pub fn mail_body_text(raw: String, html: String) -> String {
 #[uniffi::export]
 pub fn mail_decode_header(s: String) -> String {
     mail::decode_rfc2047(&s)
+}
+
+/// Parse a feed into messages. The entry's HTML becomes the body, so
+/// the same reader renders it — no second display path for a second
+/// channel.
+#[uniffi::export]
+pub fn parse_feed(xml: String, feed_title: String, feed_url: String) -> Vec<Message> {
+    feed::parse(&xml, &feed_title, &feed_url).into_iter().map(|i| Message {
+        message_id: i.id,
+        source: "rss".into(),
+        link: i.link,
+        account: i.feed_title.clone(),
+        folder: i.feed_url,
+        from: i.author,
+        to: String::new(),
+        subject: if i.title.is_empty() { "(untitled)".into() } else { i.title },
+        date: i.published,
+        // Nothing raw to keep: the entry arrived as HTML and that is all
+        // there is. body_text falls back to it and renders it as text.
+        raw: String::new(),
+        html: i.html,
+        has_attachments: false,
+    }).collect()
 }
 
 /// One attachment, without its contents.
@@ -141,13 +175,14 @@ mod tests {
 
     #[test]
     fn a_mail_round_trips() {
-        let m = Mail {
-            message_id: "a@x".into(), account: "geir@isene.com".into(),
+        let m = Message {
+            message_id: "a@x".into(), source: "mail".into(), link: String::new(),
+            account: "geir@isene.com".into(),
             folder: "INBOX".into(), from: "Someone <s@x>".into(), to: "me@x".into(),
             subject: "Hei".into(), date: 100, raw: "Hei\n".into(),
             html: String::new(), has_attachments: false,
         };
-        let back = parse_mails(serialize_mails(vec![m.clone()]));
+        let back = parse_messages(serialize_messages(vec![m.clone()]));
         assert_eq!(back, vec![m]);
     }
 
@@ -164,6 +199,22 @@ mod tests {
             r#"{"a@x": {"read": false, "ts": 300}}"#.into(),
         ]);
         assert!(!is_mail_read(merged, "a@x".into()), "the newer state wins");
+    }
+
+    #[test]
+    fn a_feed_entry_becomes_a_message() {
+        let xml = r#"<rss><channel><item><title>Post</title>
+            <link>https://example.com/1</link>
+            <description>&lt;p&gt;Body&lt;/p&gt;</description>
+            <pubDate>Thu, 3 Apr 2026 07:15:00 +0000</pubDate></item></channel></rss>"#;
+        let msgs = parse_feed(xml.into(), "Example".into(), "u".into());
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0].source, "rss");
+        assert_eq!(msgs[0].subject, "Post");
+        assert_eq!(msgs[0].link, "https://example.com/1");
+        assert_eq!(msgs[0].date, 1775200500);
+        // The same reader renders it: no raw part, so the HTML is used.
+        assert!(mail_body_text(msgs[0].raw.clone(), msgs[0].html.clone()).contains("Body"));
     }
 
     #[test]

@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
-import uniffi.fe2o3_mobile_core.Mail
+import uniffi.fe2o3_mobile_core.Message
 
 /**
  * Fetching headers, with no ViewModel and no screen involved — so the
@@ -16,7 +16,7 @@ import uniffi.fe2o3_mobile_core.Mail
  */
 object SyncEngine {
 
-    data class Result(val mails: List<Mail>, val failed: Int, val unread: Int)
+    data class Result(val mails: List<Message>, val failed: Int, val unread: Int)
 
     /**
      * Pull every account's headers and write them to the store. Bodies
@@ -26,7 +26,8 @@ object SyncEngine {
     fun fetch(ctx: Context): Result? {
         val settings = Settings(ctx)
         val accounts = settings.accounts()
-        if (accounts.isEmpty()) return null
+        val feeds = settings.feeds()
+        if (accounts.isEmpty() && feeds.isEmpty()) return null
 
         val stored = Store.load(ctx)
         val kept = stored.associateBy { it.messageId }
@@ -64,6 +65,20 @@ object SyncEngine {
                 out.filter { it.account != a.address } + withBodies
             }
             settings.setCursor(a.address, got.cursor.uidValidity, got.cursor.lastUid)
+        }
+
+        // Feeds, in the same parallel pass. No cursor: a feed is a
+        // snapshot of its last N entries, so the fetch is the whole file
+        // either way and the merge is by id.
+        val fetched = runBlocking {
+            feeds.map { f -> async(Dispatchers.IO) { f to FeedRepo.fetch(f) } }.awaitAll()
+        }
+        for ((f, items) in fetched) {
+            if (items == null) { failed++; continue }
+            val fresh = items.map { it.messageId }.toSet()
+            // Entries already held keep their place; a feed that drops an
+            // old one off the end must not delete it here.
+            out = out.filter { it.source != "rss" || it.folder != f.url || it.messageId !in fresh } + items
         }
 
         // Incremental fetching never drops anything, so the window has to
