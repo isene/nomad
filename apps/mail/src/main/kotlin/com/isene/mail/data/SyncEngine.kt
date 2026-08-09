@@ -16,7 +16,13 @@ import uniffi.fe2o3_mobile_core.Message
  */
 object SyncEngine {
 
-    data class Result(val mails: List<Message>, val failed: Int, val unread: Int)
+    data class Result(
+        val mails: List<Message>,
+        val failedAccounts: Int,
+        val failedFeeds: Int,
+        val feeds: Int,
+        val unread: Int,
+    )
 
     /**
      * Pull every account's headers and write them to the store. Bodies
@@ -32,7 +38,8 @@ object SyncEngine {
         val stored = Store.load(ctx)
         val kept = stored.associateBy { it.messageId }
         var out = stored
-        var failed = 0
+        var failedAccounts = 0
+        var failedFeeds = 0
 
         // The accounts in parallel. Three sequential IMAP sessions —
         // TLS handshake, login, search, fetch — is three times the wait
@@ -56,7 +63,7 @@ object SyncEngine {
         }
 
         for ((a, got) in results) {
-            if (got == null) { failed++; continue }
+            if (got == null) { failedAccounts++; continue }
             // A body already downloaded stays downloaded.
             val withBodies = got.mails.map { m ->
                 val old = kept[m.messageId]
@@ -80,7 +87,7 @@ object SyncEngine {
             feeds.map { f -> async(Dispatchers.IO) { f to FeedRepo.fetch(f) } }.awaitAll()
         }
         for ((f, items) in fetched) {
-            if (items == null) { failed++; continue }
+            if (items == null) { failedFeeds++; continue }
             val fresh = items.map { it.messageId }.toSet()
             // Entries already held keep their place; a feed that drops an
             // old one off the end must not delete it here.
@@ -98,7 +105,7 @@ object SyncEngine {
             .filter { it.source != "mail" || it.date == 0L || it.date >= oldest }
             .sortedByDescending { it.date }
 
-        if (failed == 0) {
+        if (failedAccounts == 0 && failedFeeds == 0) {
             val live = out.map { it.messageId }.toSet()
             settings.dismissed = settings.dismissed.intersect(live)
         }
@@ -134,6 +141,6 @@ object SyncEngine {
                 )
             },
         )
-        return Result(out, failed, unread.size)
+        return Result(out, failedAccounts, failedFeeds, feeds.size, unread.size)
     }
 }

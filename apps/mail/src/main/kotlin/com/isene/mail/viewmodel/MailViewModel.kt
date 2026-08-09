@@ -116,14 +116,24 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 busy = false,
                 status = when {
                     out == null -> "Nothing configured"
-                    out.failed > 0 -> "${out.failed} account(s) failed"
+                    out.failedAccounts > 0 || out.failedFeeds > 0 -> listOfNotNull(
+                        out.failedAccounts.takeIf { it > 0 }?.let { "$it account(s)" },
+                        out.failedFeeds.takeIf { it > 0 }?.let { "$it of ${out.feeds} feed(s)" },
+                    ).joinToString(" and ", postfix = " failed")
                     // Say what is on screen, not what is in the store —
                     // "561 messages" over an empty list is a puzzle, not
                     // a status.
                     else -> {
+                        // Name the feeds explicitly. Silence about them
+                        // is indistinguishable from not having any, and
+                        // that is exactly the confusion to avoid.
                         val h = settings.dismissed.size
-                        if (h > 0) "${all.size - h} shown, $h removed here"
-                        else "${all.size} messages"
+                        val rss = all.count { it.source == "rss" }
+                        val n = settings.feeds().size
+                        buildString {
+                            append(if (h > 0) "${all.size - h} shown, $h removed" else "${all.size} messages")
+                            if (n > 0) append(" · $rss from $n feed(s)")
+                        }
                     }
                 },
             )
@@ -151,7 +161,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         viewModelScope.launch {
-            val raw = withContext(Dispatchers.IO) { ImapRepo.body(account, m.messageId) }
+            val raw = withContext(Dispatchers.IO) { ImapRepo.body(account, m.messageId, m.uid.toLong()) }
             if (raw == null) {
                 _body.value = "(could not fetch this message)"
                 return@launch
