@@ -64,10 +64,17 @@ private val LINK = androidx.compose.ui.graphics.Color(0xFF7FC8E8)
 private val dayFmt = SimpleDateFormat("d MMM", Locale.getDefault())
 private val fullFmt = SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.getDefault())
 
-/** "Someone <s@x>" reads better as "Someone" in a narrow list. */
-private fun shortFrom(from: String): String {
-    val name = from.substringBefore('<').trim().trim('"')
-    return name.ifEmpty { from.trim().trim('<', '>') }
+/**
+ * "Someone <s@x>" reads better as "Someone" in a narrow list.
+ *
+ * Only mail is shaped that way. A feed or a channel name can contain
+ * anything, and cutting it at the first `<` turned one author into the
+ * single letter "a".
+ */
+private fun shortFrom(m: Message): String {
+    if (m.source != "mail") return m.from
+    val name = m.from.substringBefore('<').trim().trim('"')
+    return name.ifEmpty { m.from.trim().trim('<', '>') }
 }
 
 @Composable
@@ -124,7 +131,7 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            shortFrom(m.from),
+                            shortFrom(m),
                             Modifier.weight(1f),
                             fontSize = 14.sp,
                             maxLines = 1,
@@ -209,8 +216,16 @@ fun MessageScreen(vm: MailViewModel, mail: Message, onBack: () -> Unit) {
             Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).padding(14.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            HeaderRow("From", mail.from)
-            HeaderRow("To", mail.to)
+            // The same two fields mean different things per channel, so
+            // they are labelled for the channel rather than for mail.
+            HeaderRow(
+                when (mail.source) { "rss" -> "Feed"; "discord" -> "From"; else -> "From" },
+                mail.from,
+            )
+            HeaderRow(
+                when (mail.source) { "rss" -> "Author"; "discord" -> "Channel"; else -> "To" },
+                if (mail.source == "discord") mail.account else mail.to,
+            )
             HeaderRow("Date", if (mail.date > 0) fullFmt.format(Date(mail.date * 1000)) else "—")
             HeaderRow("Account", mail.account)
             Spacer(Modifier.width(8.dp))
