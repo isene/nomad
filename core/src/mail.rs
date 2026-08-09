@@ -91,8 +91,12 @@ pub fn parse_feed(xml: String, feed_title: String, feed_url: String) -> Vec<Mess
         link: i.link,
         account: i.feed_title.clone(),
         folder: i.feed_url,
-        from: i.author,
-        to: String::new(),
+        // The feed in the sender slot, not the poster. A list is scanned
+        // by where a thing came from, and "Lobsters" or "HP Forum" tells
+        // you that; /u/GlitteringHotel8383 does not. The author is still
+        // carried, and the reader shows it.
+        from: i.feed_title,
+        to: i.author,
         subject: if i.title.is_empty() { "(untitled)".into() } else { i.title },
         date: i.published,
         // Nothing raw to keep: the entry arrived as HTML and that is all
@@ -325,6 +329,7 @@ mod tests {
         assert_eq!(msgs.len(), 1);
         assert_eq!(msgs[0].source, "rss");
         assert_eq!(msgs[0].subject, "Post");
+        assert_eq!(msgs[0].from, "Example", "the feed, not the author");
         assert_eq!(msgs[0].link, "https://example.com/1");
         assert_eq!(msgs[0].date, 1775200500);
         // The same reader renders it: no raw part, so the HTML is used.
