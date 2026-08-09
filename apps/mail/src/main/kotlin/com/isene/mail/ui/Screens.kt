@@ -40,7 +40,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,6 +58,8 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import uniffi.fe2o3_mobile_core.Message
+
+private val LINK = androidx.compose.ui.graphics.Color(0xFF7FC8E8)
 
 private val dayFmt = SimpleDateFormat("d MMM", Locale.getDefault())
 private val fullFmt = SimpleDateFormat("EEE d MMM yyyy HH:mm", Locale.getDefault())
@@ -216,10 +225,37 @@ fun MessageScreen(vm: MailViewModel, mail: Message, onBack: () -> Unit) {
             if (body == null) {
                 CircularProgressIndicator(strokeWidth = 2.dp)
             } else {
-                Text(body!!, fontSize = 14.sp, fontFamily = FontFamily.SansSerif)
+                Text(linkify(body!!), fontSize = 14.sp, fontFamily = FontFamily.SansSerif)
             }
         }
     }
+}
+
+private val URL_RE = Regex("""(https?://[^\s<>"')\]]+)""")
+
+/**
+ * The body with its URLs made tappable.
+ *
+ * A mail whose whole point is a link is not much use as flat text you
+ * have to retype. Trailing punctuation is left out of the link: a URL at
+ * the end of a sentence takes the full stop with it otherwise, and the
+ * result 404s.
+ */
+private fun linkify(text: String): AnnotatedString = buildAnnotatedString {
+    var at = 0
+    for (m in URL_RE.findAll(text)) {
+        append(text.substring(at, m.range.first))
+        val url = m.value.trimEnd('.', ',', ';', ':', '!', '?', ')', ']', '\u00a0')
+        withLink(LinkAnnotation.Url(url)) {
+            withStyle(SpanStyle(color = LINK, textDecoration = TextDecoration.Underline)) {
+                append(url)
+            }
+        }
+        // Whatever the trim gave back is ordinary text again.
+        append(m.value.substring(url.length))
+        at = m.range.last + 1
+    }
+    append(text.substring(at))
 }
 
 /**

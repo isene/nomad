@@ -120,6 +120,7 @@ object ImapRepo {
                     messageId = id,
                     source = "mail",
                     link = "",
+                    uid = uid.toULong(),
                     account = a.address,
                     folder = "INBOX",
                     from = msg.from?.firstOrNull()?.toString()?.let(::mailDecodeHeader) ?: "",
@@ -138,13 +139,24 @@ object ImapRepo {
         Fetched(mails, Cursor(validity, maxUid), incremental)
     }
 
-    /** The full RFC822 source of one message, for the reader. */
-    fun body(a: Account, messageId: String): String? = withInbox(a) { inbox ->
-        val hit = if (messageId.startsWith("uid:")) {
-            inbox.getMessageByUID(messageId.substringAfterLast(':').toLongOrNull() ?: return@withInbox null)
-        } else {
-            inbox.search(MessageIDTerm(messageId)).firstOrNull()
-        } ?: return@withInbox null
+    /**
+     * The full RFC822 source of one message, for the reader.
+     *
+     * By UID when we have one. Searching the server for a Message-ID is
+     * a guess — Gmail does not always match a bare id against the header
+     * — and a miss reads to the user as "could not fetch this message"
+     * for a mail that is plainly right there. The search stays as the
+     * fallback for anything stored before UIDs were kept.
+     */
+    fun body(a: Account, messageId: String, uid: Long = 0): String? = withInbox(a) { inbox ->
+        val byUid = when {
+            uid > 0 -> uid
+            messageId.startsWith("uid:") -> messageId.substringAfterLast(':').toLongOrNull() ?: 0
+            else -> 0
+        }
+        val hit = (if (byUid > 0) inbox.getMessageByUID(byUid) else null)
+            ?: inbox.search(MessageIDTerm(messageId)).firstOrNull()
+            ?: return@withInbox null
 
         val out = ByteArrayOutputStream()
         (hit as MimeMessage).writeTo(out)

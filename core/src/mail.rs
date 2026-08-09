@@ -32,6 +32,11 @@ pub struct Message {
     /// Where to go to read the whole thing. Feeds only; mail is here.
     #[serde(default)]
     pub link: String,
+    /// The IMAP UID, mail only. Searching the server for a Message-ID is
+    /// a guess that sometimes comes back empty; a UID is the server's own
+    /// handle on the message and always finds it.
+    #[serde(default)]
+    pub uid: u64,
     /// Which account it arrived in, so a reply can go back out the same way.
     pub account: String,
     pub folder: String,
@@ -95,6 +100,7 @@ pub fn parse_feed(xml: String, feed_title: String, feed_url: String) -> Vec<Mess
         raw: String::new(),
         html: i.html,
         has_attachments: false,
+        uid: 0,
     }).collect()
 }
 
@@ -186,7 +192,7 @@ mod tests {
     #[test]
     fn a_mail_round_trips() {
         let m = Message {
-            message_id: "a@x".into(), source: "mail".into(), link: String::new(),
+            message_id: "a@x".into(), source: "mail".into(), link: String::new(), uid: 0,
             account: "geir@isene.com".into(),
             folder: "INBOX".into(), from: "Someone <s@x>".into(), to: "me@x".into(),
             subject: "Hei".into(), date: 100, raw: "Hei\n".into(),

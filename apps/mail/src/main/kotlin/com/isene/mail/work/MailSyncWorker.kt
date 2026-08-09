@@ -36,7 +36,7 @@ class MailSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         MailWidget().updateAll(applicationContext)
         // A failed account is usually a flaky network, and the next tick
         // is close enough that a retry storm buys nothing.
-        return if (out.failed > 0) Result.retry() else Result.success()
+        return if (out.failedAccounts > 0 || out.failedFeeds > 0) Result.retry() else Result.success()
     }
 
     companion object {
