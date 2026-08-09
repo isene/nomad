@@ -142,7 +142,7 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
                         )
                     }
                     Text(
-                        (if (m.source == "rss") "◆ " else "") + m.subject,
+                        when (m.source) { "rss" -> "◆ "; "discord" -> "● "; else -> "" } + m.subject,
                         fontSize = 13.sp,
                         maxLines = 2,
                         fontWeight = if (read) FontWeight.Normal else FontWeight.SemiBold,

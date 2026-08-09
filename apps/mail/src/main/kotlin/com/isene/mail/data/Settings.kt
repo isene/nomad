@@ -116,6 +116,36 @@ class Settings(ctx: Context) {
         if (url.startsWith("http")) Feed(url, title.ifEmpty { url }) else null
     }
 
+    /**
+     * The Discord blob: `{"token": "...", "channels": [{id, name}]}`,
+     * written by the laptop's `mail-accounts` out of kastrup's own
+     * channel file. Holds a bot token, so it stays in this app's prefs.
+     */
+    var discordJson: String
+        get() = p.getString("discord_json", "") ?: ""
+        set(v) = p.edit().putString("discord_json", v).apply()
+
+    fun discordToken(): String = runCatching {
+        org.json.JSONObject(discordJson).optString("token")
+    }.getOrDefault("")
+
+    fun channels(): List<Channel> = runCatching {
+        val arr = org.json.JSONObject(discordJson).optJSONArray("channels")
+            ?: return@runCatching emptyList()
+        (0 until arr.length()).mapNotNull { i ->
+            val o = arr.optJSONObject(i) ?: return@mapNotNull null
+            val id = o.optString("id")
+            if (id.isEmpty()) null else Channel(id, o.optString("name").ifEmpty { id })
+        }
+    }.getOrDefault(emptyList())
+
+    /** Last Discord message id seen per channel, so a fetch asks only
+     *  for what came after it. */
+    fun channelCursor(id: String): String = p.getString("disc_$id", "") ?: ""
+
+    fun setChannelCursor(id: String, last: String) =
+        p.edit().putString("disc_$id", last).apply()
+
     /** "all" | "unread" | "removed" */
     var filter: String
         get() = p.getString("filter", "all") ?: "all"
@@ -194,6 +224,11 @@ fun readAccountsFile(ctx: Context, treeUri: String): String? =
  *  either being retyped. Harmless to leave in the folder. */
 fun readFeedsFile(ctx: Context, treeUri: String): String? =
     readSharedFile(ctx, treeUri, "feeds.txt")
+
+/** The Discord token and channels, same script, same folder. Delete it
+ *  after importing: it carries a bot token. */
+fun readDiscordFile(ctx: Context, treeUri: String): String? =
+    readSharedFile(ctx, treeUri, "discord.json")
 
 private fun readSharedFile(ctx: Context, treeUri: String, name: String): String? {
     if (treeUri.isEmpty()) return null

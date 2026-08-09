@@ -4,7 +4,7 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.11.1-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.12.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -21,7 +21,10 @@ Part of the [nomad](../../) mobile suite.
 - **RSS and Atom feeds** in the same list, parsed by
   [fe2o3-feed](https://github.com/isene/feed) — the same parser kastrup
   uses — with **Open** to read the whole thing in a browser
-- One **scope menu**: All, all mail or one mailbox, all feeds or one feed
+- **Discord channels** off the REST API with a bot token — no bridge, no
+  laptop in the path
+- One **scope menu**: All, all mail or one mailbox, all feeds or one
+  feed, all channels or one channel
 - An **Unread** chip that hides everything already dealt with
 - Bodies decoded by [fe2o3-mail](https://github.com/isene/mail) — the same
   crate kastrup uses, so quoted-printable, base64, RFC 2047 headers,
@@ -87,9 +90,11 @@ grow without bound.
 3. **↻** fetches headers. Bodies download when you open a message, not
    before: a month of full bodies is minutes of radio for mail that
    mostly never gets read on a phone.
-4. **Feeds** come across with the accounts: `mail-accounts` also writes
-   `feeds.txt` from kastrup's own RSS source, and **Import accounts +
-   feeds** takes both. The Settings field is editable — one
+4. **Feeds and Discord** come across with the accounts: `mail-accounts`
+   also writes `feeds.txt` from kastrup's RSS source and `discord.json`
+   from its channel file and bot token, and one Import takes all three.
+   Delete `mail-accounts.json` and `discord.json` afterwards — both hold
+   credentials. The Settings field is editable — one
    `Title | https://…/feed.xml` per line, or a bare URL.
 5. **Fetch every (min)** in Settings runs the same fetch in the
    background. 15 minutes by default, 0 turns it off.
@@ -149,8 +154,10 @@ for; everything worth subscribing to redirects there anyway.
 
 ## Not yet
 
-No push (the fetch is periodic, not instant) and no compose. Discord and
-Dualog Workspace are the obvious next channels.
+No push (the fetch is periodic, not instant) and no compose. Dualog
+Workspace is the obvious next channel, and the only one that needs
+something the phone cannot do alone — its OIDC login, or the laptop
+relaying into the shared folder.
 
 ## License
 

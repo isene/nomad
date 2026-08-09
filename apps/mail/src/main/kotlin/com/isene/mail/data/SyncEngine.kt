@@ -6,6 +6,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import uniffi.fe2o3_mobile_core.Message
+import uniffi.fe2o3_mobile_core.discordLatestId
 
 /**
  * Fetching headers, with no ViewModel and no screen involved — so the
@@ -21,6 +22,8 @@ object SyncEngine {
         val failedAccounts: Int,
         val failedFeeds: Int,
         val feeds: Int,
+        val failedChannels: Int,
+        val channels: Int,
         val unread: Int,
     )
 
@@ -33,13 +36,15 @@ object SyncEngine {
         val settings = Settings(ctx)
         val accounts = settings.accounts()
         val feeds = settings.feeds()
-        if (accounts.isEmpty() && feeds.isEmpty()) return null
+        val channels = settings.channels()
+        if (accounts.isEmpty() && feeds.isEmpty() && channels.isEmpty()) return null
 
         val stored = Store.load(ctx)
         val kept = stored.associateBy { it.messageId }
         var out = stored
         var failedAccounts = 0
         var failedFeeds = 0
+        var failedChannels = 0
 
         // The accounts in parallel. Three sequential IMAP sessions —
         // TLS handshake, login, search, fetch — is three times the wait
@@ -94,6 +99,26 @@ object SyncEngine {
             out = out.filter { it.source != "rss" || it.folder != f.url || it.messageId !in fresh } + items
         }
 
+        // Discord, same parallel pass, cursor per channel.
+        val token = settings.discordToken()
+        if (token.isNotEmpty() && channels.isNotEmpty()) {
+            val posts = runBlocking {
+                channels.map { c ->
+                    async(Dispatchers.IO) {
+                        c to DiscordRepo.fetch(token, c, settings.channelCursor(c.id))
+                    }
+                }.awaitAll()
+            }
+            for ((c, msgs) in posts) {
+                if (msgs == null) { failedChannels++; continue }
+                if (msgs.isEmpty()) continue
+                val fresh = msgs.map { it.messageId }.toSet()
+                out = out.filter { it.messageId !in fresh } + msgs
+                discordLatestId(msgs).takeIf { it.isNotEmpty() }
+                    ?.let { settings.setChannelCursor(c.id, it) }
+            }
+        }
+
         // Incremental fetching never drops anything, so the window has to
         // be enforced here or the store grows for ever.
         //
@@ -105,7 +130,7 @@ object SyncEngine {
             .filter { it.source != "mail" || it.date == 0L || it.date >= oldest }
             .sortedByDescending { it.date }
 
-        if (failedAccounts == 0 && failedFeeds == 0) {
+        if (failedAccounts == 0 && failedFeeds == 0 && failedChannels == 0) {
             val live = out.map { it.messageId }.toSet()
             settings.dismissed = settings.dismissed.intersect(live)
         }
@@ -141,6 +166,6 @@ object SyncEngine {
                 )
             },
         )
-        return Result(out, failedAccounts, failedFeeds, feeds.size, unread.size)
+        return Result(out, failedAccounts, failedFeeds, feeds.size, failedChannels, channels.size, unread.size)
     }
 }
