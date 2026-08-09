@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import com.isene.mail.BuildConfig
 import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.readAccountsFile
+import com.isene.mail.data.readDiscordFile
 import com.isene.mail.data.readFeedsFile
 import com.isene.mail.viewmodel.MailViewModel
 import com.isene.mail.work.MailSyncWorker
@@ -199,6 +200,9 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
         ui.scope.isEmpty() -> "All"
         ui.scope == "mail" -> "Mail"
         ui.scope == "rss" -> "Feeds"
+        ui.scope == "discord" -> "Discord"
+        ui.scope.startsWith("discord:") ->
+            ui.channels.firstOrNull { it.second == ui.scope.removePrefix("discord:") }?.first ?: "Channel"
         ui.scope.startsWith("mail:") -> ui.scope.removePrefix("mail:").substringBefore('@')
         else -> ui.feeds.firstOrNull { it.second == ui.scope.removePrefix("rss:") }?.first ?: "Feed"
     }
@@ -222,6 +226,13 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
                 DropdownMenuItem(text = { Text("All feeds") }, onClick = { open = false; onPick("rss") })
                 ui.feeds.forEach { (title, url) ->
                     DropdownMenuItem(text = { Text(title) }, onClick = { open = false; onPick("rss:$url") })
+                }
+            }
+            if (ui.channels.isNotEmpty()) {
+                SectionLabel("Discord")
+                DropdownMenuItem(text = { Text("All channels") }, onClick = { open = false; onPick("discord") })
+                ui.channels.forEach { (name, id) ->
+                    DropdownMenuItem(text = { Text(name) }, onClick = { open = false; onPick("discord:$id") })
                 }
             }
         }
@@ -323,18 +334,22 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                     onClick = {
                         val acc = readAccountsFile(ctx, syncUri)
                         val fed = readFeedsFile(ctx, syncUri)
+                        val dis = readDiscordFile(ctx, syncUri)
                         acc?.let { accounts = it; s.accountsJson = it }
                         fed?.let { feeds = it; s.feedsText = it }
+                        dis?.let { s.discordJson = it }
                         imported = when {
-                            acc == null && fed == null -> "Nothing to import from that folder"
+                            acc == null && fed == null && dis == null ->
+                                "Nothing to import from that folder"
                             else -> listOfNotNull(
                                 acc?.let { s.accounts().size.toString() + " accounts" },
                                 fed?.let { s.feeds().size.toString() + " feeds" },
+                                dis?.let { s.channels().size.toString() + " channels" },
                             ).joinToString(", ", prefix = "Imported ")
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Import accounts + feeds from folder") }
+                ) { Text("Import accounts, feeds + channels") }
                 imported?.let {
                     Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                 }

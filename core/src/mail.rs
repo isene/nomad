@@ -104,6 +104,70 @@ pub fn parse_feed(xml: String, feed_title: String, feed_url: String) -> Vec<Mess
     }).collect()
 }
 
+/// Parse a Discord channel's messages into messages.
+///
+/// The date parser is fe2o3-feed's: Discord stamps ISO 8601 and so does
+/// Atom, and a third copy of that arithmetic is a third chance to get a
+/// timezone offset wrong.
+///
+/// Newest first, like everything else in the list.
+#[uniffi::export]
+pub fn parse_discord(json: String, channel_name: String, channel_id: String) -> Vec<Message> {
+    let Ok(items) = serde_json::from_str::<Vec<serde_json::Value>>(&json) else {
+        return Vec::new();
+    };
+    let mut out: Vec<Message> = items.iter().filter_map(|m| {
+        let id = m.get("id")?.as_str()?;
+        let content = m.get("content").and_then(|v| v.as_str()).unwrap_or("");
+        let author = m.get("author");
+        let name = author
+            .and_then(|a| a.get("global_name").and_then(|v| v.as_str()))
+            .or_else(|| author.and_then(|a| a.get("username").and_then(|v| v.as_str())))
+            .unwrap_or("someone");
+        let atts = m.get("attachments").and_then(|v| v.as_array())
+            .map(|a| a.len()).unwrap_or(0);
+        // Chat has no subject line; the message is the subject. An
+        // attachment-only post would otherwise be a blank row.
+        let subject = if !content.is_empty() {
+            content.lines().next().unwrap_or(content).to_string()
+        } else if atts > 0 {
+            format!("({} attachment(s))", atts)
+        } else {
+            "(empty)".to_string()
+        };
+        Some(Message {
+            message_id: format!("discord_{}", id),
+            source: "discord".into(),
+            link: String::new(),
+            uid: 0,
+            account: channel_name.clone(),
+            folder: channel_id.clone(),
+            from: name.to_string(),
+            to: String::new(),
+            subject,
+            date: m.get("timestamp").and_then(|v| v.as_str())
+                .and_then(feed::parse_date).unwrap_or(0),
+            raw: content.to_string(),
+            html: String::new(),
+            has_attachments: atts > 0,
+        })
+    }).collect();
+    out.sort_by(|a, b| b.date.cmp(&a.date));
+    out
+}
+
+/// The newest id in a batch, for the next fetch to ask after. Discord
+/// ids are snowflakes: bigger is later, so this is a max, not a first.
+#[uniffi::export]
+pub fn discord_latest_id(messages: Vec<Message>) -> String {
+    messages.iter()
+        .filter_map(|m| m.message_id.strip_prefix("discord_"))
+        .filter_map(|s| s.parse::<u64>().ok())
+        .max()
+        .map(|v| v.to_string())
+        .unwrap_or_default()
+}
+
 /// One attachment, without its contents.
 #[derive(Debug, Clone, PartialEq, Default, uniffi::Record)]
 pub struct MailAttachment {
@@ -228,6 +292,27 @@ mod tests {
         assert_eq!(back.len(), 1, "an older store must still load");
         assert_eq!(back[0].source, "mail");
         assert_eq!(back[0].subject, "Hi");
+    }
+
+    #[test]
+    fn a_discord_post_becomes_a_message() {
+        let json = r#"[
+          {"id":"200","content":"Second\nline two","timestamp":"2026-04-03T09:15:00.000000+00:00",
+           "author":{"username":"u","global_name":"Someone"},"attachments":[]},
+          {"id":"100","content":"","timestamp":"2026-04-03T08:00:00.000000+00:00",
+           "author":{"username":"u2"},"attachments":[{"filename":"a.png"}]}
+        ]"#;
+        let msgs = parse_discord(json.into(), "#tekst".into(), "123".into());
+        assert_eq!(msgs.len(), 2);
+        assert_eq!(msgs[0].source, "discord");
+        assert_eq!(msgs[0].from, "Someone", "the display name beats the handle");
+        assert_eq!(msgs[0].subject, "Second", "the first line is the subject");
+        assert_eq!(msgs[0].date, 1775207700);
+        assert_eq!(msgs[1].from, "u2", "no display name: the handle stands in");
+        assert_eq!(msgs[1].subject, "(1 attachment(s))");
+        assert!(msgs[1].has_attachments);
+        // Snowflakes: the max, not the first in the array.
+        assert_eq!(discord_latest_id(msgs), "200");
     }
 
     #[test]

@@ -32,6 +32,8 @@ data class UiState(
     val accounts: List<String> = emptyList(),
     /** Feeds held, as title to url, for the scope menu. */
     val feeds: List<Pair<String, String>> = emptyList(),
+    /** Discord channels held, as name to id. */
+    val channels: List<Pair<String, String>> = emptyList(),
     val filter: String = "all", // "all" | "unread" | "removed"
     val unread: Int = 0,
     /** Held in the store but hidden by a swipe or Remove all. Counted so
@@ -101,8 +103,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun sync() {
         val ctx = getApplication<Application>()
-        if (settings.accounts().isEmpty() && settings.feeds().isEmpty()) {
-            status("Add an account or a feed in Settings first")
+        if (settings.accounts().isEmpty() && settings.feeds().isEmpty() &&
+            settings.channels().isEmpty()
+        ) {
+            status("Add an account, a feed or a channel in Settings first")
             return
         }
         if (_ui.value.busy) return
@@ -116,10 +120,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 busy = false,
                 status = when {
                     out == null -> "Nothing configured"
-                    out.failedAccounts > 0 || out.failedFeeds > 0 -> listOfNotNull(
-                        out.failedAccounts.takeIf { it > 0 }?.let { "$it account(s)" },
-                        out.failedFeeds.takeIf { it > 0 }?.let { "$it of ${out.feeds} feed(s)" },
-                    ).joinToString(" and ", postfix = " failed")
+                    out.failedAccounts > 0 || out.failedFeeds > 0 || out.failedChannels > 0 ->
+                        listOfNotNull(
+                            out.failedAccounts.takeIf { it > 0 }?.let { "$it account(s)" },
+                            out.failedFeeds.takeIf { it > 0 }?.let { "$it of ${out.feeds} feed(s)" },
+                            out.failedChannels.takeIf { it > 0 }?.let { "$it of ${out.channels} channel(s)" },
+                        ).joinToString(" and ", postfix = " failed")
                     // Say what is on screen, not what is in the store —
                     // "561 messages" over an empty list is a puzzle, not
                     // a status.
@@ -133,6 +139,9 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                         buildString {
                             append(if (h > 0) "${all.size - h} shown, $h removed" else "${all.size} messages")
                             if (n > 0) append(" · $rss from $n feed(s)")
+                            val chat = all.count { it.source == "discord" }
+                            val cn = settings.channels().size
+                            if (cn > 0) append(" · $chat from $cn channel(s)")
                         }
                     }
                 },
@@ -150,9 +159,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         if (m.source != "mail") {
-            // A feed entry arrived whole; there is no second half to go
-            // and get. An empty one is an empty one.
-            _body.value = mailBodyText("", m.html).ifBlank { "(no content in this entry)" }
+            // A feed entry or a chat post arrived whole; there is no
+            // second half to go and get. A feed carries HTML, Discord
+            // carries the text itself.
+            _body.value = mailBodyText(m.raw, m.html).ifBlank { "(nothing in this one)" }
             return
         }
         val account = settings.accounts().firstOrNull { it.address == m.account }
@@ -269,9 +279,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     /** One scope, read against one message. See [Settings.scope]. */
     private fun inScope(m: Message, scope: String): Boolean = when {
         scope.isEmpty() -> true
-        scope == "mail" || scope == "rss" -> m.source == scope
+        scope == "mail" || scope == "rss" || scope == "discord" -> m.source == scope
         scope.startsWith("mail:") -> m.source == "mail" && m.account == scope.removePrefix("mail:")
         scope.startsWith("rss:") -> m.source == "rss" && m.folder == scope.removePrefix("rss:")
+        scope.startsWith("discord:") -> m.source == "discord" && m.folder == scope.removePrefix("discord:")
         else -> true
     }
 
@@ -304,6 +315,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             // A feed carries its title in `account` and its url in
             // `folder`; the url is the identity, the title is the label.
             feeds = all.filter { it.source == "rss" }
+                .map { it.account to it.folder }.distinct().sortedBy { it.first },
+            channels = all.filter { it.source == "discord" }
                 .map { it.account to it.folder }.distinct().sortedBy { it.first },
             filter = filter,
             unread = unread.size,
