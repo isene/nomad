@@ -4,7 +4,7 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.14.3-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.14.4-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -24,7 +24,9 @@ Part of the [nomad](../../) mobile suite.
 - **Discord channels** off the REST API with a bot token — no bridge, no
   laptop in the path
 - **WhatsApp, Messenger, Instagram, SMS…** as the relay app on this same
-  phone captures them
+  phone captures them, picked up the moment the app is opened
+- **Discord DMs**, which belong to no channel, under **DMs** in the
+  Discord group
 - **Views**: named lists saved in Settings, at the top of the scope menu
 - One **scope menu**: All, all mail or one mailbox, all feeds or one
   feed, all channels or one channel
@@ -170,6 +172,17 @@ Relay writes captured messages twice: `inbound/` for the laptop and
 *deletes* from `inbound/` as it ingests and Syncthing carries that
 deletion back — one queue with two readers starves the slower, which
 would always be the phone.
+
+Draining `phone/` is not part of the fetch. Those files are on this
+phone's own disk, so picking them up costs one directory listing and no
+radio at all; opening the app does it. Waiting fifteen minutes for a
+network fetch to notice a file already on the disk is the one delay
+here with no cause.
+
+A Discord DM arrives this way too — the REST API a bot can read covers
+channels, and a DM is in none of them. It lands under **DMs** in the
+Discord group, which is defined as Discord from outside the channel
+list rather than as a second source.
 
 Worth being plain about what this is: a notification carries a sender and
 a line of preview, and that is the whole message. No history, no thread,

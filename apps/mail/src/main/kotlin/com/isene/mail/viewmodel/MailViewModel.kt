@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.isene.mail.data.ImapRepo
 import com.isene.mail.data.ReadState
+import com.isene.mail.data.Scope
 import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.Settings
 import com.isene.mail.data.Store
@@ -293,31 +294,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearStatus() = status(null)
 
-    /** One scope, read against one message. See [Settings.scope]. */
-    private fun inScope(m: Message, scope: String): Boolean = when {
-        scope.isEmpty() -> true
-        // A view is any of its scopes, narrowed by its match. Defined in
-        // terms of the same strings, so there is one rule, not two.
-        scope.startsWith("view:") -> {
-            val v = settings.views().firstOrNull { it.name == scope.removePrefix("view:") }
-            when {
-                v == null -> true
-                v.scopes.isNotEmpty() && v.scopes.none { inScope(m, it) } -> false
-                v.match.isEmpty() -> true
-                else -> listOf(m.from, m.to, m.subject, m.account)
-                    .any { it.contains(v.match, ignoreCase = true) }
-            }
-        }
-        scope == "mail" || scope == "rss" || scope == "discord" -> m.source == scope
-        scope.startsWith("mail:") -> m.source == "mail" && m.account == scope.removePrefix("mail:")
-        scope.startsWith("rss:") -> m.source == "rss" && m.folder == scope.removePrefix("rss:")
-        scope.startsWith("discord:") -> m.source == "discord" && m.folder == scope.removePrefix("discord:")
-        // A chat platform is its own source ("whatsapp", "workspace", …),
-        // named by the relay rather than by this app, so there is no list
-        // to match against. Matching the source is the rule; letting an
-        // unrecognised scope through showed the whole store under it.
-        else -> m.source == scope
-    }
+    private fun inScope(m: Message, scope: String): Boolean =
+        Scope.matches(m, scope, settings)
 
     private fun recompute() {
         val filter = settings.filter

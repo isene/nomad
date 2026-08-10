@@ -211,6 +211,7 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
         ui.scope == "discord" -> "Discord"
         ui.scope in ui.chats -> ui.scope.replaceFirstChar { it.uppercase() }
         ui.scope.startsWith("mail:") -> ui.scope.removePrefix("mail:").substringBefore('@')
+        ui.scope == "discord:dm" -> "DMs"
         ui.scope.startsWith("discord:") ->
             ui.channels.firstOrNull { it.second == ui.scope.removePrefix("discord:") }?.first ?: "Channel"
         ui.scope.startsWith("rss:") ->
@@ -246,7 +247,9 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
             Group("Mail", "mail", "All mail", ui.accounts.map { it to "mail:$it" },
                 expanded, { expanded = it }) { open = false; onPick(it) }
             Group("Discord", "discord", "All channels",
-                ui.channels.map { it.first to "discord:${it.second}" },
+                ui.channels.map { it.first to "discord:${it.second}" } +
+                    // Relay's capture: a DM is in no channel we poll.
+                    (if (ui.chatsConfigured) listOf("DMs" to "discord:dm") else emptyList()),
                 expanded, { expanded = it }) { open = false; onPick(it) }
             if (ui.chatsConfigured) {
                 Group(
