@@ -221,18 +221,18 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
                     DropdownMenuItem(text = { Text(a) }, onClick = { open = false; onPick("mail:$a") })
                 }
             }
-            if (ui.feeds.isNotEmpty()) {
-                SectionLabel("Feeds")
-                DropdownMenuItem(text = { Text("All feeds") }, onClick = { open = false; onPick("rss") })
-                ui.feeds.forEach { (title, url) ->
-                    DropdownMenuItem(text = { Text(title) }, onClick = { open = false; onPick("rss:$url") })
-                }
-            }
             if (ui.channels.isNotEmpty()) {
                 SectionLabel("Discord")
                 DropdownMenuItem(text = { Text("All channels") }, onClick = { open = false; onPick("discord") })
                 ui.channels.forEach { (name, id) ->
                     DropdownMenuItem(text = { Text(name) }, onClick = { open = false; onPick("discord:$id") })
+                }
+            }
+            if (ui.feeds.isNotEmpty()) {
+                SectionLabel("Feeds")
+                DropdownMenuItem(text = { Text("All feeds") }, onClick = { open = false; onPick("rss") })
+                ui.feeds.forEach { (title, url) ->
+                    DropdownMenuItem(text = { Text(title) }, onClick = { open = false; onPick("rss:$url") })
                 }
             }
         }
@@ -350,9 +350,11 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                     },
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Import accounts, feeds + channels") }
-                imported?.let {
-                    Text(it, fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
-                }
+                Text(
+                    imported ?: "Set up: " + s.configSummary(),
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
                 OutlinedTextField(
                     accounts,
                     { accounts = it },
