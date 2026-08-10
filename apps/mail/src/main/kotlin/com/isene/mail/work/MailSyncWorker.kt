@@ -10,8 +10,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.isene.mail.data.Settings
 import com.isene.mail.data.SyncEngine
-import com.isene.mail.widget.MailWidget
-import androidx.glance.appwidget.updateAll
+import com.isene.mail.widget.WidgetPush
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -33,7 +32,7 @@ class MailSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
     override suspend fun doWork(): Result {
         val out = withContext(Dispatchers.IO) { SyncEngine.fetch(applicationContext) }
             ?: return Result.success()          // no accounts yet; nothing to retry
-        MailWidget().updateAll(applicationContext)
+        WidgetPush.push(applicationContext)
         // A failed account is usually a flaky network, and the next tick
         // is close enough that a retry storm buys nothing.
         return if (out.failedAccounts > 0 || out.failedFeeds > 0) Result.retry() else Result.success()
