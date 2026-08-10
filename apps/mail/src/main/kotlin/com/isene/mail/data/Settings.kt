@@ -188,6 +188,12 @@ class Settings(ctx: Context) {
         )
     }
 
+    /** SAF tree for the relay app's gateway folder on this phone, where
+     *  the captured notifications land. Empty until picked. */
+    var gatewayTreeUri: String
+        get() = p.getString("gateway_tree_uri", "") ?: ""
+        set(v) = p.edit().putString("gateway_tree_uri", v).apply()
+
     /** "all" | "unread" | "removed" */
     var filter: String
         get() = p.getString("filter", "all") ?: "all"

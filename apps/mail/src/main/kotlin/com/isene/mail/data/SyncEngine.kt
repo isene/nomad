@@ -119,6 +119,14 @@ object SyncEngine {
             }
         }
 
+        // The relay's capture, off this same phone. Drained after the
+        // store has it: there is no server to ask again.
+        val (captured, files) = GatewayRepo.drain(ctx, settings.gatewayTreeUri)
+        if (captured.isNotEmpty()) {
+            val fresh = captured.map { it.messageId }.toSet()
+            out = out.filter { it.messageId !in fresh } + captured
+        }
+
         // Incremental fetching never drops anything, so the window has to
         // be enforced here or the store grows for ever.
         //
@@ -135,6 +143,7 @@ object SyncEngine {
             settings.dismissed = settings.dismissed.intersect(live)
         }
         Store.save(ctx, out)
+        GatewayRepo.clear(files)
 
         val readIds = ReadState.effective(ctx, settings)
         val gone = settings.dismissed

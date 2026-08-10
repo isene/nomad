@@ -125,6 +125,21 @@ object Gateway {
         prefs(c).getString(SMS_NUM_PREFIX + target, target) ?: target
 
     fun inboundDir(c: Context) = File(dir(c), "inbound").apply { mkdirs() }
+
+    /**
+     * A second copy of every captured message, for the kastrup app on
+     * this same phone.
+     *
+     * Not a nicety: kastrup on the laptop *drains* `inbound/`, deleting
+     * each file as it ingests it, and Syncthing carries that deletion
+     * straight back here. Two readers over one queue means whoever is
+     * slower gets nothing, and the phone — fetching every quarter of an
+     * hour — would always be the slower one.
+     *
+     * Its own queue, drained by its own reader, and neither can starve
+     * the other.
+     */
+    fun phoneDir(c: Context) = File(dir(c), "phone").apply { mkdirs() }
     /** Still-image attachments referenced by inbound JSON, relative to the
      *  Syncthing root as "media/<name>". Kastrup drains these like the JSON. */
     fun mediaDir(c: Context) = File(inboundDir(c), "media").apply { mkdirs() }

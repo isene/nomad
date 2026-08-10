@@ -36,6 +36,9 @@ data class UiState(
     val channels: List<Pair<String, String>> = emptyList(),
     /** Saved view names, for the top of the scope menu. */
     val views: List<String> = emptyList(),
+    /** Chat platforms the relay has actually captured. Nothing to
+     *  configure here — the relay decides what it listens to. */
+    val chats: List<String> = emptyList(),
     val filter: String = "all", // "all" | "unread" | "removed"
     val unread: Int = 0,
     /** Held in the store but hidden by a swipe or Remove all. Counted so
@@ -336,6 +339,9 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             feeds = settings.feeds().map { it.title to it.url }.sortedBy { it.first },
             channels = settings.channels().map { it.name to it.id }.sortedBy { it.first },
             views = settings.views().map { it.name },
+            chats = all.map { it.source }
+                .filter { it != "mail" && it != "rss" && it != "discord" }
+                .distinct().sorted(),
             filter = filter,
             unread = unread.size,
             hidden = all.size - here.size,
