@@ -36,9 +36,12 @@ data class UiState(
     val channels: List<Pair<String, String>> = emptyList(),
     /** Saved view names, for the top of the scope menu. */
     val views: List<String> = emptyList(),
-    /** Chat platforms the relay has actually captured. Nothing to
-     *  configure here — the relay decides what it listens to. */
+    /** Chat platforms the relay has actually captured. Which ones is
+     *  relay's business, but whether to look at all is a setting — so
+     *  the group appears as soon as the folder is picked, empty or not.
+     *  Absent, it is indistinguishable from a folder never chosen. */
     val chats: List<String> = emptyList(),
+    val chatsConfigured: Boolean = false,
     val filter: String = "all", // "all" | "unread" | "removed"
     val unread: Int = 0,
     /** Held in the store but hidden by a swipe or Remove all. Counted so
@@ -342,6 +345,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             chats = all.map { it.source }
                 .filter { it != "mail" && it != "rss" && it != "discord" }
                 .distinct().sorted(),
+            chatsConfigured = settings.gatewayTreeUri.isNotEmpty(),
             filter = filter,
             unread = unread.size,
             hidden = all.size - here.size,
