@@ -192,21 +192,37 @@ fun MailApp(vm: MailViewModel) {
     }
 }
 
-/** Everything, one mailbox, or one feed — grouped the way they group. */
+/**
+ * Everything, one mailbox, one channel or one feed.
+ *
+ * Collapsed by default, because expanded it is four headings and twenty
+ * rows and the last of them are off the bottom of the screen. The group
+ * holding the current scope opens itself, so the menu lands where you
+ * already were.
+ */
 @Composable
 private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
     val label = when {
         ui.scope.isEmpty() -> "All"
-        ui.scope == "mail" -> "Mail"
         ui.scope.startsWith("view:") -> ui.scope.removePrefix("view:")
+        ui.scope == "mail" -> "Mail"
         ui.scope == "rss" -> "Feeds"
         ui.scope == "discord" -> "Discord"
+        ui.scope.startsWith("mail:") -> ui.scope.removePrefix("mail:").substringBefore('@')
         ui.scope.startsWith("discord:") ->
             ui.channels.firstOrNull { it.second == ui.scope.removePrefix("discord:") }?.first ?: "Channel"
-        ui.scope.startsWith("mail:") -> ui.scope.removePrefix("mail:").substringBefore('@')
         else -> ui.feeds.firstOrNull { it.second == ui.scope.removePrefix("rss:") }?.first ?: "Feed"
     }
+    // Which group the current scope lives in; that one starts open.
+    val here = when {
+        ui.scope.startsWith("mail") -> "Mail"
+        ui.scope.startsWith("discord") -> "Discord"
+        ui.scope.startsWith("rss") -> "Feeds"
+        else -> ""
+    }
+    var expanded by remember(open, here) { mutableStateOf(here) }
+
     Box {
         FilterChip(
             selected = ui.scope.isNotEmpty(),
@@ -221,28 +237,49 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
                     DropdownMenuItem(text = { Text(v) }, onClick = { open = false; onPick("view:$v") })
                 }
             }
-            if (ui.accounts.isNotEmpty()) {
-                SectionLabel("Mail")
-                DropdownMenuItem(text = { Text("All mail") }, onClick = { open = false; onPick("mail") })
-                ui.accounts.forEach { a ->
-                    DropdownMenuItem(text = { Text(a) }, onClick = { open = false; onPick("mail:$a") })
-                }
-            }
-            if (ui.channels.isNotEmpty()) {
-                SectionLabel("Discord")
-                DropdownMenuItem(text = { Text("All channels") }, onClick = { open = false; onPick("discord") })
-                ui.channels.forEach { (name, id) ->
-                    DropdownMenuItem(text = { Text(name) }, onClick = { open = false; onPick("discord:$id") })
-                }
-            }
-            if (ui.feeds.isNotEmpty()) {
-                SectionLabel("Feeds")
-                DropdownMenuItem(text = { Text("All feeds") }, onClick = { open = false; onPick("rss") })
-                ui.feeds.forEach { (title, url) ->
-                    DropdownMenuItem(text = { Text(title) }, onClick = { open = false; onPick("rss:$url") })
-                }
-            }
+            Group("Mail", "mail", "All mail", ui.accounts.map { it to "mail:$it" },
+                expanded, { expanded = it }) { open = false; onPick(it) }
+            Group("Discord", "discord", "All channels",
+                ui.channels.map { it.first to "discord:${it.second}" },
+                expanded, { expanded = it }) { open = false; onPick(it) }
+            Group("Feeds", "rss", "All feeds",
+                ui.feeds.map { it.first to "rss:${it.second}" },
+                expanded, { expanded = it }) { open = false; onPick(it) }
         }
+    }
+}
+
+/**
+ * One collapsible group: a heading that opens it, then "all of these"
+ * and a row per member.
+ */
+@Composable
+private fun Group(
+    title: String,
+    allScope: String,
+    allLabel: String,
+    members: List<Pair<String, String>>,
+    expanded: String,
+    onExpand: (String) -> Unit,
+    onPick: (String) -> Unit,
+) {
+    if (members.isEmpty()) return
+    val isOpen = expanded == title
+    DropdownMenuItem(
+        text = {
+            Text(
+                "${if (isOpen) "▾" else "▸"}  $title  (${members.size})",
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        },
+        onClick = { onExpand(if (isOpen) "" else title) },
+    )
+    if (!isOpen) return
+    DropdownMenuItem(text = { Text("   $allLabel") }, onClick = { onPick(allScope) })
+    members.forEach { (name, scope) ->
+        DropdownMenuItem(text = { Text("   $name") }, onClick = { onPick(scope) })
     }
 }
 
