@@ -29,6 +29,8 @@ data class UiState(
     val readIds: Set<String> = emptySet(),
     /** What the list is scoped to; see [Settings.scope]. */
     val scope: String = "",
+    /** The same, as the chip and the widget's header say it. */
+    val scopeLabel: String = "All",
     /** Mail addresses held, for the scope menu. */
     val accounts: List<String> = emptyList(),
     /** Feeds held, as title to url, for the scope menu. */
@@ -322,6 +324,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             mails = shown,
             readIds = readIds,
             scope = scope,
+            scopeLabel = Scope.label(scope, settings),
             // From what is CONFIGURED, not from what has arrived. Built
             // from the store, a channel that has fetched nothing yet is
             // absent from the menu, which reads as "the app has never
@@ -355,7 +358,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 subject = it.subject,
             )
         }
-        if (!WidgetStore.save(ctx, unread.size, rows)) return
+        if (!WidgetStore.save(ctx, unread.size, rows, Scope.label(settings.scope, settings))) return
         // App-lifetime scope: leaving the app must not cancel the push.
         WidgetPush.now(ctx)
     }

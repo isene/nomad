@@ -189,6 +189,7 @@ object SyncEngine {
                     subject = it.subject,
                 )
             },
+            Scope.label(scope, settings),
         )
         return Result(out, failedAccounts, failedFeeds, feeds.size, failedChannels, channels.size, unread.size)
     }

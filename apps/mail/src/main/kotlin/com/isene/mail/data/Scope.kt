@@ -13,6 +13,29 @@ import uniffi.fe2o3_mobile_core.Message
  */
 object Scope {
 
+    /**
+     * What to call it on screen. One rule, because the chip in the app
+     * and the widget's header have to say the same thing — a widget
+     * showing one channel while claiming to be everything is worse than
+     * one that says nothing.
+     */
+    fun label(scope: String, settings: Settings): String = when {
+        scope.isEmpty() -> "All"
+        scope.startsWith("view:") -> scope.removePrefix("view:")
+        scope == "mail" -> "Mail"
+        scope == "rss" -> "Feeds"
+        scope == "discord" -> "Discord"
+        scope == "discord:dm" -> "DMs"
+        scope.startsWith("mail:") -> scope.removePrefix("mail:").substringBefore('@')
+        scope.startsWith("discord:") -> settings.channels()
+            .firstOrNull { it.id == scope.removePrefix("discord:") }?.name ?: "Channel"
+        scope.startsWith("rss:") -> settings.feeds()
+            .firstOrNull { it.url == scope.removePrefix("rss:") }?.title ?: "Feed"
+        // A chat platform whose last message has been removed: still the
+        // scope, just no longer in any list built from what is held.
+        else -> scope.replaceFirstChar { it.uppercase() }
+    }
+
     fun matches(m: Message, scope: String, settings: Settings): Boolean = when {
         scope.isEmpty() -> true
         // A view is any of its scopes, narrowed by its match. Defined in

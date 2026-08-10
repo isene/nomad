@@ -203,23 +203,7 @@ fun MailApp(vm: MailViewModel) {
 @Composable
 private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    val label = when {
-        ui.scope.isEmpty() -> "All"
-        ui.scope.startsWith("view:") -> ui.scope.removePrefix("view:")
-        ui.scope == "mail" -> "Mail"
-        ui.scope == "rss" -> "Feeds"
-        ui.scope == "discord" -> "Discord"
-        ui.scope in ui.chats -> ui.scope.replaceFirstChar { it.uppercase() }
-        ui.scope.startsWith("mail:") -> ui.scope.removePrefix("mail:").substringBefore('@')
-        ui.scope == "discord:dm" -> "DMs"
-        ui.scope.startsWith("discord:") ->
-            ui.channels.firstOrNull { it.second == ui.scope.removePrefix("discord:") }?.first ?: "Channel"
-        ui.scope.startsWith("rss:") ->
-            ui.feeds.firstOrNull { it.second == ui.scope.removePrefix("rss:") }?.first ?: "Feed"
-        // A chat platform whose last message has been removed: still the
-        // scope, just no longer in the list built from what is held.
-        else -> ui.scope.replaceFirstChar { it.uppercase() }
-    }
+    val label = ui.scopeLabel
     // Which group the current scope lives in; that one starts open.
     val here = when {
         ui.scope.startsWith("mail") -> "Mail"
