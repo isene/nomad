@@ -8,7 +8,7 @@ import org.json.JSONObject
 /** One line on the home screen. */
 data class WidgetRow(val from: String, val subject: String)
 
-data class WidgetState(val unread: Int, val rows: List<WidgetRow>)
+data class WidgetState(val unread: Int, val rows: List<WidgetRow>, val scope: String = "")
 
 /**
  * What the home-screen widget shows, kept as its own small file.
@@ -24,12 +24,13 @@ object WidgetStore {
     private fun file(ctx: Context) = File(ctx.filesDir, "widget.json")
 
     /** Returns true when the file changed, so the caller knows to redraw. */
-    fun save(ctx: Context, unread: Int, rows: List<WidgetRow>): Boolean {
+    fun save(ctx: Context, unread: Int, rows: List<WidgetRow>, scope: String): Boolean {
         val arr = JSONArray()
         rows.take(MAX_ROWS).forEach {
             arr.put(JSONObject().put("from", it.from).put("subject", it.subject))
         }
-        val text = JSONObject().put("unread", unread).put("rows", arr).toString()
+        val text = JSONObject().put("unread", unread).put("scope", scope)
+            .put("rows", arr).toString()
         val f = file(ctx)
         if (f.exists() && runCatching { f.readText() }.getOrNull() == text) return false
         return runCatching { f.writeText(text); true }.getOrDefault(false)
@@ -48,6 +49,7 @@ object WidgetStore {
                         WidgetRow(it.optString("from"), it.optString("subject"))
                     }
                 },
+                o.optString("scope"),
             )
         }.getOrDefault(WidgetState(0, emptyList()))
     }

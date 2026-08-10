@@ -51,7 +51,7 @@ class MailWidget : GlanceAppWidget() {
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val state = WidgetStore.load(context)
         provideContent {
-            GlanceTheme { WidgetContent(state.unread, state.rows) }
+            GlanceTheme { WidgetContent(state.unread, state.rows, state.scope) }
         }
     }
 }
@@ -60,7 +60,12 @@ class MailWidget : GlanceAppWidget() {
 private fun WidgetContent(
     unread: Int,
     rows: List<com.isene.mail.data.WidgetRow>,
+    scope: String,
 ) {
+    // The widget shows the list through the app's scope, so it has to say
+    // which one: a count of two under Discord and a count of two under All
+    // are different claims, and they look identical without this.
+    val title = if (scope.isEmpty()) "kastrup" else "kastrup · $scope"
     val openApp = actionStartActivity<MainActivity>()
     Box(
         modifier = GlanceModifier
@@ -78,7 +83,7 @@ private fun WidgetContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "kastrup",
+                    title,
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
                         color = ACCENT,
@@ -93,7 +98,7 @@ private fun WidgetContent(
         } else {
             Column(modifier = GlanceModifier.fillMaxSize()) {
                 Text(
-                    "kastrup  $unread",
+                    "$title  $unread",
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
                         color = ACCENT,
