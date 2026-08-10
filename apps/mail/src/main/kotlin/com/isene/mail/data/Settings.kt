@@ -23,6 +23,18 @@ data class Account(
 data class Feed(val url: String, val title: String)
 
 /**
+ * A named list, saved.
+ *
+ * [scopes] are the same scope strings the menu already uses, OR'd
+ * together: a view is "any of these places". [match] narrows that to
+ * messages whose sender, recipient or subject contains the text — which
+ * is how a view like Dualog is expressed on a phone at all, since the
+ * phone reads one INBOX and has none of the laptop's maildir folders to
+ * filter on.
+ */
+data class View(val name: String, val scopes: List<String>, val match: String)
+
+/**
  * Config, kept on the phone only. Credentials are pasted in once and
  * live in this app's private prefs — deliberately NOT in the Syncthing
  * folder, which is a shared surface and has no business holding a
@@ -145,6 +157,36 @@ class Settings(ctx: Context) {
 
     fun setChannelCursor(id: String, last: String) =
         p.edit().putString("disc_$id", last).apply()
+
+    /**
+     * Saved views, one per line:
+     *
+     *     Dualog    | mail, match:dualog.com
+     *     Calc talk | rss:https://www.hpmuseum.org/…, discord
+     *     Work      | mail:geir@passionfruits.net, discord:1288…
+     *
+     * A name, a pipe, then a comma-separated list of the same scopes the
+     * menu uses, plus an optional `match:` term. Plain text for the same
+     * reason the feeds are: it is edited by hand, and a missing brace
+     * should not cost the lot.
+     */
+    var viewsText: String
+        get() = p.getString("views", "") ?: ""
+        set(v) = p.edit().putString("views", v).apply()
+
+    fun views(): List<View> = viewsText.lines().mapNotNull { line ->
+        val t = line.trim()
+        if (t.isEmpty() || t.startsWith("#") || !t.contains('|')) return@mapNotNull null
+        val name = t.substringBefore('|').trim()
+        if (name.isEmpty()) return@mapNotNull null
+        val terms = t.substringAfter('|').split(',').map { it.trim() }.filter { it.isNotEmpty() }
+        View(
+            name = name,
+            scopes = terms.filterNot { it.startsWith("match:") },
+            match = terms.firstOrNull { it.startsWith("match:") }
+                ?.removePrefix("match:")?.trim().orEmpty(),
+        )
+    }
 
     /** "all" | "unread" | "removed" */
     var filter: String

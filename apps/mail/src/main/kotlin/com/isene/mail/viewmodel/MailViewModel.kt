@@ -34,6 +34,8 @@ data class UiState(
     val feeds: List<Pair<String, String>> = emptyList(),
     /** Discord channels held, as name to id. */
     val channels: List<Pair<String, String>> = emptyList(),
+    /** Saved view names, for the top of the scope menu. */
+    val views: List<String> = emptyList(),
     val filter: String = "all", // "all" | "unread" | "removed"
     val unread: Int = 0,
     /** Held in the store but hidden by a swipe or Remove all. Counted so
@@ -279,6 +281,18 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     /** One scope, read against one message. See [Settings.scope]. */
     private fun inScope(m: Message, scope: String): Boolean = when {
         scope.isEmpty() -> true
+        // A view is any of its scopes, narrowed by its match. Defined in
+        // terms of the same strings, so there is one rule, not two.
+        scope.startsWith("view:") -> {
+            val v = settings.views().firstOrNull { it.name == scope.removePrefix("view:") }
+            when {
+                v == null -> true
+                v.scopes.isNotEmpty() && v.scopes.none { inScope(m, it) } -> false
+                v.match.isEmpty() -> true
+                else -> listOf(m.from, m.to, m.subject, m.account)
+                    .any { it.contains(v.match, ignoreCase = true) }
+            }
+        }
         scope == "mail" || scope == "rss" || scope == "discord" -> m.source == scope
         scope.startsWith("mail:") -> m.source == "mail" && m.account == scope.removePrefix("mail:")
         scope.startsWith("rss:") -> m.source == "rss" && m.folder == scope.removePrefix("rss:")
@@ -321,6 +335,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             // `folder`; the url is the identity, the title is the label.
             feeds = settings.feeds().map { it.title to it.url }.sortedBy { it.first },
             channels = settings.channels().map { it.name to it.id }.sortedBy { it.first },
+            views = settings.views().map { it.name },
             filter = filter,
             unread = unread.size,
             hidden = all.size - here.size,

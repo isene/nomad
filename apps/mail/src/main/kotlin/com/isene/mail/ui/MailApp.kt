@@ -199,6 +199,7 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
     val label = when {
         ui.scope.isEmpty() -> "All"
         ui.scope == "mail" -> "Mail"
+        ui.scope.startsWith("view:") -> ui.scope.removePrefix("view:")
         ui.scope == "rss" -> "Feeds"
         ui.scope == "discord" -> "Discord"
         ui.scope.startsWith("discord:") ->
@@ -214,6 +215,12 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
         )
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(text = { Text("All") }, onClick = { open = false; onPick("") })
+            if (ui.views.isNotEmpty()) {
+                SectionLabel("Views")
+                ui.views.forEach { v ->
+                    DropdownMenuItem(text = { Text(v) }, onClick = { open = false; onPick("view:$v") })
+                }
+            }
             if (ui.accounts.isNotEmpty()) {
                 SectionLabel("Mail")
                 DropdownMenuItem(text = { Text("All mail") }, onClick = { open = false; onPick("mail") })
@@ -258,6 +265,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
     var days by remember { mutableStateOf(s.days.toString()) }
     var every by remember { mutableStateOf(s.syncMinutes.toString()) }
     var feeds by remember { mutableStateOf(s.feedsText) }
+    var views by remember { mutableStateOf(s.viewsText) }
     var syncUri by remember { mutableStateOf(s.syncTreeUri) }
     var imported by remember { mutableStateOf<String?>(null) }
 
@@ -285,6 +293,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 days.toIntOrNull()?.let { s.days = it.coerceIn(1, 365) }
                 every.toIntOrNull()?.let { s.syncMinutes = if (it <= 0) 0 else it.coerceIn(15, 1440) }
                 s.feedsText = feeds.trim()
+                s.viewsText = views.trim()
                 MailSyncWorker.schedule(ctx)
                 vm.refresh()
                 onDismiss()
@@ -297,6 +306,24 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Text("Views", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                OutlinedTextField(
+                    views,
+                    { views = it },
+                    label = { Text("Name | scopes") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 6,
+                )
+                Text(
+                    "`Dualog | mail, match:dualog.com` — a name, then the " +
+                        "places to draw from (mail, rss, discord, or one of " +
+                        "each: mail:<address>, rss:<url>, discord:<id>), plus " +
+                        "an optional match: on sender or subject.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Spacer(Modifier.width(4.dp))
                 Text("Feeds", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 OutlinedTextField(
                     feeds,

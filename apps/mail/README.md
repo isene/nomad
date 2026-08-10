@@ -4,7 +4,7 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.12.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.13.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -23,6 +23,7 @@ Part of the [nomad](../../) mobile suite.
   uses — with **Open** to read the whole thing in a browser
 - **Discord channels** off the REST API with a bot token — no bridge, no
   laptop in the path
+- **Views**: named lists saved in Settings, at the top of the scope menu
 - One **scope menu**: All, all mail or one mailbox, all feeds or one
   feed, all channels or one channel
 - An **Unread** chip that hides everything already dealt with
@@ -134,6 +135,25 @@ month of envelopes over three sequential ones. If the server renumbers
 
 Fifteen minutes is Android's floor for periodic work. Real push would
 mean holding a socket open all day — a different trade, and not this one.
+
+## Views
+
+A named list, in Settings, one per line:
+
+```
+Dualog    | mail, match:dualog.com
+Calc talk | rss:https://www.hpmuseum.org/forum/…, discord
+Work      | mail:geir@passionfruits.net, discord:1288…
+```
+
+A name, a pipe, then the places to draw from — the same scope strings
+the menu uses, OR'd together — plus an optional `match:` on sender,
+recipient or subject.
+
+The match is not a nicety. kastrup's own views filter on maildir folders
+(`.AA.Customers.Dualog`), and the phone has none: it reads one INBOX per
+account with nothing filed. Matching the address is how the same view is
+expressed here.
 
 ## One list, many channels
 
