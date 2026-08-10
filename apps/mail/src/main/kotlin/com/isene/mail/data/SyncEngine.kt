@@ -175,15 +175,7 @@ object SyncEngine {
         val scope = settings.scope
         val unread = out
             .filter { it.messageId !in gone }
-            .filter {
-                when {
-                    scope.isEmpty() -> true
-                    scope == "mail" || scope == "rss" -> it.source == scope
-                    scope.startsWith("mail:") -> it.source == "mail" && it.account == scope.removePrefix("mail:")
-                    scope.startsWith("rss:") -> it.source == "rss" && it.folder == scope.removePrefix("rss:")
-                    else -> true
-                }
-            }
+            .filter { Scope.matches(it, scope, settings) }
             .filter { it.messageId !in readIds }
 
         // Keep the home screen in step with what was just fetched.

@@ -70,7 +70,12 @@ class SmsReceiver : BroadcastReceiver() {
                 put("group", false)
             }
             val name = "sms-$tsMs-${UUID.randomUUID().toString().take(8)}.json"
-            File(Gateway.inboundDir(ctx), name).writeText(obj.toString())
+            val payload = obj.toString()
+            File(Gateway.inboundDir(ctx), name).writeText(payload)
+            // And the kastrup app's own queue on this phone, the same as
+            // every notification-sourced platform. Without this an SMS
+            // reached the laptop and nothing else.
+            File(Gateway.phoneDir(ctx), name).writeText(payload)
         } catch (_: Exception) {
         }
     }
