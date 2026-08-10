@@ -205,6 +205,15 @@ class Settings(ctx: Context) {
         val a = accounts()
         return if (a.isEmpty()) "No accounts configured" else a.joinToString("\n") { it.address }
     }
+
+    /** What this phone is set up to fetch, in one line. Shown always,
+     *  not only after an import: "did that take?" is otherwise a
+     *  question the screen cannot answer. */
+    fun configSummary(): String = listOf(
+        accounts().size to "account",
+        feeds().size to "feed",
+        channels().size to "channel",
+    ).joinToString(" · ") { (n, what) -> "$n $what" + if (n == 1) "" else "s" }
 }
 
 /**

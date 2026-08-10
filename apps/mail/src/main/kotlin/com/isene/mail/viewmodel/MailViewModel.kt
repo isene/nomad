@@ -311,13 +311,16 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             mails = shown,
             readIds = readIds,
             scope = scope,
-            accounts = all.filter { it.source == "mail" }.map { it.account }.distinct().sorted(),
+            // From what is CONFIGURED, not from what has arrived. Built
+            // from the store, a channel that has fetched nothing yet is
+            // absent from the menu, which reads as "the app has never
+            // heard of it" — indistinguishable from a failed import, and
+            // that is exactly the question the menu should answer.
+            accounts = settings.accounts().map { it.address }.sorted(),
             // A feed carries its title in `account` and its url in
             // `folder`; the url is the identity, the title is the label.
-            feeds = all.filter { it.source == "rss" }
-                .map { it.account to it.folder }.distinct().sortedBy { it.first },
-            channels = all.filter { it.source == "discord" }
-                .map { it.account to it.folder }.distinct().sortedBy { it.first },
+            feeds = settings.feeds().map { it.title to it.url }.sortedBy { it.first },
+            channels = settings.channels().map { it.name to it.id }.sortedBy { it.first },
             filter = filter,
             unread = unread.size,
             hidden = all.size - here.size,
