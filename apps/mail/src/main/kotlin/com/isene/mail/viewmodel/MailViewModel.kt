@@ -303,7 +303,11 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         scope.startsWith("mail:") -> m.source == "mail" && m.account == scope.removePrefix("mail:")
         scope.startsWith("rss:") -> m.source == "rss" && m.folder == scope.removePrefix("rss:")
         scope.startsWith("discord:") -> m.source == "discord" && m.folder == scope.removePrefix("discord:")
-        else -> true
+        // A chat platform is its own source ("whatsapp", "workspace", …),
+        // named by the relay rather than by this app, so there is no list
+        // to match against. Matching the source is the rule; letting an
+        // unrecognised scope through showed the whole store under it.
+        else -> m.source == scope
     }
 
     private fun recompute() {
