@@ -209,6 +209,7 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
         ui.scope == "mail" -> "Mail"
         ui.scope == "rss" -> "Feeds"
         ui.scope == "discord" -> "Discord"
+        ui.scope in ui.chats -> ui.scope.replaceFirstChar { it.uppercase() }
         ui.scope.startsWith("mail:") -> ui.scope.removePrefix("mail:").substringBefore('@')
         ui.scope.startsWith("discord:") ->
             ui.channels.firstOrNull { it.second == ui.scope.removePrefix("discord:") }?.first ?: "Channel"
@@ -241,6 +242,8 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
                 expanded, { expanded = it }) { open = false; onPick(it) }
             Group("Discord", "discord", "All channels",
                 ui.channels.map { it.first to "discord:${it.second}" },
+                expanded, { expanded = it }) { open = false; onPick(it) }
+            Group("Chats", "", "", ui.chats.map { it.replaceFirstChar { c -> c.uppercase() } to it },
                 expanded, { expanded = it }) { open = false; onPick(it) }
             Group("Feeds", "rss", "All feeds",
                 ui.feeds.map { it.first to "rss:${it.second}" },
@@ -277,7 +280,11 @@ private fun Group(
         onClick = { onExpand(if (isOpen) "" else title) },
     )
     if (!isOpen) return
-    DropdownMenuItem(text = { Text("   $allLabel") }, onClick = { onPick(allScope) })
+    // A group with no "all of these" (chats: each platform is its own
+    // thing, and there is no useful union of WhatsApp and SMS).
+    if (allScope.isNotEmpty()) {
+        DropdownMenuItem(text = { Text("   $allLabel") }, onClick = { onPick(allScope) })
+    }
     members.forEach { (name, scope) ->
         DropdownMenuItem(text = { Text("   $name") }, onClick = { onPick(scope) })
     }
@@ -303,6 +310,19 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
     var every by remember { mutableStateOf(s.syncMinutes.toString()) }
     var feeds by remember { mutableStateOf(s.feedsText) }
     var views by remember { mutableStateOf(s.viewsText) }
+    var gwUri by remember { mutableStateOf(s.gatewayTreeUri) }
+    val pickGateway = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri != null) {
+            ctx.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+            )
+            s.gatewayTreeUri = uri.toString()
+            gwUri = uri.toString()
+        }
+    }
     var syncUri by remember { mutableStateOf(s.syncTreeUri) }
     var imported by remember { mutableStateOf<String?>(null) }
 
@@ -343,6 +363,21 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Text("Chats", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                OutlinedButton(onClick = { pickGateway.launch(null) }, modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        ReadStateRepo.folderName(ctx, gwUri)?.let { "Folder: $it" }
+                            ?: "Pick the relay folder (kastrup-gw)",
+                    )
+                }
+                Text(
+                    "WhatsApp, Messenger, Instagram and the rest, as the relay " +
+                        "app on this phone captures them. Sender and preview " +
+                        "only — that is all a notification carries.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Spacer(Modifier.width(4.dp))
                 Text("Views", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 OutlinedTextField(
                     views,

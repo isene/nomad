@@ -172,6 +172,47 @@ pub fn discord_latest_id(messages: Vec<Message>) -> String {
         .unwrap_or_default()
 }
 
+/// Parse one captured notification from the relay app into a message.
+///
+/// The relay writes `{"platform","thread_key","sender","text","timestamp"}`
+/// per notification, the same shape kastrup's gateway source reads on
+/// the laptop.
+///
+/// What this can and cannot be is worth stating: a notification carries
+/// a sender and a preview, so that is the whole message. No history, no
+/// thread, and nothing that never raised a notification.
+#[uniffi::export]
+pub fn parse_gateway(json: String) -> Option<Message> {
+    let v: serde_json::Value = serde_json::from_str(&json).ok()?;
+    let platform = v.get("platform")?.as_str()?.to_string();
+    let thread = v.get("thread_key").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let text = v.get("text").and_then(|x| x.as_str()).unwrap_or("").to_string();
+    let sender = v.get("sender").and_then(|x| x.as_str())
+        .filter(|s| !s.is_empty())
+        .unwrap_or(&thread).to_string();
+    let ts = v.get("timestamp").and_then(|x| x.as_i64()).unwrap_or(0);
+    // The relay writes one file per notification and never twice, so its
+    // own id is the identity; failing that, the shape of the message is.
+    let id = v.get("id").and_then(|x| x.as_str()).map(str::to_string)
+        .unwrap_or_else(|| format!("{}:{}:{}:{}", platform, thread, ts, text.len()));
+    Some(Message {
+        message_id: format!("gw_{}", id),
+        source: platform.clone(),
+        link: String::new(),
+        uid: 0,
+        account: thread.clone(),
+        folder: platform,
+        from: sender,
+        to: thread,
+        subject: if text.is_empty() { "(no text)".into() }
+                 else { text.lines().next().unwrap_or(&text).to_string() },
+        date: ts,
+        raw: text,
+        html: String::new(),
+        has_attachments: false,
+    })
+}
+
 /// One attachment, without its contents.
 #[derive(Debug, Clone, PartialEq, Default, uniffi::Record)]
 pub struct MailAttachment {
@@ -296,6 +337,30 @@ mod tests {
         assert_eq!(back.len(), 1, "an older store must still load");
         assert_eq!(back[0].source, "mail");
         assert_eq!(back[0].subject, "Hi");
+    }
+
+    #[test]
+    fn a_captured_notification_becomes_a_message() {
+        let json = r#"{"platform":"whatsapp","thread_key":"Alice","sender":"Alice",
+                       "text":"hei\nder","timestamp":1716900000}"#;
+        let m = parse_gateway(json.into()).unwrap();
+        assert_eq!(m.source, "whatsapp", "the platform IS the channel");
+        assert_eq!(m.from, "Alice");
+        assert_eq!(m.subject, "hei", "the first line, as with any chat");
+        assert_eq!(m.date, 1716900000);
+        assert!(m.message_id.starts_with("gw_"));
+    }
+
+    #[test]
+    fn a_notification_with_no_sender_falls_back_to_the_thread() {
+        let json = r#"{"platform":"sms","thread_key":"+4712345678","text":"hi"}"#;
+        assert_eq!(parse_gateway(json.into()).unwrap().from, "+4712345678");
+    }
+
+    #[test]
+    fn rubbish_is_not_a_message() {
+        assert!(parse_gateway("not json".into()).is_none());
+        assert!(parse_gateway("{}".into()).is_none());
     }
 
     #[test]

@@ -4,7 +4,7 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.13.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.14.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -23,6 +23,8 @@ Part of the [nomad](../../) mobile suite.
   uses — with **Open** to read the whole thing in a browser
 - **Discord channels** off the REST API with a bot token — no bridge, no
   laptop in the path
+- **WhatsApp, Messenger, Instagram, SMS…** as the relay app on this same
+  phone captures them
 - **Views**: named lists saved in Settings, at the top of the scope menu
 - One **scope menu**: All, all mail or one mailbox, all feeds or one
   feed, all channels or one channel
@@ -154,6 +156,24 @@ The match is not a nicety. kastrup's own views filter on maildir folders
 (`.AA.Customers.Dualog`), and the phone has none: it reads one INBOX per
 account with nothing filed. Matching the address is how the same view is
 expressed here.
+
+## Chats
+
+None of these can be read over an API. Meta exposes no way to read a
+personal Messenger or Instagram conversation, and WhatsApp none at all.
+What exists is the notification, and [relay](../relay/) already listens
+for it — so this reads relay's own queue on the same device. No network,
+no laptop, no Syncthing hop.
+
+Relay writes captured messages twice: `inbound/` for the laptop and
+`phone/` for this app. Two queues, because kastrup on the laptop
+*deletes* from `inbound/` as it ingests and Syncthing carries that
+deletion back — one queue with two readers starves the slower, which
+would always be the phone.
+
+Worth being plain about what this is: a notification carries a sender and
+a line of preview, and that is the whole message. No history, no thread,
+nothing that never raised a notification, nothing while an app is muted.
 
 ## One list, many channels
 

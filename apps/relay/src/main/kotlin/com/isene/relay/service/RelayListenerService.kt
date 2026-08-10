@@ -311,10 +311,17 @@ class RelayListenerService : NotificationListenerService() {
                 }
             }
             // JSON tmp + rename too, so a half-written file is never drained.
+            val payload = obj.toString()
             val dir = Gateway.inboundDir(ctx)
             val jsonTmp = File(dir, "$base.json.tmp")
-            jsonTmp.writeText(obj.toString())
+            jsonTmp.writeText(payload)
             jsonTmp.renameTo(File(dir, "$base.json"))
+            // And a copy for the kastrup app on this phone, which has its
+            // own queue because the laptop deletes as it drains this one.
+            val pdir = Gateway.phoneDir(ctx)
+            val ptmp = File(pdir, "$base.json.tmp")
+            ptmp.writeText(payload)
+            ptmp.renameTo(File(pdir, "$base.json"))
         } catch (_: Exception) {
             // Storage may be momentarily unavailable; drop this one rather
             // than crash the listener.
