@@ -1,14 +1,13 @@
 package com.isene.mail.work
 
 import android.content.Context
-import androidx.glance.appwidget.updateAll
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.OutOfQuotaPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import com.isene.mail.widget.MailWidget
+import com.isene.mail.widget.WidgetPush
 
 /**
  * Redrawing the widget, in something that outlives the app.
@@ -20,7 +19,7 @@ import com.isene.mail.widget.MailWidget
  */
 class WidgetPushWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx, params) {
     override suspend fun doWork(): Result {
-        MailWidget().updateAll(applicationContext)
+        WidgetPush.push(applicationContext)
         return Result.success()
     }
 

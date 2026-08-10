@@ -4,7 +4,7 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.14.4-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.14.5-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -123,6 +123,14 @@ file the app writes when the count moves, and declares no update period
 at all — a widget nobody looks at wakes nothing. The background fetch
 keeps it current; without one it is as fresh as the last time the app
 ran.
+
+Every redraw, from the app or from either worker, goes through one lock.
+Glance restarts a widget's session when a second update arrives
+mid-flight, and picking a scope fires several redraws in a breath — so
+they raced, and the launcher kept whichever finished last, usually the
+scope you had just left. Waiting pushes collapse into one, since the
+redraw reads the summary file when it runs and the rest would repaint
+the identical thing.
 
 ## Background fetch
 
