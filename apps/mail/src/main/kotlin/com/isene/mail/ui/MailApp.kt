@@ -213,14 +213,19 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
         ui.scope.startsWith("mail:") -> ui.scope.removePrefix("mail:").substringBefore('@')
         ui.scope.startsWith("discord:") ->
             ui.channels.firstOrNull { it.second == ui.scope.removePrefix("discord:") }?.first ?: "Channel"
-        else -> ui.feeds.firstOrNull { it.second == ui.scope.removePrefix("rss:") }?.first ?: "Feed"
+        ui.scope.startsWith("rss:") ->
+            ui.feeds.firstOrNull { it.second == ui.scope.removePrefix("rss:") }?.first ?: "Feed"
+        // A chat platform whose last message has been removed: still the
+        // scope, just no longer in the list built from what is held.
+        else -> ui.scope.replaceFirstChar { it.uppercase() }
     }
     // Which group the current scope lives in; that one starts open.
     val here = when {
         ui.scope.startsWith("mail") -> "Mail"
         ui.scope.startsWith("discord") -> "Discord"
         ui.scope.startsWith("rss") -> "Feeds"
-        else -> ""
+        ui.scope.isEmpty() || ui.scope.startsWith("view:") -> ""
+        else -> "Chats"
     }
     var expanded by remember(open, here) { mutableStateOf(here) }
 
