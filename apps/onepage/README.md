@@ -6,7 +6,7 @@
 
 **One screen. Your widgets, placed freely. Nothing else.**
 
-![version](https://img.shields.io/badge/version-0.3.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android%2011%2B-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Views-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![idle](https://img.shields.io/badge/idle-zero%20cost-22c55e) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.4.1-3ddc84) ![platform](https://img.shields.io/badge/platform-Android%2011%2B-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Views-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![idle](https://img.shields.io/badge/idle-zero%20cost-22c55e) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A minimal home launcher — part of the [nomad](../../) mobile suite.
 
@@ -56,6 +56,11 @@ The launcher is always alive, so the idle path is empty by design:
   process from the OEM app-freeze (the Home-button root cause).
 - **No drawing or layout when idle.** Widgets invalidate themselves on their own
   `RemoteViews` pushes; the surface draws borders only in edit mode.
+- **One nudge per widget when the home screen comes back**, and nowhere else. A
+  host receives nothing while stopped and does not reliably get what it missed,
+  so a widget could sit on the state it had before you opened its app. Only the
+  provider can hand over `RemoteViews`, so it is asked to — on returning home,
+  never on a timer.
 - **Persistence is one atomic write** on edit-done / add / remove — never per
   drag-tick.
 - The floating pill is one inert composited layer; it spends cycles only when
