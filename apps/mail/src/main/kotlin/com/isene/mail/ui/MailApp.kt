@@ -243,8 +243,13 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
             Group("Discord", "discord", "All channels",
                 ui.channels.map { it.first to "discord:${it.second}" },
                 expanded, { expanded = it }) { open = false; onPick(it) }
-            Group("Chats", "", "", ui.chats.map { it.replaceFirstChar { c -> c.uppercase() } to it },
-                expanded, { expanded = it }) { open = false; onPick(it) }
+            if (ui.chatsConfigured) {
+                Group(
+                    "Chats", "", "",
+                    ui.chats.map { it.replaceFirstChar { c -> c.uppercase() } to it },
+                    expanded, { expanded = it }, showWhenEmpty = true,
+                ) { open = false; onPick(it) }
+            }
             Group("Feeds", "rss", "All feeds",
                 ui.feeds.map { it.first to "rss:${it.second}" },
                 expanded, { expanded = it }) { open = false; onPick(it) }
@@ -264,9 +269,10 @@ private fun Group(
     members: List<Pair<String, String>>,
     expanded: String,
     onExpand: (String) -> Unit,
+    showWhenEmpty: Boolean = false,
     onPick: (String) -> Unit,
 ) {
-    if (members.isEmpty()) return
+    if (members.isEmpty() && !showWhenEmpty) return
     val isOpen = expanded == title
     DropdownMenuItem(
         text = {
@@ -284,6 +290,18 @@ private fun Group(
     // thing, and there is no useful union of WhatsApp and SMS).
     if (allScope.isNotEmpty()) {
         DropdownMenuItem(text = { Text("   $allLabel") }, onClick = { onPick(allScope) })
+    }
+    if (members.isEmpty()) {
+        DropdownMenuItem(
+            text = {
+                Text(
+                    "   nothing captured yet",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            },
+            onClick = {},
+        )
     }
     members.forEach { (name, scope) ->
         DropdownMenuItem(text = { Text("   $name") }, onClick = { onPick(scope) })

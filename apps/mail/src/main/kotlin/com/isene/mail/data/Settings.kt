@@ -261,7 +261,8 @@ class Settings(ctx: Context) {
         accounts().size to "account",
         feeds().size to "feed",
         channels().size to "channel",
-    ).joinToString(" · ") { (n, what) -> "$n $what" + if (n == 1) "" else "s" }
+    ).joinToString(" · ") { (n, what) -> "$n $what" + if (n == 1) "" else "s" } +
+        if (gatewayTreeUri.isEmpty()) " · no chat folder" else " · chats on"
 }
 
 /**
