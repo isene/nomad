@@ -83,12 +83,17 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
      * fetches into it while this ViewModel sits in memory, so a mail
      * that reached the widget was missing from the list until the next
      * manual sync.
+     *
+     * And the relay's queue, which is on this phone's own disk: making
+     * a chat captured a minute ago wait for a network fetch was the
+     * whole of why one did not show up.
      */
     fun refresh() {
         val ctx = getApplication<Application>()
         viewModelScope.launch {
             val (stored, marks) = withContext(Dispatchers.IO) {
-                Store.load(ctx) to ReadStateRepo.loadAll(ctx, settings.syncTreeUri)
+                (SyncEngine.chats(ctx) ?: Store.load(ctx)) to
+                    ReadStateRepo.loadAll(ctx, settings.syncTreeUri)
             }
             all = stored
             laptopRead = marks.filter { it.read }.map { it.messageId }.toSet()
@@ -150,6 +155,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                             val chat = all.count { it.source == "discord" }
                             val cn = settings.channels().size
                             if (cn > 0) append(" · $chat from $cn channel(s)")
+                            val relayed = all.count {
+                                it.source != "mail" && it.source != "rss" && it.source != "discord"
+                            }
+                            if (settings.gatewayTreeUri.isNotEmpty()) append(" · $relayed from relay")
                         }
                     }
                 },

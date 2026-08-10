@@ -28,6 +28,29 @@ object SyncEngine {
     )
 
     /**
+     * The relay's queue, and nothing else. No radio, no server, no
+     * Syncthing hop — relay wrote those files on this same phone, so
+     * picking them up costs one directory listing.
+     *
+     * Which is why it is not part of [fetch]: waiting fifteen minutes
+     * for a network fetch to notice a file already on the disk is the
+     * one delay here with no cause. Opening the app runs this.
+     *
+     * Returns the whole store when something was taken, else null.
+     */
+    fun chats(ctx: Context): List<Message>? {
+        val settings = Settings(ctx)
+        val (captured, files) = GatewayRepo.drain(ctx, settings.gatewayTreeUri)
+        if (captured.isEmpty()) { GatewayRepo.clear(files); return null }
+        val fresh = captured.map { it.messageId }.toSet()
+        val out = (Store.load(ctx).filter { it.messageId !in fresh } + captured)
+            .sortedByDescending { it.date }
+        Store.save(ctx, out)
+        GatewayRepo.clear(files)
+        return out
+    }
+
+    /**
      * Pull every account's headers and write them to the store. Bodies
      * are not touched: they download when a message is opened, and a
      * background fetch has no reader to download them for.
