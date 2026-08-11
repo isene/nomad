@@ -96,35 +96,24 @@ private fun WidgetContent(
             .clickable(openApp),
         contentAlignment = Alignment.TopStart,
     ) {
-        if (rows.isEmpty()) {
-            Column(
-                modifier = GlanceModifier.fillMaxSize(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    title,
-                    style = TextStyle(
-                        fontWeight = FontWeight.Bold,
-                        color = ACCENT,
-                    ),
-                )
-                Spacer(GlanceModifier.padding(4.dp))
+        Column(modifier = GlanceModifier.fillMaxSize()) {
+            // Always the first line, always at the left edge: the header
+            // says which scope this is, and a title that moves when the
+            // list empties reads as a different widget.
+            Text(
+                if (rows.isEmpty()) title else "$title  $unread",
+                style = TextStyle(
+                    fontWeight = FontWeight.Bold,
+                    color = ACCENT,
+                ),
+                modifier = GlanceModifier.padding(bottom = 4.dp).clickable(openApp),
+            )
+            if (rows.isEmpty()) {
                 Text(
                     if (unread == 0) "Nothing unread" else "Open the app",
                     style = TextStyle(color = BODY),
                 )
-            }
-        } else {
-            Column(modifier = GlanceModifier.fillMaxSize()) {
-                Text(
-                    "$title  $unread",
-                    style = TextStyle(
-                        fontWeight = FontWeight.Bold,
-                        color = ACCENT,
-                    ),
-                    modifier = GlanceModifier.padding(bottom = 4.dp).clickable(openApp),
-                )
+            } else {
                 LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                     items(rows.size) { idx ->
                         val row = rows[idx]
