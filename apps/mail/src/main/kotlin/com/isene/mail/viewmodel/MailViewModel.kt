@@ -324,7 +324,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             mails = shown,
             readIds = readIds,
             scope = scope,
-            scopeLabel = Scope.label(scope, settings),
+            scopeLabel = Scope.label(scope, settings, short = true),
             // From what is CONFIGURED, not from what has arrived. Built
             // from the store, a channel that has fetched nothing yet is
             // absent from the menu, which reads as "the app has never

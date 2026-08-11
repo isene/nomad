@@ -18,15 +18,21 @@ object Scope {
      * and the widget's header have to say the same thing — a widget
      * showing one channel while claiming to be everything is worse than
      * one that says nothing.
+     *
+     * `short` shortens a mailbox to its local part, for the chip, which
+     * sits directly above the list it names. The widget takes the whole
+     * address: three that begin the same way read identically otherwise,
+     * and the header is the only thing there to tell them apart.
      */
-    fun label(scope: String, settings: Settings): String = when {
+    fun label(scope: String, settings: Settings, short: Boolean = false): String = when {
         scope.isEmpty() -> "All"
         scope.startsWith("view:") -> scope.removePrefix("view:")
         scope == "mail" -> "Mail"
         scope == "rss" -> "Feeds"
         scope == "discord" -> "Discord"
         scope == "discord:dm" -> "DMs"
-        scope.startsWith("mail:") -> scope.removePrefix("mail:").substringBefore('@')
+        scope.startsWith("mail:") -> scope.removePrefix("mail:")
+            .let { if (short) it.substringBefore('@') else it }
         scope.startsWith("discord:") -> settings.channels()
             .firstOrNull { it.id == scope.removePrefix("discord:") }?.name ?: "Channel"
         scope.startsWith("rss:") -> settings.feeds()
