@@ -113,8 +113,8 @@ android {
         applicationId = "com.isene.mail"
         minSdk = 33
         targetSdk = 35
-        versionCode = 35
-        versionName = "0.14.6"
+        versionCode = 36
+        versionName = "0.14.7"
         ndk { abiFilters += androidAbis.keys }
     }
 

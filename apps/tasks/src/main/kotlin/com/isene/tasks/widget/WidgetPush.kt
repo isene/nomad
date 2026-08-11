@@ -1,6 +1,8 @@
 package com.isene.tasks.widget
 
 import android.content.Context
+import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.state.updateAppWidgetState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -19,6 +21,24 @@ object WidgetPush {
 
     fun now(context: Context) {
         val app = context.applicationContext
-        scope.launch { TasksWidgetReceiver.update(app) }
+        scope.launch { push(app) }
+    }
+
+    /** Into the widget's own state first, then redraw. The redraw
+     *  recomposes what the state says; handing it nothing new is handing
+     *  it the old list again. */
+    suspend fun push(context: Context) {
+        val app = context.applicationContext
+        val widget = TasksWidget()
+        val text = widget.loadText(app)
+        val transparent = app.getSharedPreferences("tasks_prefs", Context.MODE_PRIVATE)
+            .getBoolean("widget_transparent", false)
+        for (id in GlanceAppWidgetManager(app).getGlanceIds(TasksWidget::class.java)) {
+            updateAppWidgetState(app, id) { prefs ->
+                if (text != null) prefs[LIST] = text
+                prefs[TRANSPARENT] = transparent
+            }
+        }
+        TasksWidgetReceiver.update(app)
     }
 }

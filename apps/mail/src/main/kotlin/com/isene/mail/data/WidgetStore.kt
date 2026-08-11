@@ -36,9 +36,14 @@ object WidgetStore {
         return runCatching { f.writeText(text); true }.getOrDefault(false)
     }
 
-    fun load(ctx: Context): WidgetState {
-        val text = runCatching { file(ctx).takeIf { it.exists() }?.readText() }.getOrNull()
-            ?: return WidgetState(0, emptyList())
+    /** The raw summary, as written. What the widget's own state carries. */
+    fun text(ctx: Context): String =
+        runCatching { file(ctx).takeIf { it.exists() }?.readText() }.getOrNull() ?: ""
+
+    fun load(ctx: Context): WidgetState = parse(text(ctx))
+
+    fun parse(text: String): WidgetState {
+        if (text.isEmpty()) return WidgetState(0, emptyList())
         return runCatching {
             val o = JSONObject(text)
             val arr = o.optJSONArray("rows") ?: JSONArray()
