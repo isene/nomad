@@ -4,7 +4,7 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.14.7-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.14.8-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -128,6 +128,11 @@ Its header names the scope it is showing (`kastrup · Discord  2`),
 because it draws the list through the app's scope and two counts under
 two scopes look identical without it. The chip in the app and the header
 take their name from the same rule, so they cannot disagree.
+
+A mailbox appears there in full (`kastrup · geir@example.com`). The chip
+shortens it to the local part, since it sits directly above the list it
+names — but three addresses that begin the same way are one word on the
+home screen, and the header is all there is to tell them apart.
 
 The summary reaches the widget through Glance's own state, and is read
 inside the composition. Anything read in `provideGlance` is read once
