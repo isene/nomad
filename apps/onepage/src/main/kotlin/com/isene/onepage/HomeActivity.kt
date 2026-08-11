@@ -4,7 +4,6 @@ import android.app.Activity
 import android.appwidget.AppWidgetHost
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProviderInfo
-import android.content.ComponentName
 import android.content.Intent
 import android.os.Bundle
 import uniffi.fe2o3_mobile_core.Layout
@@ -22,10 +21,6 @@ class HomeActivity : Activity() {
     private lateinit var widgetManager: AppWidgetManager
     private lateinit var surface: HomeSurface
     private var pendingWidgetId = -1
-
-    /** Whether the host has listened before, so the first pass can skip
-     *  the refresh: those views were bound moments ago. */
-    private var listened = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,45 +88,24 @@ class HomeActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        // Idempotent: it returns at once when already listening, which is
+        // the normal case — see onStop.
         if (::host.isInitialized) host.startListening()
-        // Not the first time in: the views were just bound and are current.
-        if (listened) refreshWidgets() else listened = true
-    }
-
-    /**
-     * Ask every hosted widget to redraw itself.
-     *
-     * A stopped host receives nothing, and coming back does not reliably
-     * bring what it missed — which is why a widget could sit on the state
-     * it had before you opened its app, sometimes for minutes. Only the
-     * provider can hand over RemoteViews, so ask it to: the same
-     * broadcast the system sends for a periodic update, one per widget.
-     *
-     * On coming home and nowhere else. No timer, no polling, and nothing
-     * at all while the home screen is up.
-     */
-    private fun refreshWidgets() {
-        if (!::surface.isInitialized) return
-        for (e in surface.entries) {
-            val cn = ComponentName.unflattenFromString(e.provider) ?: continue
-            val intent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
-                component = cn
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(e.appWidgetId))
-            }
-            try {
-                sendBroadcast(intent)
-            } catch (_: Exception) {
-                // A provider that has gone away is dropped on the next
-                // restore; nothing here needs to care.
-            }
-        }
     }
 
     override fun onStop() {
         // Leaving the launcher ends edit mode (and persists) — but not while
         // a widget bind/configure activity is up mid-add, which also stops us.
         if (::surface.isInitialized && pendingWidgetId == -1) surface.exitEdit()
-        if (::host.isInitialized) host.stopListening()
+        // The host keeps listening. A stopped host receives nothing, and
+        // coming back does not reliably bring what it missed — so a
+        // widget sat on the state it had before you opened its app, and
+        // going in and out again was how you fixed it. Listening costs
+        // nothing until a provider pushes: no timer, no poll, one Binder
+        // callback when something genuinely changed. Asking the providers
+        // to redraw instead (the previous attempt) woke every widget's
+        // app on every trip home, and half the time the broadcast was
+        // deferred anyway because the app had gone cached.
         super.onStop()
     }
 
