@@ -1,7 +1,10 @@
 package com.isene.mail.widget
 
 import android.content.Context
+import androidx.glance.appwidget.GlanceAppWidgetManager
+import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.appwidget.updateAll
+import com.isene.mail.data.WidgetStore
 import com.isene.mail.work.WidgetPushWorker
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CancellationException
@@ -50,7 +53,16 @@ object WidgetPush {
      *  moment it does. */
     suspend fun push(context: Context) {
         val app = context.applicationContext
-        lock.withLock { MailWidget().updateAll(app) }
+        lock.withLock {
+            // Into the widget's own state first, then redraw. The redraw
+            // recomposes what the state says; handing it nothing new is
+            // handing it the old summary again.
+            val text = WidgetStore.text(app)
+            for (id in GlanceAppWidgetManager(app).getGlanceIds(MailWidget::class.java)) {
+                updateAppWidgetState(app, id) { it[SUMMARY] = text }
+            }
+            MailWidget().updateAll(app)
+        }
     }
 
     fun now(context: Context) {

@@ -4,7 +4,7 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.14.6-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.14.7-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -129,13 +129,20 @@ because it draws the list through the app's scope and two counts under
 two scopes look identical without it. The chip in the app and the header
 take their name from the same rule, so they cannot disagree.
 
+The summary reaches the widget through Glance's own state, and is read
+inside the composition. Anything read in `provideGlance` is read once
+per session, and updating a widget that already has one only recomposes
+— so a redraw drew the same bytes it drew before, and the widget kept
+the state it had when its session started. That was the lag: changing
+scope redrew nothing, and only a new session ever caught up, which is
+why leaving the app and coming back a few times appeared to fix it.
+
 Every redraw, from the app or from either worker, goes through one lock.
 Glance restarts a widget's session when a second update arrives
-mid-flight, and picking a scope fires several redraws in a breath — so
-they raced, and the launcher kept whichever finished last, usually the
-scope you had just left. Waiting pushes collapse into one, since the
-redraw reads the summary file when it runs and the rest would repaint
-the identical thing.
+mid-flight, and picking a scope fires several redraws in a breath, so
+they raced. Waiting pushes collapse into one, since the redraw carries
+whatever the summary says when it runs and the rest would repaint the
+identical thing.
 
 ## Background fetch
 

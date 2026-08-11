@@ -145,8 +145,8 @@ android {
         applicationId = "com.isene.tasks"
         minSdk = 33
         targetSdk = 35
-        versionCode = 13
-        versionName = "0.5.1"
+        versionCode = 14
+        versionName = "0.5.2"
         ndk { abiFilters += androidAbis.keys }
     }
 

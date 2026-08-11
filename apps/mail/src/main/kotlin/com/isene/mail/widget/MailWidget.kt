@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -14,6 +16,9 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
+import androidx.glance.currentState
+import androidx.glance.state.PreferencesGlanceStateDefinition
+import androidx.glance.LocalContext
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -37,20 +42,35 @@ private val ACCENT = ColorProvider(Color(0xFF7FC8E8))
 private val NAME = ColorProvider(Color(0xFFCFE3F0))
 private val BODY = ColorProvider(Color.White)
 
+/** The summary this widget is drawing, in the widget's own state. */
+internal val SUMMARY = stringPreferencesKey("summary")
+
 /**
  * Unread mail on the home screen: a count and who it is from.
  *
- * Reads only the small summary file the app writes when the count moves,
- * so a launcher redraw costs one short file read. Tapping anywhere opens
- * the app.
+ * Reads only the small summary the app writes when the count moves, so a
+ * launcher redraw costs one short read. Tapping anywhere opens the app.
+ *
+ * The summary comes through Glance's own state, read inside the
+ * composition. Anything read in `provideGlance` is read once per session
+ * and an update to a widget that already has one only recomposes — so
+ * with the file read out here, every redraw drew the same bytes again
+ * and the widget sat on the state it had when the session started.
+ * That was the lag: a scope change redrew nothing, and only a new
+ * session (leaving the app long enough, a restart) ever caught up.
  */
 class MailWidget : GlanceAppWidget() {
 
     override val sizeMode: SizeMode = SizeMode.Exact
+    override val stateDefinition = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val state = WidgetStore.load(context)
         provideContent {
+            // Falling back to the file covers a widget just placed on the
+            // home screen, whose state nobody has written yet.
+            val text = currentState<Preferences>()[SUMMARY]
+                ?: WidgetStore.text(LocalContext.current)
+            val state = WidgetStore.parse(text)
             GlanceTheme { WidgetContent(state.unread, state.rows, state.scope) }
         }
     }

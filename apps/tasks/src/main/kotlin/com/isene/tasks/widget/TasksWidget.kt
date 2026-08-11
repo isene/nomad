@@ -4,6 +4,9 @@ import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -14,7 +17,10 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
+import androidx.glance.LocalContext
 import androidx.glance.background
+import androidx.glance.currentState
+import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -45,18 +51,56 @@ private const val KEY_URI = "doc_uri"
 private const val KEY_TRANSPARENT = "widget_transparent"
 private const val MAX_ROWS: UInt = 12u
 
+/** The list this widget is drawing, in the widget's own state. */
+internal val LIST = stringPreferencesKey("list")
+internal val TRANSPARENT = booleanPreferencesKey("transparent")
+
 class TasksWidget : GlanceAppWidget() {
 
     override val sizeMode: SizeMode = SizeMode.Exact
+    override val stateDefinition = PreferencesGlanceStateDefinition
 
+    /**
+     * The list comes through Glance's own state, read inside the
+     * composition. Anything read in `provideGlance` is read once per
+     * session, and updating a widget that already has one only
+     * recomposes — so with the read out here every redraw drew the same
+     * rows again, and the widget kept the list it had when the session
+     * started. Only a new session ever caught up, which is why leaving
+     * the app and coming back a few times appeared to fix it.
+     */
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val rows = loadRows(context)
-        val transparent = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .getBoolean(KEY_TRANSPARENT, false)
         provideContent {
+            val prefs = currentState<Preferences>()
+            val ctx = LocalContext.current
+            // Falling back to the file covers a widget just placed on the
+            // home screen, whose state nobody has written yet.
+            val rows = prefs[LIST]?.let {
+                runCatching { widgetRows(parse(it), MAX_ROWS) }.getOrDefault(emptyList())
+            } ?: loadRows(ctx)
+            val transparent = prefs[TRANSPARENT]
+                ?: ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                    .getBoolean(KEY_TRANSPARENT, false)
             GlanceTheme {
                 WidgetContent(rows, transparent)
             }
+        }
+    }
+
+    /** The hyperlist itself, for the state to be filled from. */
+    internal fun loadText(context: Context): String? {
+        TaskRepository.widgetCache(context)?.let { return it }
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val uriStr = prefs.getString(KEY_URI, null) ?: return null
+        val uri = Uri.parse(uriStr)
+        return try {
+            val text = context.contentResolver.openInputStream(uri)?.use { input ->
+                input.bufferedReader(Charsets.UTF_8).readText()
+            } ?: return null
+            TaskRepository.cacheForWidget(context, text)
+            text
+        } catch (_: Exception) {
+            null
         }
     }
 
