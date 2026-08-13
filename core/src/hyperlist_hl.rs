@@ -13,7 +13,8 @@
 //
 // Colour mapping lives on the Kotlin side (light/dark aware); this module
 // only classifies. Roles mirror hyperlist.vim / the TUI:
-//   Property/MultiMarker/ChangeMarkup  -> red
+//   Property/ChangeMarkup             -> red
+//   MultiMarker/Identifier/Reference  -> magenta
 //   Operator/StateTransition           -> blue
 //   Qualifier/Checkbox/Semicolon       -> green
 //   Reference/Identifier/Keyword       -> magenta
@@ -158,9 +159,13 @@ fn hl_line(body: &str) -> Vec<HlSpan> {
 
     let mut sb = SpanBuf::new();
 
-    // Multi-line indicator `+ ` at start of body.
+    // Starter `+ ` or `- ` at start of body. HyperList 2.8 made `-` a
+    // neutral Starter alongside the multi-line `+`; both are magenta.
     let body = if let Some(rest) = body.strip_prefix("+ ") {
         sb.push("+ ".into(), TokenRole::MultiMarker);
+        rest
+    } else if let Some(rest) = body.strip_prefix("- ") {
+        sb.push("- ".into(), TokenRole::MultiMarker);
         rest
     } else {
         body

@@ -28,7 +28,7 @@ private data class RoleStyle(
 // black; light palette uses the darker print colours.
 private val DARK: Map<TokenRole, RoleStyle> = mapOf(
     TokenRole.PROPERTY to RoleStyle(color = Color(0xFFFF6B6B)),
-    TokenRole.MULTI_MARKER to RoleStyle(color = Color(0xFFFF6B6B)),
+    TokenRole.MULTI_MARKER to RoleStyle(color = Color(0xFFE07BFF)),
     TokenRole.CHANGE_MARKUP to RoleStyle(color = Color(0xFFFF6B6B)),
     TokenRole.OPERATOR to RoleStyle(color = Color(0xFF7FA8FF)),
     TokenRole.STATE_TRANSITION to RoleStyle(color = Color(0xFF7FA8FF)),
@@ -52,7 +52,7 @@ private val DARK: Map<TokenRole, RoleStyle> = mapOf(
 
 private val LIGHT: Map<TokenRole, RoleStyle> = mapOf(
     TokenRole.PROPERTY to RoleStyle(color = Color(0xFFCC0000)),
-    TokenRole.MULTI_MARKER to RoleStyle(color = Color(0xFFCC0000)),
+    TokenRole.MULTI_MARKER to RoleStyle(color = Color(0xFFAA00AA)),
     TokenRole.CHANGE_MARKUP to RoleStyle(color = Color(0xFFCC0000)),
     TokenRole.OPERATOR to RoleStyle(color = Color(0xFF0000CC)),
     TokenRole.STATE_TRANSITION to RoleStyle(color = Color(0xFF0000CC)),
