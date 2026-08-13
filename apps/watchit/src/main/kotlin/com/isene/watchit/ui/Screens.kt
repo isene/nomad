@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -107,7 +108,14 @@ fun MovieRow(item: ListItem, details: Details?, wished: Boolean, dumped: Boolean
 }
 
 @Composable
-fun BrowseScreen(vm: WatchitViewModel, ui: UiState, modifier: Modifier, onOpen: (ListItem) -> Unit, onFilters: () -> Unit) {
+fun BrowseScreen(
+    vm: WatchitViewModel,
+    ui: UiState,
+    modifier: Modifier,
+    scroll: LazyListState,
+    onOpen: (ListItem) -> Unit,
+    onFilters: () -> Unit,
+) {
     val details by vm.detailsFlow.collectAsState()
     val ratings by vm.ratings.collectAsState()
     Column(modifier.fillMaxSize()) {
@@ -132,7 +140,7 @@ fun BrowseScreen(vm: WatchitViewModel, ui: UiState, modifier: Modifier, onOpen: 
                 }
             }
         } else {
-            LazyColumn(Modifier.fillMaxSize()) {
+            LazyColumn(Modifier.fillMaxSize(), state = scroll) {
                 items(ui.filtered, key = { it.id }) { item ->
                     MovieRow(item, details[item.id], vm.isWished(item.id), vm.isDumped(item.id),
                         ratingFor(ratings, ratingKey(item.id, item.kind), item.title, item.year)) { onOpen(item) }
@@ -143,7 +151,14 @@ fun BrowseScreen(vm: WatchitViewModel, ui: UiState, modifier: Modifier, onOpen: 
 }
 
 @Composable
-fun ListScreen(vm: WatchitViewModel, items: List<ListItem>, emptyMsg: String, modifier: Modifier, onOpen: (ListItem) -> Unit) {
+fun ListScreen(
+    vm: WatchitViewModel,
+    items: List<ListItem>,
+    emptyMsg: String,
+    modifier: Modifier,
+    scroll: LazyListState,
+    onOpen: (ListItem) -> Unit,
+) {
     val details by vm.detailsFlow.collectAsState()
     val ratings by vm.ratings.collectAsState()
     if (items.isEmpty()) {
@@ -151,7 +166,7 @@ fun ListScreen(vm: WatchitViewModel, items: List<ListItem>, emptyMsg: String, mo
             Text(emptyMsg, color = MaterialTheme.colorScheme.secondary)
         }
     } else {
-        LazyColumn(modifier.fillMaxSize()) {
+        LazyColumn(modifier.fillMaxSize(), state = scroll) {
             items(items, key = { it.id }) { item ->
                 MovieRow(item, details[item.id], vm.isWished(item.id), vm.isDumped(item.id),
                     ratingFor(ratings, ratingKey(item.id, item.kind), item.title, item.year)) { onOpen(item) }

@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -68,6 +69,14 @@ fun WatchitApp(vm: WatchitViewModel) {
     val ui by vm.ui.collectAsState()
     var tab by remember { mutableStateOf(Tab.Browse) }
     var detail by remember { mutableStateOf<ListItem?>(null) }
+    // Where each tab's list was left. Held here, above the `return` that
+    // swaps in the detail screen: that return takes the whole list
+    // composition with it, and a state remembered inside the list goes
+    // with it — which is why coming back landed at the top. One per tab,
+    // since they are three different lists.
+    val browseScroll = rememberLazyListState()
+    val wishScroll = rememberLazyListState()
+    val dumpScroll = rememberLazyListState()
     var menuOpen by remember { mutableStateOf(false) }
     var showFilters by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -133,9 +142,9 @@ fun WatchitApp(vm: WatchitViewModel) {
     ) { pad ->
         val m = Modifier.padding(pad)
         when (tab) {
-            Tab.Browse -> BrowseScreen(vm, ui, m, onOpen = { detail = it }, onFilters = { showFilters = true })
-            Tab.Wish -> ListScreen(vm, vm.wishItems(), "No wished ${ui.view} yet — open a title and tap Add to Wish.", m) { detail = it }
-            Tab.Dump -> ListScreen(vm, vm.dumpItems(), "No dumped ${ui.view} yet.", m) { detail = it }
+            Tab.Browse -> BrowseScreen(vm, ui, m, browseScroll, onOpen = { detail = it }, onFilters = { showFilters = true })
+            Tab.Wish -> ListScreen(vm, vm.wishItems(), "No wished ${ui.view} yet — open a title and tap Add to Wish.", m, wishScroll) { detail = it }
+            Tab.Dump -> ListScreen(vm, vm.dumpItems(), "No dumped ${ui.view} yet.", m, dumpScroll) { detail = it }
         }
     }
 
