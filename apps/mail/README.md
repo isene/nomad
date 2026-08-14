@@ -4,7 +4,7 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.14.10-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.14.11-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -37,6 +37,8 @@ Part of the [nomad](../../) mobile suite.
 - **Mark READ** / **Mark unread**, on this phone only
 - Swipe a row (or **Remove** in a message) to take it off this phone —
   local only, the laptop keeps the mail
+- **Calendar invitations** read as invitations — what, when, where, who
+  — rather than as the `DTSTART;TZID=` they arrive as
 - **Tappable links** in the body
 - **Attachments** listed under the headers; tap one to open it in
   whatever app handles the type
