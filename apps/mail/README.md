@@ -4,7 +4,7 @@
 
 # kastrup
 
-![version](https://img.shields.io/badge/version-0.14.13-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.14.14-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -46,6 +46,9 @@ Part of the [nomad](../../) mobile suite.
   put one back
 - **Mark all read** and **Remove all** in the ⋮ menu, acting on what the
   list is showing — so a filter narrows them
+- **Search** (🔍): live, over sender, recipient and subject of what is
+  held — not the body, which for mail is only fetched when a message is
+  opened, so most rows have none to search
 - A **home-screen widget**: the same unread list at a glance, through the
   same account filter, tap to open
 
