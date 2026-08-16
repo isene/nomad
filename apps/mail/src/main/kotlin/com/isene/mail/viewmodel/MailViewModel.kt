@@ -46,6 +46,8 @@ data class UiState(
     val chats: List<String> = emptyList(),
     val chatsConfigured: Boolean = false,
     val filter: String = "all", // "all" | "unread" | "removed"
+    /** Live search needle; empty means no search. */
+    val query: String = "",
     val unread: Int = 0,
     /** Held in the store but hidden by a swipe or Remove all. Counted so
      *  the app can never claim messages it is not showing. */
@@ -62,6 +64,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     /** What the laptop says, merged. Read-only to this phone. */
     private var laptopRead: Set<String> = emptySet()
+
+    /** See [setQuery]. */
+    private var query: String = ""
+
 
     private val _ui = MutableStateFlow(UiState())
     val ui: StateFlow<UiState> = _ui.asStateFlow()
@@ -290,6 +296,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setFilter(f: String) { settings.filter = f; recompute() }
 
+    /** Transient by design: a search is a question about now, and coming
+     *  back tomorrow to a list still narrowed by it reads as lost mail. */
+    fun setQuery(q: String) { query = q; recompute() }
+
     fun setScope(s: String) { settings.scope = s; recompute() }
 
     fun status(s: String?) { _ui.value = _ui.value.copy(status = s) }
@@ -313,6 +323,14 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         val shown = base
             .filter { inScope(it, scope) }
             .filter { filter != "unread" || it.messageId !in readIds }
+            // Sender, recipient, subject. Not the body: mail bodies are
+            // fetched when opened, so most rows have none to search, and
+            // a search that matches only the ones you already read is
+            // worse than one that says what it looks at.
+            .filter {
+                query.isBlank() || listOf(it.from, it.to, it.subject)
+                    .any { f -> f.contains(query, ignoreCase = true) }
+            }
         // Unread, through the same account filter the list uses — the
         // widget is meant to be the list at a glance, not a second view
         // with its own opinion. The read/unread filter is deliberately
@@ -341,6 +359,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 .distinct().sorted(),
             chatsConfigured = settings.gatewayTreeUri.isNotEmpty(),
             filter = filter,
+            query = query,
             unread = unread.size,
             hidden = all.size - here.size,
         )

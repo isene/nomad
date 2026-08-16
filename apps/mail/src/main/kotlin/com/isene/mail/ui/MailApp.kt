@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -65,6 +66,7 @@ fun MailApp(vm: MailViewModel) {
     var open by remember { mutableStateOf<Message?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
+    var showSearch by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     // Bulk actions confirm first: they touch everything on screen, and
     // marking read reaches the laptop.
@@ -97,6 +99,10 @@ fun MailApp(vm: MailViewModel) {
                                 strokeWidth = 2.dp,
                             )
                         }
+                        IconButton(onClick = {
+                            showSearch = !showSearch
+                            if (!showSearch) vm.setQuery("")
+                        }) { Icon(Icons.Filled.Search, "Search") }
                         IconButton(onClick = { vm.sync() }) { Icon(Icons.Filled.Refresh, "Fetch") }
                         IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, "Menu") }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -143,6 +149,21 @@ fun MailApp(vm: MailViewModel) {
                             label = { Text("Removed ${ui.hidden}") },
                         )
                     }
+                }
+                if (showSearch) {
+                    // Live, over what is held: sender, recipient, subject.
+                    // No server round trip — search is for finding what
+                    // the eye lost, and the eye lost it in this list.
+                    OutlinedTextField(
+                        value = ui.query,
+                        onValueChange = { vm.setQuery(it) },
+                        placeholder = { Text("Search sender or subject") },
+                        singleLine = true,
+                        trailingIcon = {
+                            TextButton(onClick = { vm.setQuery(""); showSearch = false }) { Text("✕") }
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 2.dp),
+                    )
                 }
                 ui.status?.let { s ->
                     Surface(
