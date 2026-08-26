@@ -3,7 +3,9 @@ package com.isene.mail.viewmodel
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.isene.mail.data.Attachments
 import com.isene.mail.data.ImapRepo
+import com.isene.mail.data.Outbound
 import com.isene.mail.data.ReadState
 import com.isene.mail.data.Scope
 import com.isene.mail.data.ReadStateRepo
@@ -19,8 +21,35 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import uniffi.fe2o3_mobile_core.Draft
 import uniffi.fe2o3_mobile_core.Message
+import uniffi.fe2o3_mobile_core.composeForward
+import uniffi.fe2o3_mobile_core.composeReply
+import uniffi.fe2o3_mobile_core.mailAttachmentBytes
 import uniffi.fe2o3_mobile_core.mailBodyText
+
+/**
+ * A reply or forward on its way to the compose screen: the original,
+ * what the core made of it, and the account it would go out from.
+ */
+data class ComposeRequest(
+    val kind: String, // "reply" | "forward"
+    val original: Message,
+    val draft: Draft,
+    val fromAccount: String,
+    /** What a forward carries along, by name, for the screen to say so. */
+    val attachmentNames: List<String> = emptyList(),
+) {
+    /** Forwards are always mail; so is a reply to mail. The rest answer
+     *  on their own channel. */
+    val viaMail: Boolean get() = kind == "forward" || original.source == "mail"
+    val title: String get() = if (kind == "forward") "Forward" else "Reply"
+    val channelLabel: String get() =
+        if (original.messageId.startsWith("gw_")) original.folder else "#${original.account}"
+}
 
 data class UiState(
     val mails: List<Message> = emptyList(),
@@ -210,6 +239,77 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun closeBody() { _body.value = null }
+
+    // ---------- replying and forwarding ----------
+
+    /** Same shape as the laptop's "On …, X wrote:" line. */
+    private val draftFmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
+
+    /**
+     * What the compose screen starts from. The core decides addressing,
+     * prefixes and the quote; this only hands it the date written out in
+     * the phone's zone, which the core has no table for.
+     */
+    fun compose(m: Message, kind: String, all: Boolean = false): ComposeRequest {
+        val held = current(m.messageId) ?: m
+        val date = if (held.date > 0) draftFmt.format(Date(held.date * 1000)) else ""
+        val draft = if (kind == "forward") composeForward(held, date) else composeReply(held, all, date)
+        val accounts = settings.accounts()
+        val from = accounts.firstOrNull { it.address == held.account }?.address
+            ?: accounts.firstOrNull()?.address ?: ""
+        val names = if (kind == "forward") Attachments.list(held.raw).map { it.filename } else emptyList()
+        return ComposeRequest(kind, held, draft, from, names)
+    }
+
+    /**
+     * Out it goes, on the channel the original came in on. Mail and
+     * every forward over SMTP; a Discord post back to its channel; a
+     * relayed chat through relay's outbox.
+     */
+    fun send(
+        req: ComposeRequest, from: String, to: String, cc: String, subject: String, body: String,
+        onResult: (String?) -> Unit,
+    ) {
+        if (_ui.value.busy) return
+        val ctx = getApplication<Application>()
+        _ui.value = _ui.value.copy(busy = true, status = "Sending…")
+        viewModelScope.launch {
+            val o = req.original
+            val err = withContext(Dispatchers.IO) {
+                when {
+                    req.viaMail -> {
+                        val a = settings.accounts().firstOrNull { it.address == from }
+                        if (a == null) "No account to send from — add one in Settings"
+                        else Outbound.mail(
+                            a, to, cc, subject, body, req.draft.inReplyTo, req.draft.references,
+                            if (req.kind == "forward") forwardAttachments(o) else emptyList(),
+                        )
+                    }
+                    o.messageId.startsWith("gw_") ->
+                        Outbound.gateway(ctx, settings.gatewayTreeUri, o.folder, o.account, body)
+                    o.source == "discord" -> Outbound.discord(settings.discordToken(), o.folder, body)
+                    else -> "Nothing to reply to here"
+                }
+            }
+            _ui.value = _ui.value.copy(
+                busy = false,
+                status = err ?: when {
+                    req.viaMail -> "Sent"
+                    o.messageId.startsWith("gw_") -> "Handed to relay — it sends while the notification is up"
+                    else -> "Posted"
+                },
+            )
+            onResult(err)
+        }
+    }
+
+    /** The original's attachments, bytes and all, for a forward. */
+    private fun forwardAttachments(m: Message): List<Outbound.Attachment> =
+        Attachments.list(m.raw).mapIndexedNotNull { i, a ->
+            runCatching { mailAttachmentBytes(m.raw, i.toUInt()) }.getOrNull()
+                ?.takeIf { it.isNotEmpty() }
+                ?.let { Outbound.Attachment(a.filename, a.mimeType, it) }
+        }
 
     /** The stored copy, which may have gained a body since the list was built. */
     fun current(messageId: String): Message? = all.firstOrNull { it.messageId == messageId }

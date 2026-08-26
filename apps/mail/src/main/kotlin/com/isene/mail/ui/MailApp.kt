@@ -55,6 +55,7 @@ import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.readAccountsFile
 import com.isene.mail.data.readDiscordFile
 import com.isene.mail.data.readFeedsFile
+import com.isene.mail.viewmodel.ComposeRequest
 import com.isene.mail.viewmodel.MailViewModel
 import com.isene.mail.work.MailSyncWorker
 import uniffi.fe2o3_mobile_core.Message
@@ -64,6 +65,7 @@ import uniffi.fe2o3_mobile_core.Message
 fun MailApp(vm: MailViewModel) {
     val ui by vm.ui.collectAsState()
     var open by remember { mutableStateOf<Message?>(null) }
+    var compose by remember { mutableStateOf<ComposeRequest?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
@@ -72,13 +74,24 @@ fun MailApp(vm: MailViewModel) {
     // marking read reaches the laptop.
     var confirmBulk by remember { mutableStateOf<String?>(null) }
 
+    compose?.let { req ->
+        // Back drops the draft and returns to the message it answers.
+        BackHandler { vm.clearStatus(); compose = null }
+        ComposeScreen(vm, req, onDone = { compose = null })
+        return
+    }
+
     open?.let { m ->
         // System back belongs to the app while a message is open: it goes
         // back to the list, not out of mail altogether.
         BackHandler { vm.closeBody(); open = null }
         // The stored copy, so a body fetched a moment ago is used rather
         // than fetched again.
-        MessageScreen(vm, vm.current(m.messageId) ?: m, onBack = { open = null })
+        MessageScreen(
+            vm, vm.current(m.messageId) ?: m,
+            onBack = { open = null },
+            onCompose = { compose = it },
+        )
         return
     }
 

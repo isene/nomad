@@ -294,6 +294,168 @@ pub fn set_read_mark(marks: Vec<ReadMark>, message_id: String, read: bool, now: 
     from_marks(m)
 }
 
+// ---------- replying and forwarding ----------
+//
+// What goes in the reply, and how it is addressed, is decided here and
+// nowhere in Kotlin: the same prefixes, the same "On …, X wrote:" line
+// and the same forward fences as desktop kastrup, so a mail answered
+// from the phone threads and reads exactly like one answered from the
+// laptop. Kotlin only carries the result to a socket.
+
+/// What a reply or a forward starts from. The user edits it, then the
+/// shell sends it.
+#[derive(Debug, Clone, PartialEq, Default, uniffi::Record)]
+pub struct Draft {
+    pub to: String,
+    pub cc: String,
+    pub subject: String,
+    /// Empty for a chat reply; a quoted or forwarded block for mail.
+    pub body: String,
+    /// Bare Message-ID the reply answers. Empty when there is none.
+    pub in_reply_to: String,
+    /// The `References` header to send: the original's chain plus the
+    /// original itself, angle brackets included.
+    pub references: String,
+}
+
+/// The inline-forward fences, verbatim from desktop kastrup.
+const FWD_BEGIN: &str = "---------- Forwarded message ----------\n";
+const FWD_END: &str = "-------- End forwarded message --------\n";
+
+/// One header out of a raw RFC822 message, unfolded and decoded. Only
+/// the header block is searched, so a quoted "To:" in the body cannot
+/// be mistaken for the real one.
+fn header(raw: &str, name: &str) -> String {
+    let end = mail::body_after_headers(raw);
+    let head = &raw[..end.min(raw.len())];
+    let mut out: Option<String> = None;
+    for line in head.lines() {
+        if let Some(cur) = out.as_mut() {
+            if line.starts_with(' ') || line.starts_with('\t') {
+                cur.push(' ');
+                cur.push_str(line.trim());
+                continue;
+            }
+            break;
+        }
+        if line.len() > name.len() + 1
+            && line.as_bytes()[name.len()] == b':'
+            && line[..name.len()].eq_ignore_ascii_case(name)
+        {
+            out = Some(line[name.len() + 1..].trim().to_string());
+        }
+    }
+    out.map(|s| mail::decode_rfc2047(&s)).unwrap_or_default()
+}
+
+/// Does the subject already carry one of these prefixes? Case does not
+/// matter: "RE:" and "re:" are both a reply.
+fn has_prefix(subject: &str, prefixes: &[&str]) -> bool {
+    let lower = subject.trim_start().to_ascii_lowercase();
+    prefixes.iter().any(|p| lower.starts_with(p))
+}
+
+/// The bare address inside "Name <addr>", lowercased for comparison.
+fn bare_address(s: &str) -> String {
+    let s = s.trim();
+    match (s.rfind('<'), s.rfind('>')) {
+        (Some(a), Some(b)) if a < b => s[a + 1..b].trim().to_ascii_lowercase(),
+        _ => s.to_ascii_lowercase(),
+    }
+}
+
+/// A reply to `m`, addressed the way desktop kastrup addresses it.
+///
+/// `date` is the original's timestamp already written out by the shell,
+/// in the phone's own zone; the core has no clock and no zone table.
+///
+/// Reply-all puts the original sender in To and everyone else the mail
+/// went to in Cc, minus the replying account and minus the sender, who
+/// is already in To. Chat replies (Discord, a relayed notification)
+/// carry no quote: the platform shows the thread itself.
+#[uniffi::export]
+pub fn compose_reply(m: Message, all: bool, date: String) -> Draft {
+    let subject = if has_prefix(&m.subject, &["re:", "sv:", "svar:", "aw:"]) {
+        m.subject.clone()
+    } else {
+        format!("Re: {}", m.subject)
+    };
+    if m.source != "mail" {
+        return Draft { to: m.from.clone(), subject, ..Default::default() };
+    }
+
+    let cc = if all {
+        let own = m.account.to_ascii_lowercase();
+        let sender = bare_address(&m.from);
+        let to_hdr = header(&m.raw, "To");
+        let to_list = if to_hdr.is_empty() { m.to.as_str() } else { to_hdr.as_str() };
+        let cc_hdr = header(&m.raw, "Cc");
+        to_list.split(',').chain(cc_hdr.split(','))
+            .map(str::trim)
+            .filter(|a| !a.is_empty())
+            .filter(|a| {
+                let bare = bare_address(a);
+                bare != own && bare != sender
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    } else {
+        String::new()
+    };
+
+    let mut body = String::new();
+    body.push_str(&format!("\n\nOn {}, {} wrote:\n", date, m.from));
+    let html = if m.html.trim().is_empty() { None } else { Some(m.html.as_str()) };
+    for line in mail::body_text(&m.raw, html).lines() {
+        body.push_str("> ");
+        body.push_str(line);
+        body.push('\n');
+    }
+
+    // A UID-keyed id is the phone's own stand-in, not a Message-ID; the
+    // recipient could thread nothing on it.
+    let mid = if m.message_id.starts_with("uid:") { String::new() } else { m.message_id.clone() };
+    let references = if mid.is_empty() {
+        String::new()
+    } else {
+        let mut refs: Vec<String> = header(&m.raw, "References")
+            .split_whitespace().map(str::to_string).collect();
+        refs.push(format!("<{}>", mid));
+        refs.join(" ")
+    };
+
+    Draft { to: m.from.clone(), cc, subject, body, in_reply_to: mid, references }
+}
+
+/// `m` forwarded as mail, inline, between the same fences the laptop
+/// uses. Any channel can be forwarded: a feed entry carries its link
+/// too, since that is the whole of what a feed entry is for.
+#[uniffi::export]
+pub fn compose_forward(m: Message, date: String) -> Draft {
+    let subject = if has_prefix(&m.subject, &["fwd:", "fw:", "vs:"]) {
+        m.subject.clone()
+    } else {
+        format!("Fwd: {}", m.subject)
+    };
+    let html = if m.html.trim().is_empty() { None } else { Some(m.html.as_str()) };
+    let content = mail::mime::normalize_line_endings(mail::body_text(&m.raw, html));
+
+    let mut body = String::from("\n\n");
+    body.push_str(FWD_BEGIN);
+    body.push_str(&format!("From: {}\n", m.from));
+    body.push_str(&format!("Date: {}\n", date));
+    body.push_str(&format!("Subject: {}\n", m.subject));
+    if !m.link.is_empty() {
+        body.push_str(&format!("Link: {}\n", m.link));
+    }
+    body.push('\n');
+    body.push_str(&content);
+    if !content.ends_with('\n') { body.push('\n'); }
+    body.push_str(FWD_END);
+
+    Draft { subject, body, ..Default::default() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -417,5 +579,82 @@ mod tests {
     fn a_body_decodes_through_the_shared_crate() {
         let out = mail_body_text("Hei =C3=A5 =\nder\n".into(), String::new());
         assert!(out.contains("Hei å der"), "got {:?}", out);
+    }
+
+    fn a_mail() -> Message {
+        Message {
+            message_id: "orig@x".into(), source: "mail".into(), link: String::new(), uid: 7,
+            account: "me@isene.com".into(), folder: "INBOX".into(),
+            from: "Alice <alice@x>".into(),
+            to: "me@isene.com, Bob <bob@x>".into(),
+            subject: "Plans".into(), date: 100,
+            raw: "From: Alice <alice@x>\r\nTo: me@isene.com, Bob <bob@x>\r\nCc: Carol <carol@x>\r\n\
+                  References: <root@x> <mid@x>\r\nSubject: Plans\r\n\
+                  Content-Type: text/plain; charset=utf-8\r\n\r\nSee you at nine.\r\n".into(),
+            html: String::new(), has_attachments: false,
+        }
+    }
+
+    #[test]
+    fn a_reply_quotes_and_threads() {
+        let d = compose_reply(a_mail(), false, "2026-08-26 09:00".into());
+        assert_eq!(d.to, "Alice <alice@x>");
+        assert_eq!(d.cc, "");
+        assert_eq!(d.subject, "Re: Plans");
+        assert_eq!(d.body, "\n\nOn 2026-08-26 09:00, Alice <alice@x> wrote:\n> See you at nine.\n");
+        assert_eq!(d.in_reply_to, "orig@x");
+        assert_eq!(d.references, "<root@x> <mid@x> <orig@x>");
+    }
+
+    #[test]
+    fn reply_all_keeps_everyone_but_me_and_the_sender() {
+        let d = compose_reply(a_mail(), true, "".into());
+        assert_eq!(d.to, "Alice <alice@x>");
+        assert_eq!(d.cc, "Bob <bob@x>, Carol <carol@x>");
+    }
+
+    #[test]
+    fn a_prefix_already_there_is_not_doubled() {
+        let mut m = a_mail();
+        m.subject = "SV: Plans".into();
+        assert_eq!(compose_reply(m.clone(), false, "".into()).subject, "SV: Plans");
+        m.subject = "Fwd: Plans".into();
+        assert_eq!(compose_forward(m, "".into()).subject, "Fwd: Plans");
+    }
+
+    #[test]
+    fn a_chat_reply_carries_no_quote_and_no_headers() {
+        let mut m = a_mail();
+        m.source = "discord".into();
+        m.message_id = "discord_1".into();
+        let d = compose_reply(m, false, "".into());
+        assert_eq!(d.body, "");
+        assert_eq!(d.in_reply_to, "");
+        assert_eq!(d.references, "");
+    }
+
+    #[test]
+    fn a_forward_sits_between_the_fences() {
+        let d = compose_forward(a_mail(), "2026-08-26 09:00".into());
+        assert_eq!(d.to, "");
+        assert_eq!(d.subject, "Fwd: Plans");
+        assert_eq!(
+            d.body,
+            "\n\n---------- Forwarded message ----------\nFrom: Alice <alice@x>\n\
+             Date: 2026-08-26 09:00\nSubject: Plans\n\nSee you at nine.\n\
+             -------- End forwarded message --------\n"
+        );
+    }
+
+    #[test]
+    fn a_feed_entry_forwards_with_its_link() {
+        let mut m = a_mail();
+        m.source = "rss".into();
+        m.link = "https://example.com/p".into();
+        m.raw = String::new();
+        m.html = "<p>Hello</p>".into();
+        let d = compose_forward(m, "".into());
+        assert!(d.body.contains("Link: https://example.com/p\n"));
+        assert!(d.body.contains("\nHello\n"));
     }
 }

@@ -18,6 +18,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Forward
+import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.automirrored.filled.ReplyAll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -52,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.isene.mail.data.Attachments
+import com.isene.mail.viewmodel.ComposeRequest
 import com.isene.mail.viewmodel.MailViewModel
 import com.isene.mail.viewmodel.UiState
 import java.text.SimpleDateFormat
@@ -164,7 +168,12 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MessageScreen(vm: MailViewModel, mail: Message, onBack: () -> Unit) {
+fun MessageScreen(
+    vm: MailViewModel,
+    mail: Message,
+    onBack: () -> Unit,
+    onCompose: (ComposeRequest) -> Unit,
+) {
     val body by vm.body.collectAsState()
     val ui by vm.ui.collectAsState()
     LaunchedEffect(mail.messageId) { vm.open(mail) }
@@ -179,6 +188,28 @@ fun MessageScreen(vm: MailViewModel, mail: Message, onBack: () -> Unit) {
                     }
                 },
                 title = { Text(mail.subject, maxLines = 1, fontSize = 16.sp) },
+                actions = {
+                    // A feed has nobody to answer. Everything else does:
+                    // mail by mail, a channel post on the channel, a
+                    // relayed chat through relay.
+                    val canReply = mail.source == "mail" || mail.source == "discord" ||
+                        mail.messageId.startsWith("gw_")
+                    // Mail quotes the body, so the body must be here first.
+                    val ready = mail.source != "mail" || body != null
+                    if (canReply) {
+                        IconButton(enabled = ready, onClick = { onCompose(vm.compose(mail, "reply")) }) {
+                            Icon(Icons.AutoMirrored.Filled.Reply, "Reply")
+                        }
+                    }
+                    if (mail.source == "mail") {
+                        IconButton(enabled = ready, onClick = { onCompose(vm.compose(mail, "reply", all = true)) }) {
+                            Icon(Icons.AutoMirrored.Filled.ReplyAll, "Reply all")
+                        }
+                    }
+                    IconButton(enabled = ready, onClick = { onCompose(vm.compose(mail, "forward")) }) {
+                        Icon(Icons.AutoMirrored.Filled.Forward, "Forward")
+                    }
+                },
             )
         },
         bottomBar = {
