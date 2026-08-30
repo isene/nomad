@@ -3,6 +3,8 @@
     <!-- Sideloaded personal tool; needed to see other installed packages
          on Android 11+ (package visibility filtering). -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
+    <!-- Lets the uninstall menu item hand the package to the system installer. -->
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
     <application
         android:allowBackup="true"
