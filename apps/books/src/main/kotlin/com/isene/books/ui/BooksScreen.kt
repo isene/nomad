@@ -33,6 +33,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalView
+import com.isene.books.data.Heading
+import com.isene.books.data.trackStarts
+import kotlinx.coroutines.delay
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Refresh
@@ -415,6 +430,47 @@ private fun ReaderScreen(vm: BooksViewModel) {
     val progress =
         (100f * scroll.value / scroll.maxValue.coerceAtLeast(1)).toInt().coerceIn(0, 100)
 
+    // Listening. Headings report where they lie in the laid-out text, so a
+    // track can be placed at its chapter and the text can follow the voice.
+    val tracks = vm.content?.tracks ?: emptyList()
+    val headings = remember(book.id) { mutableStateMapOf<Int, Heading>() }
+    var viewportH by remember { mutableStateOf(0) }
+    var viewportTop by remember { mutableStateOf(0f) }
+    // Dragging while listening moves the text against the voice and stays
+    // that way, so a page that has drifted can be put right.
+    var nudge by remember(book.id) { mutableStateOf(0f) }
+    val nudgeConn = remember(book.id) {
+        object : NestedScrollConnection {
+            override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                if (vm.audioTrack >= 0) nudge -= consumed.y
+                return Offset.Zero
+            }
+        }
+    }
+    fun starts() = trackStarts(tracks, headings.values.sortedBy { it.y })
+    val listening = vm.audioTrack >= 0 && !vm.audioPaused
+    LaunchedEffect(vm.audioTrack, book.id) {
+        if (vm.audioTrack < 0) return@LaunchedEffect
+        nudge = 0f
+        while (true) {
+            val st = starts()
+            val i = vm.audioTrack
+            if (i in st.indices && !vm.audioPaused && viewportH > 0) {
+                val start = st[i]
+                val end = st.filter { it > start }.minOrNull() ?: (scroll.maxValue + viewportH).toFloat()
+                val line = start + vm.audioFrac * (end - start)
+                val target = (line - viewportH / 3f + nudge).toInt().coerceIn(0, scroll.maxValue)
+                scroll.animateScrollTo(target)
+            }
+            delay(1000)
+        }
+    }
+    val view = LocalView.current
+    DisposableEffect(listening) {
+        view.keepScreenOn = listening
+        onDispose { view.keepScreenOn = false }
+    }
+
     // Resume at the synced bookmark once the content has actually laid out.
     // ScrollState.maxValue is Int.MAX_VALUE until measured, so wait for the
     // real overflow before restoring — otherwise the restore scrolls to a
@@ -462,10 +518,25 @@ private fun ReaderScreen(vm: BooksViewModel) {
                         Text(book.title, style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold, maxLines = 1,
                             overflow = TextOverflow.Ellipsis)
-                        Text("$progress%", style = MaterialTheme.typography.bodySmall)
+                        val voice = if (vm.audioTrack >= 0)
+                            "  ·  ${if (vm.audioPaused) "⏸" else "▶"} ${vm.audioTrack + 1}/${tracks.size}" else ""
+                        Text("$progress%$voice", style = MaterialTheme.typography.bodySmall)
                     }
                 },
                 actions = {
+                    if (tracks.isNotEmpty()) {
+                        // Play the chapter at the current position; once
+                        // playing, pause and resume.
+                        IconButton(onClick = {
+                            val st = starts()
+                            val here = scroll.value + viewportH / 3f
+                            val i = st.indices.filter { st[it] <= here }.maxByOrNull { st[it] } ?: 0
+                            vm.playPause(i)
+                        }) {
+                            Icon(if (listening) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = "Listen")
+                        }
+                    }
                     // Tap: set/move the bookmark (picks the folder first time).
                     // Long-press: re-pick the library-state folder (if the first
                     // grant pointed at the wrong place).
@@ -501,7 +572,11 @@ private fun ReaderScreen(vm: BooksViewModel) {
         },
     ) { inner ->
         val c = vm.content
-        Box(Modifier.fillMaxSize().padding(inner)) {
+        Box(
+            Modifier.fillMaxSize().padding(inner).nestedScroll(nudgeConn)
+                .onSizeChanged { viewportH = it.height }
+                .onGloballyPositioned { viewportTop = it.positionInRoot().y },
+        ) {
             when {
                 vm.contentLoading || c == null ->
                     Text(
@@ -509,7 +584,15 @@ private fun ReaderScreen(vm: BooksViewModel) {
                         modifier = Modifier.align(Alignment.Center),
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     )
-                else -> BookText(c.md, c.figures, c.equations, vm.fontScale, scroll) { zoom = it }
+                else -> BookText(
+                    c.md, c.figures, c.equations, vm.fontScale, scroll,
+                    onHeading = { li, level, text, coords ->
+                        // Screen position plus the scroll offset, minus the
+                        // reader's top: the heading's place in the text.
+                        val y = coords.positionInRoot().y + scroll.value - viewportTop
+                        headings[li] = Heading(level, text, y)
+                    },
+                ) { zoom = it }
             }
         }
     }
@@ -565,6 +648,7 @@ private fun BookText(
     equations: Map<Int, android.net.Uri>,
     scale: Float,
     scroll: androidx.compose.foundation.ScrollState,
+    onHeading: (Int, Int, String, LayoutCoordinates) -> Unit = { _, _, _, _ -> },
     onZoom: (android.net.Uri) -> Unit,
 ) {
     val accent = MaterialTheme.colorScheme.primary
@@ -607,14 +691,18 @@ private fun BookText(
                 )
                 line.startsWith("## ") -> {
                     Spacer(Modifier.height(22.dp))
+                    val idx = li
                     Text(line.substring(3), color = accent, fontWeight = FontWeight.Bold,
-                        fontSize = (22 * scale).sp, lineHeight = (28 * scale).sp)
+                        fontSize = (22 * scale).sp, lineHeight = (28 * scale).sp,
+                        modifier = Modifier.onGloballyPositioned { onHeading(idx, 2, line.substring(3), it) })
                     HorizontalDivider(Modifier.padding(top = 5.dp, bottom = 8.dp))
                 }
                 line.startsWith("### ") -> {
                     Spacer(Modifier.height(14.dp))
+                    val idx = li
                     Text(line.substring(4), color = body, fontWeight = FontWeight.Bold,
-                        fontSize = (19 * scale).sp, lineHeight = (25 * scale).sp)
+                        fontSize = (19 * scale).sp, lineHeight = (25 * scale).sp,
+                        modifier = Modifier.onGloballyPositioned { onHeading(idx, 3, line.substring(4), it) })
                     Spacer(Modifier.height(4.dp))
                 }
                 line.startsWith("> ") -> Text(
