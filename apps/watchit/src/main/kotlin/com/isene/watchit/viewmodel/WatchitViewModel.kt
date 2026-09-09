@@ -42,6 +42,12 @@ data class UiState(
     val genresExclude: List<String> = emptyList(),
     val movieCount: Int = 0,
     val seriesCount: Int = 0,
+    /** The curated lists for the current view. They live here, not only in
+     *  Settings, because Compose can only see what the state carries: a
+     *  wish that changed nothing in this record left the flow silent, and
+     *  the screen kept saying "Add to Wish" after the tap. */
+    val wish: List<String> = emptyList(),
+    val dump: List<String> = emptyList(),
     val ratingMin: Double = 0.0,
     val yearMin: Int = 0,
     val yearMax: Int = 0,
@@ -171,6 +177,7 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
         val view = settings.view
         val cat = catalog(view)
         val dumpIds = if (view == "movies") settings.dumpMovies else settings.dumpSeries
+        val wishIds = if (view == "movies") settings.wishMovies else settings.wishSeries
         var filtered = filterSort(
             cat, settings.ratingMin, settings.yearMin, settings.yearMax,
             settings.genresInclude, settings.genresExclude, dumpIds, settings.sort,
@@ -186,6 +193,8 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
             genresExclude = settings.genresExclude,
             movieCount = movies.size,
             seriesCount = series.size,
+            wish = wishIds,
+            dump = dumpIds,
             ratingMin = settings.ratingMin,
             yearMin = settings.yearMin,
             yearMax = settings.yearMax,

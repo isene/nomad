@@ -184,8 +184,11 @@ fun DetailScreen(vm: WatchitViewModel, item: ListItem, onBack: () -> Unit) {
     LaunchedEffect(item.id) {
         if (d == null) vm.fetchDetails(item.id, item.kind)
     }
-    val wished = vm.isWished(item.id)
-    val dumped = vm.isDumped(item.id)
+    // From the state, not from Settings: a plain preference read cannot
+    // tell Compose that the tap changed anything.
+    val ui by vm.ui.collectAsState()
+    val wished = item.id in ui.wish
+    val dumped = item.id in ui.dump
 
     Scaffold(
         topBar = {

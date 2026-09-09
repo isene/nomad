@@ -132,11 +132,8 @@ fun WatchitApp(vm: WatchitViewModel) {
         bottomBar = {
             NavigationBar {
                 NavigationBarItem(selected = tab == Tab.Browse, onClick = { tab = Tab.Browse }, icon = {}, label = { Text("Browse (${ui.filtered.size})") })
-                val view = ui.view
-                val wishN = if (view == "movies") vm.settingsObj().wishMovies.size else vm.settingsObj().wishSeries.size
-                val dumpN = if (view == "movies") vm.settingsObj().dumpMovies.size else vm.settingsObj().dumpSeries.size
-                NavigationBarItem(selected = tab == Tab.Wish, onClick = { tab = Tab.Wish }, icon = {}, label = { Text("Wish ($wishN)") })
-                NavigationBarItem(selected = tab == Tab.Dump, onClick = { tab = Tab.Dump }, icon = {}, label = { Text("Dump ($dumpN)") })
+                NavigationBarItem(selected = tab == Tab.Wish, onClick = { tab = Tab.Wish }, icon = {}, label = { Text("Wish (${ui.wish.size})") })
+                NavigationBarItem(selected = tab == Tab.Dump, onClick = { tab = Tab.Dump }, icon = {}, label = { Text("Dump (${ui.dump.size})") })
             }
         },
     ) { pad ->
