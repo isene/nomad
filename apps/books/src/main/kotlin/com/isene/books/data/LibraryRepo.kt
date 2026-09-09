@@ -45,13 +45,15 @@ data class Heading(val level: Int, val text: String, val y: Float)
  * reader: a track named after a heading starts there; tracks with no heading
  * in their names take the chapters in order; anything else starts at the top.
  * Names are compared on letters and digits only, so "Don't Be Afraid" meets
- * dont-be-afraid.mp3.
+ * dont-be-afraid.mp3. A long name may have been cut short by whatever made
+ * the file, so a heading that begins with a name of 24+ characters counts too.
  */
 fun trackStarts(tracks: List<Track>, headings: List<Heading>): List<Float> {
     fun key(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
+    fun fits(h: String, s: String) = key(h).let { it == s || (s.length >= 24 && it.startsWith(s)) }
     val starts = MutableList<Float?>(tracks.size) { i ->
         val s = key(tracks[i].stem.trimStart { it.isDigit() || it in "-_ ." })
-        if (s.isEmpty()) null else headings.firstOrNull { key(it.text) == s }?.y
+        if (s.isEmpty()) null else headings.firstOrNull { fits(it.text, s) }?.y
     }
     if (tracks.size > 1 && starts.all { it == null } && headings.isNotEmpty()) {
         val lvl = if (headings.count { it.level == 2 } >= 2) 2 else headings.minOf { it.level }
