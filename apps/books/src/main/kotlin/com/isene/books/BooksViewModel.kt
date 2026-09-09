@@ -170,7 +170,71 @@ class BooksViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun closeReader() { open = null; content = null }
+    fun closeReader() { stopAudio(); open = null; content = null }
+
+    // Listening. The player lives here so it survives rotation; the reader
+    // closing releases it. A one-second ticker runs only while a track plays.
+    private var player: android.media.MediaPlayer? = null
+    private var ticker: kotlinx.coroutines.Job? = null
+    /** Index of the playing track, or -1 when nothing plays. */
+    var audioTrack by mutableStateOf(-1); private set
+    var audioPaused by mutableStateOf(false); private set
+    /** How far into the track the voice is, 0..1. */
+    var audioFrac by mutableStateOf(0f); private set
+
+    /** Start track `i`, or pause / resume the one already playing. */
+    fun playPause(i: Int) {
+        val p = player
+        if (p != null && audioTrack >= 0) {
+            if (p.isPlaying) { p.pause(); audioPaused = true } else { p.start(); audioPaused = false }
+            return
+        }
+        startTrack(i)
+    }
+
+    private fun startTrack(i: Int) {
+        val tracks = content?.tracks ?: return
+        if (i !in tracks.indices) { stopAudio(); return }
+        stopPlayer()
+        val p = android.media.MediaPlayer()
+        player = p
+        audioTrack = i; audioPaused = false; audioFrac = 0f
+        viewModelScope.launch(Dispatchers.IO) {
+            val ok = runCatching {
+                p.setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA).build()
+                )
+                p.setDataSource(getApplication(), tracks[i].uri)
+                p.prepare()
+            }.isSuccess
+            withContext(Dispatchers.Main) {
+                if (player !== p) return@withContext          // stopped meanwhile
+                if (!ok) { message = "Could not play ${tracks[i].stem}.mp3"; stopAudio(); return@withContext }
+                p.setOnCompletionListener { startTrack(i + 1) }
+                p.start()
+                ticker?.cancel()
+                ticker = viewModelScope.launch {
+                    while (true) {
+                        val d = runCatching { p.duration }.getOrDefault(0)
+                        if (d > 0) audioFrac = (p.currentPosition.toFloat() / d).coerceIn(0f, 1f)
+                        kotlinx.coroutines.delay(1000)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stopPlayer() {
+        ticker?.cancel(); ticker = null
+        player?.let { runCatching { it.stop() }; it.release() }
+        player = null
+    }
+
+    fun stopAudio() { stopPlayer(); audioTrack = -1; audioPaused = false; audioFrac = 0f }
+
+    override fun onCleared() { stopPlayer(); super.onCleared() }
 
     fun setStateFolder(treeUri: String) {
         Prefs.setStateUri(getApplication(), treeUri)

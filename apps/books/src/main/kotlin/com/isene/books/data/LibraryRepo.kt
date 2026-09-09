@@ -25,13 +25,40 @@ data class Book(
     val deep: Boolean,
 )
 
+/** A spoken track in `books/<id>/audio/`: the file name without .mp3, and where it is. */
+data class Track(val stem: String, val uri: Uri)
+
 /** A loaded book: Markdown plus resolved figure (figN.png) and equation
- *  (eqN.png) image URIs, keyed by their number. */
+ *  (eqN.png) image URIs, keyed by their number, and its spoken tracks. */
 data class BookContent(
     val md: String,
     val figures: Map<Int, Uri>,
     val equations: Map<Int, Uri> = emptyMap(),
+    val tracks: List<Track> = emptyList(),
 )
+
+/** A heading as laid out in the reader: level (2 or 3), text, and y offset in px. */
+data class Heading(val level: Int, val text: String, val y: Float)
+
+/**
+ * Where each track begins in the laid-out text, the same rule as the laptop
+ * reader: a track named after a heading starts there; tracks with no heading
+ * in their names take the chapters in order; anything else starts at the top.
+ * Names are compared on letters and digits only, so "Don't Be Afraid" meets
+ * dont-be-afraid.mp3.
+ */
+fun trackStarts(tracks: List<Track>, headings: List<Heading>): List<Float> {
+    fun key(s: String) = s.lowercase().filter { it.isLetterOrDigit() }
+    val starts = MutableList<Float?>(tracks.size) { i ->
+        val s = key(tracks[i].stem.trimStart { it.isDigit() || it in "-_ ." })
+        if (s.isEmpty()) null else headings.firstOrNull { key(it.text) == s }?.y
+    }
+    if (tracks.size > 1 && starts.all { it == null } && headings.isNotEmpty()) {
+        val lvl = if (headings.count { it.level == 2 } >= 2) 2 else headings.minOf { it.level }
+        headings.filter { it.level == lvl }.take(tracks.size).forEachIndexed { i, h -> starts[i] = h.y }
+    }
+    return starts.map { it ?: 0f }
+}
 
 /**
  * Read-only reader over the synced `~/.library` folder:
@@ -76,7 +103,11 @@ class LibraryRepo(private val context: Context) {
             figName.find(name)?.groupValues?.get(1)?.toIntOrNull()?.let { figs[it] = f.uri }
             eqName.find(name)?.groupValues?.get(1)?.toIntOrNull()?.let { eqs[it] = f.uri }
         }
-        return BookContent(text, figs, eqs)
+        val tracks = dir.findFile("audio")?.takeIf { it.isDirectory }?.listFiles()
+            ?.filter { it.isFile && (it.name ?: "").endsWith(".mp3", ignoreCase = true) }
+            ?.map { Track((it.name ?: "").dropLast(4), it.uri) }
+            ?.sortedBy { it.stem } ?: emptyList()
+        return BookContent(text, figs, eqs, tracks)
     }
 
     /**
