@@ -410,6 +410,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         Scope.matches(m, scope, settings)
 
     private fun recompute() {
+        // One row per id, always. The list keys on the Message-ID, and
+        // Compose throws the moment two rows claim the same key — which
+        // took the app down on launch, over and over, because the
+        // offending pair was in the store and every start read it back.
+        // Newest wins: the list is sorted newest first.
+        all = all.distinctBy { it.messageId }
         val filter = settings.filter
         // The laptop's view, with this phone's own overrides on top.
         val readIds = ReadState.merge(laptopRead, settings.localMarks)
