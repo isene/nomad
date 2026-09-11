@@ -181,8 +181,15 @@ pub fn discord_latest_id(messages: Vec<Message>) -> String {
 /// What this can and cannot be is worth stating: a notification carries
 /// a sender and a preview, so that is the whole message. No history, no
 /// thread, and nothing that never raised a notification.
+///
+/// `file_id` is the name relay gave the file, which carries milliseconds
+/// and a random tail and so is unique per notification. It is the
+/// identity, because nothing inside the file is: two notifications from
+/// the same chat in the same second whose texts are the same length were
+/// one message to the old rule, and two rows under one id is a crash in
+/// the list.
 #[uniffi::export]
-pub fn parse_gateway(json: String) -> Option<Message> {
+pub fn parse_gateway(json: String, file_id: String) -> Option<Message> {
     let v: serde_json::Value = serde_json::from_str(&json).ok()?;
     let platform = v.get("platform")?.as_str()?.to_string();
     let thread = v.get("thread_key").and_then(|x| x.as_str()).unwrap_or("").to_string();
@@ -191,9 +198,12 @@ pub fn parse_gateway(json: String) -> Option<Message> {
         .filter(|s| !s.is_empty())
         .unwrap_or(&thread).to_string();
     let ts = v.get("timestamp").and_then(|x| x.as_i64()).unwrap_or(0);
-    // The relay writes one file per notification and never twice, so its
-    // own id is the identity; failing that, the shape of the message is.
+    // An id inside the file wins, then the file's own name. The shape of
+    // the message is the last resort, and only because a caller with no
+    // name to give must still get something back.
     let id = v.get("id").and_then(|x| x.as_str()).map(str::to_string)
+        .filter(|s| !s.is_empty())
+        .or(Some(file_id).filter(|s| !s.is_empty()))
         .unwrap_or_else(|| format!("{}:{}:{}:{}", platform, thread, ts, text.len()));
     Some(Message {
         message_id: format!("gw_{}", id),
@@ -505,7 +515,7 @@ mod tests {
     fn a_captured_notification_becomes_a_message() {
         let json = r#"{"platform":"whatsapp","thread_key":"Alice","sender":"Alice",
                        "text":"hei\nder","timestamp":1716900000}"#;
-        let m = parse_gateway(json.into()).unwrap();
+        let m = parse_gateway(json.into(), "f1".into()).unwrap();
         assert_eq!(m.source, "whatsapp", "the platform IS the channel");
         assert_eq!(m.from, "Alice");
         assert_eq!(m.subject, "hei", "the first line, as with any chat");
@@ -514,15 +524,34 @@ mod tests {
     }
 
     #[test]
+    fn two_notifications_one_second_apart_stay_two_messages() {
+        // Workspace hides the content of a sensitive notification, so
+        // several in a row are the same platform, the same empty thread
+        // and the same text length. Keyed on that, they were one message
+        // twice over, and the list crashed on the repeated key.
+        let json = r#"{"platform":"workspace","thread_key":"","sender":"",
+                       "text":"Sensitive notification content hidden","timestamp":1789124120}"#;
+        let a = parse_gateway(json.into(), "workspace-1789124120652-2e250af1".into()).unwrap();
+        let b = parse_gateway(json.into(), "workspace-1789124120804-6caa0edb".into()).unwrap();
+        assert_ne!(a.message_id, b.message_id);
+    }
+
+    #[test]
+    fn an_id_inside_the_file_still_wins() {
+        let json = r#"{"platform":"sms","thread_key":"A","text":"hi","id":"abc"}"#;
+        assert_eq!(parse_gateway(json.into(), "some-file".into()).unwrap().message_id, "gw_abc");
+    }
+
+    #[test]
     fn a_notification_with_no_sender_falls_back_to_the_thread() {
         let json = r#"{"platform":"sms","thread_key":"+4712345678","text":"hi"}"#;
-        assert_eq!(parse_gateway(json.into()).unwrap().from, "+4712345678");
+        assert_eq!(parse_gateway(json.into(), "f1".into()).unwrap().from, "+4712345678");
     }
 
     #[test]
     fn rubbish_is_not_a_message() {
-        assert!(parse_gateway("not json".into()).is_none());
-        assert!(parse_gateway("{}".into()).is_none());
+        assert!(parse_gateway("not json".into(), "f1".into()).is_none());
+        assert!(parse_gateway("{}".into(), "f1".into()).is_none());
     }
 
     #[test]

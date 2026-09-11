@@ -42,7 +42,10 @@ object GatewayRepo {
             val text = runCatching {
                 ctx.contentResolver.openInputStream(f.uri)?.use { it.bufferedReader().readText() }
             }.getOrNull() ?: continue
-            val m = runCatching { parseGateway(text) }.getOrNull()
+            // The file name is the identity: relay stamps it with
+            // milliseconds and a random tail, and nothing inside the file
+            // tells two notifications of one second apart apart.
+            val m = runCatching { parseGateway(text, name.removeSuffix(".json")) }.getOrNull()
             if (m != null) msgs.add(m)
             // Unparseable ones go too: a file that cannot be read once
             // cannot be read later either, and leaving it makes the queue
