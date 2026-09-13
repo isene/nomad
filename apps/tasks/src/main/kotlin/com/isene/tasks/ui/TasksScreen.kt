@@ -17,7 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -121,6 +121,7 @@ fun TasksScreen(vm: TasksViewModel) {
 
     val cats = state.hyperlist.categories
     val rows = state.hyperlist.flatRows(state.collapsed)
+    val keys = rowKeys(rows, cats)
     val listState = rememberLazyListState()
     val reorderState = rememberReorderableLazyListState(listState) { from, to ->
         vm.onDragMove(from.index, to.index)
@@ -195,8 +196,8 @@ fun TasksScreen(vm: TasksViewModel) {
                 contentPadding = PaddingValues(8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                items(rows, key = { row -> rowKey(row, cats) }) { row ->
-                    ReorderableItem(reorderState, key = rowKey(row, cats)) { _ ->
+                itemsIndexed(rows, key = { i, _ -> keys[i] }) { i, row ->
+                    ReorderableItem(reorderState, key = keys[i]) { _ ->
                         when (row) {
                             is TaskRow.Header -> {
                                 val cat = cats.getOrNull(row.catIdx)
@@ -207,7 +208,7 @@ fun TasksScreen(vm: TasksViewModel) {
                                         onToggle = { vm.toggleCollapse(cat.name) },
                                         onAddItem = { addItemUnderCat = row.catIdx },
                                         onMenu = { categoryMenuIdx = row.catIdx },
-                                        dragHandle = Modifier.draggableHandle(),
+                                        dragHandle = Modifier.draggableHandle(onDragStopped = { vm.onDragEnd() }),
                                     )
                                 }
                             }
@@ -224,7 +225,7 @@ fun TasksScreen(vm: TasksViewModel) {
                                         onMoveDown = { vm.moveItemDown(row.catIdx, row.itemIdx) },
                                         onMoveToCat = { moveItemTo = row.catIdx to row.itemIdx },
                                         onDelete = { vm.deleteItem(row.catIdx, row.itemIdx) },
-                                        dragHandle = Modifier.draggableHandle(),
+                                        dragHandle = Modifier.draggableHandle(onDragStopped = { vm.onDragEnd() }),
                                     )
                                 }
                             }
@@ -387,8 +388,8 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                     "• Tap the file icon to pick your synced todo.hl.\n" +
                         "• + on a category adds an item; the ⋮ menu adds a " +
                         "category, renames, or deletes.\n" +
-                        "• Long-press and drag to reorder. Edits save back to " +
-                        "the file automatically.\n" +
+                        "• Drag a row by its handle, as far up or down as you " +
+                        "like. Edits save back to the file automatically.\n" +
                         "• Add the home-screen widget for a glance at your items.",
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -417,11 +418,28 @@ private fun AboutDialog(onDismiss: () -> Unit) {
     )
 }
 
-private fun rowKey(row: TaskRow, cats: List<RustCategory>): String = when (row) {
-    is TaskRow.Header -> "cat:${row.catIdx}:${cats.getOrNull(row.catIdx)?.name.orEmpty()}"
-    is TaskRow.Item -> {
-        val it = cats.getOrNull(row.catIdx)?.items?.getOrNull(row.itemIdx)
-        "it:${row.catIdx}:${row.itemIdx}:${it?.text.orEmpty()}"
+/**
+ * One key per row, in row order.
+ *
+ * The key has to survive the row moving. It used to carry the row's
+ * position, so the first swap of a drag renamed the very row being
+ * dragged, the list lost hold of it, and the finger was left dragging
+ * nothing. That is why an item moved one place per gesture.
+ *
+ * What the row says names it instead. A counter keeps two rows that read
+ * the same apart, because a repeated key crashes the list.
+ */
+private fun rowKeys(rows: List<TaskRow>, cats: List<RustCategory>): List<String> {
+    val seen = HashMap<String, Int>()
+    return rows.map { row ->
+        val base = when (row) {
+            is TaskRow.Header -> "cat:" + cats.getOrNull(row.catIdx)?.name.orEmpty()
+            is TaskRow.Item ->
+                "it:" + cats.getOrNull(row.catIdx)?.items?.getOrNull(row.itemIdx)?.text.orEmpty()
+        }
+        val n = seen[base] ?: 0
+        seen[base] = n + 1
+        if (n == 0) base else "$base#$n"
     }
 }
 

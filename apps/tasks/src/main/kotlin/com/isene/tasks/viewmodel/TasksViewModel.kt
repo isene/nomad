@@ -217,6 +217,24 @@ class TasksViewModel(app: Application) : AndroidViewModel(app) {
         }
         if (next == hl) return
         _state.value = _state.value.copy(hyperlist = next)
+        dragMoved = true
+    }
+
+    /** Whether this drag has actually moved anything, so a grab and a
+     *  release with no travel writes nothing. */
+    private var dragMoved = false
+
+    /**
+     * The finger has lifted. Save once for the whole drag.
+     *
+     * A drag crosses a row at a time, and each of those used to be its
+     * own save: a write to the file, a widget redraw and a pass over
+     * every alarm. Dragging an item down ten rows paid all of that ten
+     * times over, for nine states nobody would ever see.
+     */
+    fun onDragEnd() {
+        if (!dragMoved) return
+        dragMoved = false
         persist()
     }
 
