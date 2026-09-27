@@ -41,7 +41,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import org.json.JSONTokener
 import uniffi.fe2o3_mobile_core.AdList
-import uniffi.fe2o3_mobile_core.Chat
 import uniffi.fe2o3_mobile_core.Login
 import uniffi.fe2o3_mobile_core.LoginChange
 import uniffi.fe2o3_mobile_core.Places
@@ -52,10 +51,14 @@ import uniffi.fe2o3_mobile_core.gazeTabParse
 import uniffi.fe2o3_mobile_core.gazeTabText
 import uniffi.fe2o3_mobile_core.gazeToUri
 
-enum class Screen { Browser, Tabs, Bookmarks, Claude, Passwords, Settings }
+enum class Screen { Browser, Tabs, Bookmarks, Passwords, Settings }
 
 /** Steven Black's unified hosts list: ads and trackers, public domain. */
 private const val HOSTS_URL = "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
+
+/** The Claude app, which takes the page for "Ask Claude". */
+private const val CLAUDE_APP = "com.anthropic.claude"
+private const val PAGE_MAX = 100_000
 
 class MainActivity : ComponentActivity() {
     lateinit var prefs: Prefs
@@ -74,7 +77,6 @@ class MainActivity : ComponentActivity() {
     var askMaster by mutableStateOf(false)
     var unlocking by mutableStateOf(false)
     var saveOffer by mutableStateOf<Login?>(null)
-    var busy by mutableStateOf(false)
     /** How far a pull past the top of the page has gone, 0 to 1 (1 reloads). */
     var pull by mutableFloatStateOf(0f)
     /** Bumped when the logins change, so the password list redraws. */
@@ -201,7 +203,6 @@ class MainActivity : ComponentActivity() {
             webHost.removeView(it)
             it.destroy()
         }
-        t.chat?.destroy()
         if (i < current) current--
         if (tabs.isEmpty()) newBlankTab() else show(current)
     }
@@ -415,10 +416,12 @@ class MainActivity : ComponentActivity() {
         val send = Intent(Intent.ACTION_SEND).setType("text/plain")
             .putExtra(Intent.EXTRA_TEXT, t.url)
             .putExtra(Intent.EXTRA_TITLE, t.title)
-        val pick = Intent.createChooser(send, null)
-            .putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(ComponentName(this, MainActivity::class.java)))
-        startActivity(pick)
+        startActivity(chooser(send))
     }
+
+    /** Android's share list, without gaze itself in it. */
+    private fun chooser(send: Intent): Intent = Intent.createChooser(send, null)
+        .putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(ComponentName(this, MainActivity::class.java)))
 
     private fun receiveTabs() {
         if (!store.canReachSync()) return
@@ -443,48 +446,26 @@ class MainActivity : ComponentActivity() {
 
     // ---------- Claude ----------
 
-    fun openClaude() {
+    /**
+     * The page to the Claude app, through Android's share: its title, its
+     * address and its text. The question is asked there, on your own plan.
+     */
+    fun askClaude() {
         val tab = current() ?: return
-        if (prefs.apiKey.isBlank()) {
-            say("Put your Claude API key in the settings first")
-            screen = Screen.Settings
-            return
-        }
-        screen = Screen.Claude
-        if (tab.chat != null && tab.chatUrl == tab.url) return
-        tab.chat?.destroy()
-        tab.chat = null
-        tab.talk.clear()
-        tab.chatUrl = tab.url
         val web = tab.web ?: return
+        if (!tab.url.startsWith("http")) return say("Nothing to ask about")
         web.evaluateJavascript("document.body ? document.body.innerText : ''") { json ->
             val text = runCatching { JSONTokener(json).nextValue() as? String }.getOrNull() ?: ""
-            val chat = Chat.forPage(tab.title, tab.url, text)
-            tab.chat = chat
-            if (chat.pageWasCut()) tab.talk.add(Said(false, "A long page: Claude reads the first 400,000 characters."))
-        }
-    }
-
-    fun ask(question: String) {
-        val tab = current() ?: return
-        val chat = tab.chat ?: return say("The page is still being read")
-        if (busy || question.isBlank()) return
-        tab.talk.add(Said(true, question.trim()))
-        val answer = Said(false, "")
-        tab.talk.add(answer)
-        busy = true
-        val key = prefs.apiKey
-        lifecycleScope.launch {
-            val out = withContext(Dispatchers.IO) {
-                streamClaude(key, chat, question.trim()) { piece -> runOnUiThread { answer.text += piece } }
+            // An intent carries at most about a megabyte, two bytes a character.
+            if (text.length > PAGE_MAX) say("A long page: Claude gets the first 100,000 characters")
+            val send = Intent(Intent.ACTION_SEND).setType("text/plain")
+                .putExtra(Intent.EXTRA_TEXT, "${tab.title}\n${tab.url}\n\n${text.take(PAGE_MAX)}")
+                .putExtra(Intent.EXTRA_TITLE, tab.title)
+            try {
+                startActivity(Intent(send).setPackage(CLAUDE_APP))
+            } catch (e: ActivityNotFoundException) {
+                startActivity(chooser(send))
             }
-            if (out.error.isNotEmpty()) {
-                answer.text = out.error
-                answer.error = true
-            } else {
-                answer.text = out.text + if (out.cut) "\n\n(Cut at the length limit.)" else ""
-            }
-            busy = false
         }
     }
 

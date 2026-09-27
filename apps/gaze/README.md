@@ -8,7 +8,7 @@ The laptop browser's best parts on the phone, around Android's own WebView.
 - **Bookmarks** shared with the laptop; the address line suggests them first, then the pages you visit most.
 - **Ad blocking** from Steven Black's hosts list, as on the laptop. The page you asked for is never blocked.
 - **Dark pages:** each site is asked for its dark style, and a site with none is turned around. *Dark here* flips it for one site.
-- **Ask Claude** about the page, with follow-up questions. It needs your own API key from console.anthropic.com, set in the settings.
+- **Ask Claude** hands the page, its title, address and text, to the Claude app. You ask there, on your own plan; no API key.
 - **Pull down** at the top of a page to reload it. A map or a scrolling panel keeps its drag.
 - **Share** from the menu sends the page to any app. Links from other apps open here, and links shared to gaze open too.
 
@@ -16,6 +16,6 @@ The laptop browser's best parts on the phone, around Android's own WebView.
 
 1. Grant *All files access* from the settings screen.
 2. In Syncthing-Fork, accept the laptop's `gaze` folder and point it at `Documents/gaze` (the default in the settings).
-3. Put your API key in the settings to ask Claude.
+3. Install the Claude app to ask about pages.
 
 Everything else is local: the history, the per-site dark choices, the ad list, the settings.
