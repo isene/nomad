@@ -2,6 +2,7 @@ package com.isene.gaze
 
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
+import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -24,6 +25,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -73,6 +75,8 @@ class MainActivity : ComponentActivity() {
     var unlocking by mutableStateOf(false)
     var saveOffer by mutableStateOf<Login?>(null)
     var busy by mutableStateOf(false)
+    /** How far a pull past the top of the page has gone, 0 to 1 (1 reloads). */
+    var pull by mutableFloatStateOf(0f)
     /** Bumped when the logins change, so the password list redraws. */
     var vaultVersion by mutableIntStateOf(0)
 
@@ -402,6 +406,18 @@ class MainActivity : ComponentActivity() {
             val err = withContext(Dispatchers.IO) { runCatching { store.send(url, title); null }.getOrElse { writeProblem() } }
             say(err ?: "Sent to the laptop")
         }
+    }
+
+    /** The page to another app, through Android's share sheet. */
+    fun share() {
+        val t = current() ?: return
+        if (!t.url.startsWith("http")) return say("Nothing to share")
+        val send = Intent(Intent.ACTION_SEND).setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, t.url)
+            .putExtra(Intent.EXTRA_TITLE, t.title)
+        val pick = Intent.createChooser(send, null)
+            .putExtra(Intent.EXTRA_EXCLUDE_COMPONENTS, arrayOf(ComponentName(this, MainActivity::class.java)))
+        startActivity(pick)
     }
 
     private fun receiveTabs() {
