@@ -9,7 +9,8 @@ The laptop browser's best parts on the phone, around Android's own WebView.
 - **Ad blocking** from Steven Black's hosts list, as on the laptop. The page you asked for is never blocked.
 - **Dark pages:** each site is asked for its dark style, and a site with none is turned around. *Dark here* flips it for one site.
 - **Ask Claude** about the page, with follow-up questions. It needs your own API key from console.anthropic.com, set in the settings.
-- Opens links from other apps, and takes links shared to it.
+- **Pull down** at the top of a page to reload it. A map or a scrolling panel keeps its drag.
+- **Share** from the menu sends the page to any app. Links from other apps open here, and links shared to gaze open too.
 
 ## Setup
 

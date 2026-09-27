@@ -3,6 +3,7 @@ package com.isene.gaze
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.Uri
+import android.view.MotionEvent
 import android.view.View
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
@@ -38,8 +39,53 @@ class Said(val question: Boolean, text: String) {
     var error by mutableStateOf(false)
 }
 
+/**
+ * A WebView that reloads when you pull down past the top of the page.
+ * The pull counts only when the drag starts at the top and the page has
+ * no scrolling left, so a map or a scrolling panel keeps its drag.
+ */
+@SuppressLint("ViewConstructor")
+class PageView(private val a: MainActivity) : WebView(a) {
+    private val far = 120 * resources.displayMetrics.density
+    private var atTop = false
+    private var past = false
+    private var from = -1f
+
+    override fun onOverScrolled(x: Int, y: Int, clampedX: Boolean, clampedY: Boolean) {
+        super.onOverScrolled(x, y, clampedX, clampedY)
+        if (atTop && clampedY && y == 0) past = true
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(e: MotionEvent): Boolean {
+        when (e.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                atTop = scrollY == 0
+                past = false
+                from = -1f
+            }
+            MotionEvent.ACTION_MOVE -> if (past) {
+                if (from < 0) from = e.y
+                a.pull = ((e.y - from) / far).coerceIn(0f, 1f)
+            }
+            MotionEvent.ACTION_UP -> {
+                if (a.pull >= 1f) reload()
+                stop()
+            }
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> stop()
+        }
+        return super.onTouchEvent(e)
+    }
+
+    private fun stop() {
+        atTop = false
+        past = false
+        a.pull = 0f
+    }
+}
+
 @SuppressLint("SetJavaScriptEnabled")
-fun newWebView(a: MainActivity, tab: Tab): WebView = WebView(a).apply {
+fun newWebView(a: MainActivity, tab: Tab): WebView = PageView(a).apply {
     settings.apply {
         javaScriptEnabled = true
         domStorageEnabled = true

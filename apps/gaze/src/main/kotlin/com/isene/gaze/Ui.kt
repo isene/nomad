@@ -4,6 +4,7 @@ import android.os.Environment
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,6 +22,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -44,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -94,7 +98,10 @@ fun GazeApp(a: MainActivity) {
 private fun Browser(a: MainActivity) {
     val tab = a.tabs.getOrNull(a.current)
     Column(Modifier.fillMaxSize()) {
-        AndroidView(factory = { a.webHostView() }, modifier = Modifier.weight(1f).fillMaxWidth())
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            AndroidView(factory = { a.webHostView() }, modifier = Modifier.fillMaxSize())
+            PullMark(a)
+        }
         if (a.unlockOffer) Offer("This page has a login.", "Unlock passwords", { a.unlockOffer = false }) { a.askMaster = true }
         a.saveOffer?.let { l ->
             val who = l.username.ifEmpty { "this login" }
@@ -110,6 +117,16 @@ private fun Browser(a: MainActivity) {
         }
         AddressBar(a, tab)
     }
+}
+
+/** The arrow that follows a pull past the top of the page; orange means let go to reload. */
+@Composable
+private fun BoxScope.PullMark(a: MainActivity) {
+    val p = a.pull
+    if (p <= 0f) return
+    Text("↻", color = if (p >= 1f) Accent else Color.White, fontSize = 22.sp,
+        modifier = Modifier.align(Alignment.TopCenter).offset(y = (p * 64).dp).rotate(p * 270f)
+            .background(Panel, CircleShape).padding(horizontal = 10.dp, vertical = 2.dp))
 }
 
 @Composable
@@ -192,6 +209,7 @@ private fun Menu(a: MainActivity) {
         (if (a.bookmarked) "Remove bookmark" else "Bookmark") to { a.toggleBookmark() },
         "Bookmarks" to { a.screen = Screen.Bookmarks },
         "Send to laptop" to { a.sendToLaptop() },
+        "Share" to { a.share() },
         "Ask Claude" to { a.openClaude() },
         "Fill password" to { a.fillLogin() },
         (if (dark) "Light here" else "Dark here") to { a.toggleDark() },
