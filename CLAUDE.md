@@ -128,8 +128,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
   URL, a tab, the title). Both sides read a changed file again before
   they write it, so neither loses the other's login or bookmark.
 - `core/src/gaze.rs` holds the formats, the ad list and the suggestions.
-  `core/src/claude.rs` is the phone's `claude -p`: the Messages API with
-  the user's own key, streamed; any app can hold a `Chat`.
+  "Ask Claude" shares the page's text to the Claude app
+  (`com.anthropic.claude`), so the user's own plan answers and no API key
+  lives on the phone. 0.1 had a Messages API client; 0.2 removed it.
 
 ## Anti-patterns (don't drift into these)
 

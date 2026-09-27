@@ -20,13 +20,11 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
@@ -79,7 +77,6 @@ fun GazeApp(a: MainActivity) {
                 Screen.Browser -> {}
                 Screen.Tabs -> TabsScreen(a)
                 Screen.Bookmarks -> BookmarksScreen(a)
-                Screen.Claude -> ClaudeScreen(a)
                 Screen.Passwords -> PasswordsScreen(a)
                 Screen.Settings -> SettingsScreen(a)
             }
@@ -210,7 +207,7 @@ private fun Menu(a: MainActivity) {
         "Bookmarks" to { a.screen = Screen.Bookmarks },
         "Send to laptop" to { a.sendToLaptop() },
         "Share" to { a.share() },
-        "Ask Claude" to { a.openClaude() },
+        "Ask Claude" to { a.askClaude() },
         "Fill password" to { a.fillLogin() },
         (if (dark) "Light here" else "Dark here") to { a.toggleDark() },
         "Passwords" to { a.screen = Screen.Passwords },
@@ -290,50 +287,6 @@ private fun BookmarksScreen(a: MainActivity) {
 }
 
 @Composable
-private fun ClaudeScreen(a: MainActivity) {
-    val tab = a.tabs.getOrNull(a.current) ?: return
-    var question by remember { mutableStateOf("") }
-    val state = rememberLazyListState()
-    LaunchedEffect(tab.talk.size) { if (tab.talk.isNotEmpty()) state.animateScrollToItem(tab.talk.lastIndex) }
-    Sheet("Claude · ${tab.title.ifEmpty { shown(tab.url) }}", a) {
-        SelectionContainer(Modifier.weight(1f)) {
-            LazyColumn(state = state, modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp)) {
-                if (tab.talk.isEmpty()) item { Text("Ask anything about this page.", color = Dim, modifier = Modifier.padding(vertical = 12.dp)) }
-                items(tab.talk) { s ->
-                    Text(
-                        if (s.text.isEmpty() && !s.question) "…" else s.text,
-                        color = when {
-                            s.question -> Accent
-                            s.error -> Bad
-                            else -> Color.White
-                        },
-                        fontSize = 15.sp,
-                        modifier = Modifier.padding(vertical = 6.dp),
-                    )
-                }
-            }
-        }
-        Row(Modifier.fillMaxWidth().background(Panel).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = question,
-                onValueChange = { question = it },
-                placeholder = { Text("Ask about this page") },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = {
-                    a.ask(question)
-                    question = ""
-                }),
-                modifier = Modifier.weight(1f).padding(vertical = 6.dp),
-            )
-            TextButton(enabled = !a.busy && question.isNotBlank(), onClick = {
-                a.ask(question)
-                question = ""
-            }) { Text(if (a.busy) "…" else "Ask", color = if (a.busy) Dim else Accent) }
-        }
-    }
-}
-
-@Composable
 private fun PasswordsScreen(a: MainActivity) {
     a.vaultVersion
     Sheet("Passwords", a) {
@@ -355,7 +308,6 @@ private fun SettingsScreen(a: MainActivity) {
     val p = a.prefs
     Sheet("Settings", a) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(12.dp)) {
-            Field("Claude API key", p.apiKey, secret = true) { p.apiKey = it }
             Field("Synced folder", p.syncDir) { p.syncDir = it }
             Field("Search (%s is what you type)", p.search) { p.search = it }
             Toggle("Dark pages by default", p.dark) { p.dark = it }
@@ -370,8 +322,7 @@ private fun SettingsScreen(a: MainActivity) {
             TextButton(onClick = { a.loadAds(fetch = true) }) { Text("Fetch the ad list again", color = Accent) }
             Text(
                 "Passwords, bookmarks and the tabs sent across live in the synced folder. " +
-                    "Share it with the laptop's ~/.gaze/sync/ in Syncthing. " +
-                    "The API key comes from console.anthropic.com and stays on this phone.",
+                    "Share it with the laptop's ~/.gaze/sync/ in Syncthing.",
                 color = Dim, fontSize = 13.sp, modifier = Modifier.padding(top = 12.dp),
             )
         }

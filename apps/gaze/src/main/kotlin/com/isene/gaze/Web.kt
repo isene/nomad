@@ -14,11 +14,9 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.io.ByteArrayInputStream
-import uniffi.fe2o3_mobile_core.Chat
 
 /** One tab. Its WebView is made when the tab is first shown. */
 class Tab(url: String, title: String) {
@@ -26,17 +24,6 @@ class Tab(url: String, title: String) {
     var title by mutableStateOf(title)
     var progress by mutableIntStateOf(100)
     var web: WebView? = null
-
-    /** The talk with Claude about the page, and the page it was about. */
-    var chat: Chat? = null
-    var chatUrl = ""
-    val talk = mutableStateListOf<Said>()
-}
-
-/** One line of the talk with Claude. */
-class Said(val question: Boolean, text: String) {
-    var text by mutableStateOf(text)
-    var error by mutableStateOf(false)
 }
 
 /**

@@ -2,13 +2,14 @@ package com.isene.gaze
 
 import android.content.Context
 
-/** The phone's own settings. The API key stays in this app's private storage. */
+/** The phone's own settings. */
 class Prefs(context: Context) {
     private val p = context.getSharedPreferences("gaze", Context.MODE_PRIVATE)
 
-    var apiKey: String
-        get() = p.getString("api_key", "") ?: ""
-        set(v) = p.edit().putString("api_key", v.trim()).apply()
+    init {
+        // 0.1 kept an API key for Claude; the Claude app answers now.
+        if (p.contains("api_key")) p.edit().remove("api_key").apply()
+    }
 
     var syncDir: String
         get() = p.getString("sync_dir", DEFAULT_SYNC) ?: DEFAULT_SYNC

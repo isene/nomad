@@ -19,4 +19,3 @@ pub mod amardice;
 pub mod xrpn;
 pub mod onepage;
 pub mod gaze;
-pub mod claude;
