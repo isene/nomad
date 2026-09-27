@@ -62,8 +62,9 @@ These come from the original mobile-architecture artifact. Do not drift.
 
 ## Toolchain
 
-- **JDK 17** (apt: `openjdk-17-jdk-headless`). System default JDK may be
-  newer; gradle invokes JDK 17 explicitly via `JAVA_HOME`.
+- **JDK 21** (`/usr/lib/jvm/java-21-openjdk-amd64`; JDK 17 is gone from
+  this laptop). Gradle needs it named in `JAVA_HOME`; the apps still
+  compile for Java 17.
 - **Android SDK** at `~/.android-sdk/` (hidden). Platform 35, build-tools 35.0.0.
 - **Android NDK** 27.2.12479018 under `~/.android-sdk/ndk/`.
 - **Rust** stable, 2021 edition. Targets: `aarch64-linux-android`,
@@ -78,7 +79,7 @@ export ANDROID_HOME="$HOME/.android-sdk"
 export ANDROID_SDK_ROOT="$HOME/.android-sdk"
 export ANDROID_NDK_HOME="$HOME/.android-sdk/ndk/27.2.12479018"
 export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 ```
 
 ### PATH-shadow note
@@ -116,6 +117,19 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `com.isene.tasks.action.RESCAN` broadcast that vox sends after filing a
   spoken reminder. `[x]` items never fire, and a stamp in the past is
   history, not a missed alarm.
+
+### gaze (com.isene.gaze)
+
+- A browser around Android's WebView, paired with the laptop's gaze.
+  Signed with the tasks key, like fresh.
+- The synced folder (default `Documents/gaze`) is the laptop's
+  `~/.gaze/sync/`: `passwords` (the laptop's sealed file, byte for byte),
+  `bookmarks`, and `tabs/to-phone/`, `tabs/to-laptop/` (one file per tab,
+  URL, a tab, the title). Both sides read a changed file again before
+  they write it, so neither loses the other's login or bookmark.
+- `core/src/gaze.rs` holds the formats, the ad list and the suggestions.
+  `core/src/claude.rs` is the phone's `claude -p`: the Messages API with
+  the user's own key, streamed; any app can hold a `Chat`.
 
 ## Anti-patterns (don't drift into these)
 

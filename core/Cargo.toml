@@ -38,6 +38,11 @@ sha2 = "0.10"
 base64 = "0.22"
 getrandom = "0.2"
 
+# gaze: the laptop's password file, byte for byte (Argon2id key,
+# ChaCha20-Poly1305 seal). Pure Rust, cross-compiles as is.
+argon2 = "0.5"
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
+
 [build-dependencies]
 uniffi = { version = "0.28", features = ["build"] }
 
