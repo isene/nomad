@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>nomad — Fe2O3 on the phone</title>
-  <meta name="description" content="nomad is the mobile half of the Fe2O3 suite: an Android monorepo with a shared Rust core (UniFFI) under thin Kotlin/Compose shells. Fifteen apps — tasks, hyperlist, relay, astro, watchit, amardice, xrpn, vox, scribe, ref, gazette, books, onepage, kastrup, gaze — synced over Syncthing.">
+  <title>nomad: Fe2O3 on the phone</title>
+  <meta name="description" content="nomad is the mobile half of the Fe2O3 suite. One Android repo: a shared Rust core (UniFFI) under thin Kotlin/Compose shells. Sixteen apps, synced over Syncthing.">
   <link rel="icon" href="img/nomad.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
-  <meta property="og:title" content="nomad — Fe2O3 on the phone">
+  <meta property="og:title" content="nomad: Fe2O3 on the phone">
   <meta property="og:description" content="The mobile half of Fe2O3: one Rust core, fifteen Kotlin/Compose apps, synced over Syncthing. No Google account, no cloud.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="img/nomad.svg">
@@ -21,7 +21,7 @@
       <p class="tagline">
         The mobile half of the <a href="https://github.com/isene/fe2o3" style="color:var(--accent-glow)">Fe<sub>2</sub>O<sub>3</sub></a>
         suite. One Rust core, fifteen Kotlin&nbsp;/&nbsp;Compose apps,
-        synced over Syncthing — no Google account, no cloud middleman.
+        synced over Syncthing, with no Google account and no cloud middleman.
       </p>
       <div class="badges">
         <img src="https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff" alt="Kotlin / Compose">
@@ -44,14 +44,14 @@
         Each app carries one Fe<sub>2</sub>O<sub>3</sub> workflow off the
         laptop and onto an Android phone. The interesting code lives in
         Rust and is shared with the desktop tools, so the phone and the
-        terminal compute identically — the Kotlin side stays a thin shell.
+        terminal compute identically; the Kotlin side stays a thin shell.
       </p>
       <div class="features">
         <div class="feature">
           <h3>Shared Rust core</h3>
           <p>
-            One crate (<code>fe2o3-mobile-core</code>) holds the models,
-            parsers, transforms and engines — the same logic as the desktop
+            One crate (<code>fe2o3-mobile-core</code>) contains the models,
+            parsers, transforms and engines: the same logic as the desktop
             tools. Exposed to Kotlin through
             <a href="https://mozilla.github.io/uniffi-rs/" style="color:var(--rust-glow)">UniFFI</a>,
             which generates the bindings. Never hand-rolled JNI.
@@ -69,7 +69,7 @@
           <h3>Syncthing, not cloud</h3>
           <p>
             Data rides the same <a href="https://syncthing.net" style="color:var(--green)">Syncthing</a>
-            channel the desktop already uses — <code>todo.hl</code>,
+            channel the desktop already uses: <code>todo.hl</code>,
             <code>gear.json</code>, the relay gateway, <code>.xrpn</code>
             programs. One source of truth, no account, no middleman.
           </p>
@@ -131,7 +131,7 @@
           </div></div>
           <p class="card-desc">
             Relays WhatsApp / Messenger / Instagram / SMS / Discord (and
-            photo previews) into kastrup and fires replies — replacing the
+            photo previews) into kastrup and fires replies, replacing the
             laptop's Firefox/Marionette bridge with an on-device listener.
           </p>
           <div class="card-meta"><span class="repo">apps/relay</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
@@ -145,7 +145,7 @@
           </div></div>
           <p class="card-desc">
             Ephemeris, met.no weather + observing conditions, in-the-sky
-            events, APOD, starchart, and a telescope/eyepiece gear catalog —
+            events, APOD, starchart, and a telescope/eyepiece gear catalog:
             the <code>gear.json</code> shared with desktop astro.
           </p>
           <div class="card-meta"><span class="repo">apps/astro</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
@@ -158,7 +158,7 @@
             <div class="card-pairs">Pairs with <a href="https://github.com/isene/watchit">watchit</a></div>
           </div></div>
           <p class="card-desc">
-            TMDB browser — top-rated &amp; popular lists, your own wish and
+            TMDB browser: top-rated &amp; popular lists, your own wish and
             dump lists, posters, full detail (cast, plot, streaming), and
             search-to-add.
           </p>
@@ -181,17 +181,17 @@
 
         <div class="card">
           <div class="card-head"><div>
-            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/xrpn">xrpn</a></h3>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/rpnx">rpnx</a></h3>
             <div class="card-kind">RPN calculator</div>
-            <div class="card-pairs">Pairs with <a href="https://github.com/isene/xrpn">xrpn</a></div>
+            <div class="card-pairs">Pairs with <a href="https://github.com/isene/rpnx">rpnx</a></div>
           </div></div>
           <p class="card-desc">
-            Pocket HP-41 RPN scientific calculator — full stack, registers,
+            Pocket HP-41 RPN scientific calculator: full stack, registers,
             modes and the XRPN command set, an HP-41-style multi-shift
             keypad, persistent state, and a FOCAL program runner that loads
             <code>.xrpn</code> files from the synced folder.
           </p>
-          <div class="card-meta"><span class="repo">apps/xrpn</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/rpnx</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
         </div>
 
         <div class="card">
@@ -202,7 +202,7 @@
           </div></div>
           <p class="card-desc">
             Records on launch, transcribes through Whisper, then files the
-            text where you choose — under an <code>Inbox</code> in your synced
+            text where you choose: under an <code>Inbox</code> in your synced
             <code>todo.hl</code> or appended to a notes file. The pocket
             version of the laptop's <code>Win+a</code> dictation.
           </p>
@@ -217,7 +217,7 @@
           </div></div>
           <p class="card-desc">
             Distraction-free pad for the <code>.md</code>/<code>.hl</code>/<code>.txt</code>
-            files in your synced writing folder — newest first, full-screen
+            files in your synced writing folder, newest first, full-screen
             monospace editor, auto-save. The same files open in desktop
             scribe over Syncthing.
           </p>
@@ -232,7 +232,7 @@
           </div></div>
           <p class="card-desc">
             An offline, searchable reference reader. Each collection is a set
-            of titled entries — a glossary, a book, or a set of writings.
+            of titled entries: a glossary, a book, or a set of writings.
             Public collections ship bundled; your own load as JSON from a
             synced folder, so private corpora never leave your devices.
           </p>
@@ -287,6 +287,20 @@
 
         <div class="card">
           <div class="card-head"><div>
+            <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/fresh">fresh</a></h3>
+            <div class="card-kind">Recent apps</div>
+            <div class="card-pairs">Standalone · no network</div>
+          </div></div>
+          <p class="card-desc">
+            The ten most recently installed apps, newest first, system apps
+            left out. Tap one to open it; long-press for app info or to
+            uninstall. No Rust core and no background work.
+          </p>
+          <div class="card-meta"><span class="repo">apps/fresh</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/onepage">onepage</a></h3>
             <div class="card-kind">Home launcher</div>
             <div class="card-pairs">Standalone · zero idle cost</div>
@@ -334,9 +348,9 @@
 <span class="comment"># a signed release APK (cargo-ndk + uniffi-bindgen run from Gradle)</span>
 <span class="cmd">export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 export ANDROID_NDK_HOME="$HOME/.android-sdk/ndk/27.2.12479018"
-./gradlew :apps:xrpn:assembleRelease</span>
+./gradlew :apps:rpnx:assembleRelease</span>
 
-<span class="comment"># APK lands in apps/&lt;name&gt;/build/outputs/apk/release/ — sync &amp; sideload</span></pre>
+<span class="comment"># APK lands in apps/&lt;name&gt;/build/outputs/apk/release/; sync &amp; sideload</span></pre>
     </div>
   </section>
 
