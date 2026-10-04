@@ -7,8 +7,9 @@ plugins {
 }
 
 // pointer: a file manager. The Rust core lists, sorts, searches, copies,
-// moves and trashes (core/src/pointer.rs, tested on real folders); Kotlin
-// owns the screens, the volumes and the hand-over of a file to another app.
+// moves, trashes and reads archives (core/src/pointer.rs, tested on real
+// folders); Kotlin owns the screens, the volumes and the hand-over of a
+// file to and from another app.
 
 // ---------- Rust core integration ----------
 // Identical wiring to the other core-consuming apps.
@@ -115,8 +116,8 @@ android {
         applicationId = "com.isene.pointer"
         minSdk = 33
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
         ndk { abiFilters += androidAbis.keys }
     }
 
@@ -173,8 +174,11 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
-    // Thumbnails and the picture viewer.
+    // Thumbnails and the picture viewer; one frame of a video for its thumbnail.
     implementation(libs.coil.compose)
+    implementation(libs.coil.video)
+    // The marks on top are dragged into order.
+    implementation(libs.reorderable)
 
     // JNA — generated UniFFI bindings depend on com.sun.jna.*.
     implementation("net.java.dev.jna:jna:5.15.0@aar")

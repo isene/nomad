@@ -25,6 +25,7 @@ import uniffi.fe2o3_mobile_core.Trashed
 import uniffi.fe2o3_mobile_core.Undo
 import uniffi.fe2o3_mobile_core.pointerCopy
 import uniffi.fe2o3_mobile_core.pointerCrumbs
+import uniffi.fe2o3_mobile_core.pointerGrep
 import uniffi.fe2o3_mobile_core.pointerJobBytes
 import uniffi.fe2o3_mobile_core.pointerJobCancel
 import uniffi.fe2o3_mobile_core.pointerJobStart
@@ -42,6 +43,8 @@ import uniffi.fe2o3_mobile_core.pointerTrashEmpty
 import uniffi.fe2o3_mobile_core.pointerTrashList
 import uniffi.fe2o3_mobile_core.pointerTreeSize
 import uniffi.fe2o3_mobile_core.pointerUndo
+import uniffi.fe2o3_mobile_core.pointerUnpack
+import uniffi.fe2o3_mobile_core.pointerUnpackHere
 
 /** A copy or move under way. `total` is 0 when the size is not known. */
 data class Running(val label: String, val done: Long = 0, val total: Long = 0)
@@ -56,6 +59,11 @@ data class UiState(
     /** False until the user has let the app reach all files. */
     val allowed: Boolean = true,
     val dir: String = "",
+    /** True when the folder on screen is an archive, or inside one. */
+    val packed: Boolean = false,
+    /** The folder of each tab; the one on screen is `tabs[tab]`. */
+    val tabs: List<String> = emptyList(),
+    val tab: Int = 0,
     /** The folder as steps from its volume, for the line on top. */
     val crumbs: List<Mark> = emptyList(),
     val entries: List<Entry> = emptyList(),
@@ -69,6 +77,8 @@ data class UiState(
     /** Hits from the folders below; null when no such search was run. */
     val found: List<Entry>? = null,
     val searching: Boolean = false,
+    /** True when the search looks inside the files, not at their names. */
+    val inside: Boolean = false,
     /** Tagged paths, in the order they were tagged. They stay while the
      *  user walks to another folder. */
     val tagged: Set<String> = emptySet(),
@@ -90,7 +100,15 @@ data class UiState(
 
 /** How much of a text file is read for showing. */
 const val TEXT_MAX = 512 * 1024
-private const val SEARCH_MAX = 500
+const val SEARCH_MAX = 500
+const val TABS_MAX = 8
+
+/** The folder in the app's cache for files copied out of archives to be
+ *  looked at. `file_paths.xml` names it too. */
+private const val UNPACKED = "archive"
+
+/** What the app starts with, read off the main thread. */
+private class Start(val volumes: List<Volume>, val marks: List<Mark>, val recent: List<String>, val tabs: List<String>)
 
 class PointerViewModel(app: Application) : AndroidViewModel(app) {
     private val store = Store(app)
@@ -102,8 +120,9 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
     private var searchJob: Job? = null
     private var sizeJob: Job? = null
 
-    /** The folders walked through, for the back key. */
-    private val trail = ArrayDeque<String>()
+    /** The folders walked through in each tab, for the back key. */
+    private val trails = arrayListOf(ArrayDeque<String>())
+    private val trail: ArrayDeque<String> get() = trails.getOrElse(_ui.value.tab) { trails[0] }
 
     /** Where the list stood in each folder: first row and its offset. */
     private val scroll = HashMap<String, Pair<Int, Int>>()
@@ -135,31 +154,56 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
         if (s.running != null) return
         viewModelScope.launch {
             // One stat: the folder is read again only when it has changed.
-            val (there, stamp) = withContext(Dispatchers.IO) {
-                var d = File(s.dir)
-                while (!d.isDirectory) d = d.parentFile ?: break
-                d.path to d.lastModified()
-            }
+            val (there, stamp) = withContext(Dispatchers.IO) { nearest(s.dir, s.packed) }
             if (there != s.dir || stamp != listed) list(there)
         }
+    }
+
+    /** The folder to show for `dir`, and when it last changed. A folder
+     *  that is gone gives way to the nearest one above it. A folder inside
+     *  an archive stands for as long as the archive's file does. */
+    private fun nearest(dir: String, packed: Boolean): Pair<String, Long> {
+        var d = File(dir)
+        while (!d.exists()) d = d.parentFile ?: return dir to 0L
+        if (packed && d.isFile) return dir to d.lastModified()
+        while (!d.isDirectory) d = d.parentFile ?: break
+        return d.path to d.lastModified()
     }
 
     private fun start() {
         viewModelScope.launch {
             val app = getApplication<Application>()
-            val (vols, marks, recent) = withContext(Dispatchers.IO) {
+            val first = withContext(Dispatchers.IO) {
+                // What the last run copied out of archives to look at.
+                File(app.cacheDir, UNPACKED).deleteRecursively()
                 val vols = volumes(app)
-                val marks = store.marks() ?: firstMarks(vols.first().path).also { store.saveMarks(it) }
-                Triple(vols, marks, store.recent())
-            }
-            _ui.update {
-                it.copy(
-                    allowed = true, volumes = vols, marks = marks, recent = recent,
-                    sort = store.sort, reverse = store.reverse, hidden = store.hidden,
+                Start(
+                    vols,
+                    store.marks() ?: firstMarks(vols.first().path).also { store.saveMarks(it) },
+                    store.recent(),
+                    // The tabs of the last run, each at a folder that is still there.
+                    store.tabs.map { nearest(it, false).first }.filter { File(it).isDirectory },
                 )
             }
-            list(vols.first().path)
+            val tabs = first.tabs.ifEmpty { listOf(first.volumes.first().path) }
+            val tab = store.tab.coerceIn(0, tabs.lastIndex)
+            trails.clear()
+            repeat(tabs.size) { trails.add(ArrayDeque()) }
+            _ui.update {
+                it.copy(
+                    allowed = true, volumes = first.volumes, marks = first.marks, recent = first.recent,
+                    sort = store.sort, reverse = store.reverse, hidden = store.hidden,
+                    tabs = tabs, tab = tab,
+                )
+            }
+            list(tabs[tab])
         }
+    }
+
+    /** The app left the screen: the tabs are kept for the next start. */
+    fun keep() {
+        val s = _ui.value
+        if (s.tabs.isNotEmpty()) store.saveTabs(s.tabs, s.tab)
     }
 
     /** The marks a new install starts with: the usual folders that exist. */
@@ -177,7 +221,7 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
         listJob = viewModelScope.launch {
             val s = _ui.value
             val (listing, stamp) = withContext(Dispatchers.IO) {
-                pointerList(dir, s.sort, s.reverse, s.hidden) to File(dir).lastModified()
+                pointerList(dir, s.sort, s.reverse, s.hidden) to nearest(dir, true).second
             }
             listed = stamp
             val vols = _ui.value.volumes
@@ -189,10 +233,13 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
                 val moved = dir != it.dir
                 it.copy(
                     dir = dir, crumbs = crumbs, entries = listing.entries, error = listing.error,
+                    packed = listing.packed,
+                    tabs = it.tabs.mapIndexed { i, d -> if (i == it.tab) dir else d },
                     // A search belongs to the folder it was typed in.
                     filter = if (moved) null else it.filter,
                     found = if (moved) null else it.found,
                     searching = if (moved) false else it.searching,
+                    inside = if (moved) false else it.inside,
                 )
             }
         }
@@ -229,7 +276,39 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
         return true
     }
 
-    val canGoBack: Boolean get() = trail.isNotEmpty()
+    // ---------- tabs ----------
+
+    /** Open a tab: on the folder on screen, or on the one given. */
+    fun newTab(path: String? = null) {
+        val s = _ui.value
+        if (s.tabs.size >= TABS_MAX) {
+            say("$TABS_MAX tabs is the most")
+            return
+        }
+        pointerSearchStop()
+        trails.add(ArrayDeque())
+        _ui.update { it.copy(tabs = it.tabs + (path ?: it.dir), tab = it.tabs.size, tagged = it.tagged - path.orEmpty()) }
+        if (path != null && path != s.dir) list(path)
+    }
+
+    fun switchTab(i: Int) {
+        val s = _ui.value
+        if (i == s.tab || i !in s.tabs.indices) return
+        pointerSearchStop()
+        _ui.update { it.copy(tab = i) }
+        list(s.tabs[i])
+    }
+
+    /** Close a tab; the last one stays. */
+    fun closeTab(i: Int) {
+        val s = _ui.value
+        if (s.tabs.size < 2 || i !in s.tabs.indices) return
+        trails.removeAt(i)
+        val tabs = s.tabs.filterIndexed { n, _ -> n != i }
+        val tab = if (i < s.tab) s.tab - 1 else s.tab.coerceAtMost(tabs.lastIndex)
+        _ui.update { it.copy(tabs = tabs, tab = tab) }
+        if (i == s.tab) list(tabs[tab])
+    }
 
     fun scrollOf(dir: String): Pair<Int, Int> = scroll[dir] ?: (0 to 0)
 
@@ -264,12 +343,12 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
     /** Typing narrows the folder on screen; no file is touched. */
     fun setFilter(text: String) {
         stopSearch()
-        _ui.update { it.copy(filter = text, found = null, searching = false) }
+        _ui.update { it.copy(filter = text, found = null, searching = false, inside = false) }
     }
 
     fun closeSearch() {
         stopSearch()
-        _ui.update { it.copy(filter = null, found = null, searching = false) }
+        _ui.update { it.copy(filter = null, found = null, searching = false, inside = false) }
     }
 
     private fun stopSearch() {
@@ -277,15 +356,22 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
         pointerSearchStop()
     }
 
-    /** Look for the typed words in every folder below this one. */
-    fun searchBelow() {
+    /** Look for the typed words in every folder below this one: in the
+     *  names, or `inside` the text files. */
+    fun searchBelow(inside: Boolean = false) {
         val s = _ui.value
         val query = s.filter?.trim().orEmpty()
         if (query.isEmpty()) return
         stopSearch()
         searchJob = viewModelScope.launch {
-            _ui.update { it.copy(searching = true, found = null) }
-            val found = withContext(Dispatchers.IO) { pointerSearch(s.dir, query, s.hidden, SEARCH_MAX.toUInt()) }
+            _ui.update { it.copy(searching = true, found = null, inside = inside) }
+            val found = withContext(Dispatchers.IO) {
+                if (inside) {
+                    pointerGrep(s.dir, query, s.hidden, SEARCH_MAX.toUInt())
+                } else {
+                    pointerSearch(s.dir, query, s.hidden, SEARCH_MAX.toUInt())
+                }
+            }
             _ui.update { it.copy(searching = false, found = found) }
         }
     }
@@ -386,6 +472,12 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
         work("Moving ${named(paths)}", "Moved", paths, true) { pointerMove(it, s.dir) }
     }
 
+    /** Unpack a whole archive into a new folder, in the folder on screen. */
+    fun unpackHere(path: String) {
+        val dir = _ui.value.dir
+        work("Unpacking ${File(path).name}", "Unpacked", listOf(path), false) { pointerUnpackHere(it, dir) }
+    }
+
     fun trashTagged() {
         val paths = _ui.value.tagged.toList()
         val roots = roots
@@ -440,15 +532,41 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
      *  the app does not show itself; the screen then hands it to another app. */
     fun view(entry: Entry): Boolean {
         File(entry.path).parent?.let(::remember)
-        when (entry.kind) {
-            Kind.IMAGE -> _ui.update { it.copy(viewing = entry, text = "") }
-            Kind.TEXT -> viewModelScope.launch {
+        return show(entry)
+    }
+
+    private fun show(entry: Entry): Boolean {
+        when {
+            entry.kind == Kind.IMAGE -> _ui.update { it.copy(viewing = entry, text = "") }
+            // A file the search found words in is text, whatever its name.
+            entry.kind == Kind.TEXT || entry.line > 0u -> viewModelScope.launch {
                 val text = withContext(Dispatchers.IO) { pointerText(entry.path, TEXT_MAX.toUInt()) }
                 _ui.update { it.copy(viewing = entry, text = text) }
             }
             else -> return false
         }
         return true
+    }
+
+    /** Open a file that is inside an archive: copy it out to the app's
+     *  cache, then show it here, or give it to `hand` for another app. */
+    fun unpack(entry: Entry, hand: (Entry) -> Unit) {
+        if (_ui.value.running != null) return
+        File(entry.path).parent?.let(::remember)
+        val cache = File(getApplication<Application>().cacheDir, UNPACKED).path
+        viewModelScope.launch {
+            stop = false
+            _ui.update { it.copy(running = Running("Unpacking ${entry.name}")) }
+            val out = withContext(Dispatchers.IO) {
+                pointerJobStart()
+                pointerUnpack(entry.path, cache)
+            }
+            _ui.update { it.copy(running = null) }
+            when {
+                out.error.isNotEmpty() -> say(out.error)
+                else -> entry.copy(path = out.path).let { if (!show(it)) hand(it) }
+            }
+        }
     }
 
     /** The picture viewer moved to another picture. */
@@ -472,15 +590,33 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Mark the folder on screen, or take its mark away. */
-    fun toggleMark() {
+    /** Mark a folder, or take its mark away. With no path, the folder on
+     *  screen. */
+    fun toggleMark(path: String = _ui.value.dir) {
         val s = _ui.value
-        val marks = if (s.marks.any { it.path == s.dir }) {
-            s.marks.filterNot { it.path == s.dir }
+        val marks = if (s.marks.any { it.path == path }) {
+            s.marks.filterNot { it.path == path }
         } else {
-            s.marks + Mark(s.crumbs.lastOrNull()?.name ?: File(s.dir).name, s.dir)
+            // A volume goes by the name people know it by.
+            s.marks + Mark(s.volumes.firstOrNull { it.path == path }?.name ?: File(path).name, path)
         }
         setMarks(marks)
+    }
+
+    /** A mark is being dragged past another one in the row. */
+    fun moveMark(from: String, to: String) {
+        val marks = _ui.value.marks.toMutableList()
+        val a = marks.indexOfFirst { it.path == from }
+        val b = marks.indexOfFirst { it.path == to }
+        if (a < 0 || b < 0 || a == b) return
+        marks.add(b, marks.removeAt(a))
+        _ui.update { it.copy(marks = marks) }
+    }
+
+    /** The drag ended: the new order is written down, once. */
+    fun keepMarks() {
+        val marks = _ui.value.marks
+        viewModelScope.launch(Dispatchers.IO) { store.saveMarks(marks) }
     }
 
     fun unmark(mark: Mark) = setMarks(_ui.value.marks - mark)

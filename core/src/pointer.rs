@@ -12,14 +12,20 @@
 //     moves the item to a trash folder on the same volume.
 //   - A copy that fails or is cancelled leaves no half file behind.
 // And no panics: the release profile aborts on one.
+//
+// A zip or tar file is walked like a folder, and read only: see "archives
+// as folders" below.
 
 use std::cmp::Ordering;
-use std::collections::VecDeque;
+use std::collections::hash_map::DefaultHasher;
+use std::collections::{HashSet, VecDeque};
 use std::fs::{self, File};
-use std::io::{self, Read, Write};
-use std::path::{Path, PathBuf};
+use std::hash::{Hash, Hasher};
+use std::io::{self, BufReader, Read, Write};
+use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as Atomic};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const TRASH: &str = ".pointer-trash";
 
@@ -45,9 +51,14 @@ pub struct Entry {
     pub size: u64,
     /// "2.4 MB"; empty for a folder.
     pub size_text: String,
-    /// Seconds since 1970.
+    /// Seconds since 1970; 0 when it is not known.
     pub modified: i64,
     pub hidden: bool,
+    /// For a hit of a search inside files: the number of the line the words
+    /// stand on, from 1. Else 0.
+    pub line: u32,
+    /// The text of that line; else empty.
+    pub note: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -65,6 +76,8 @@ pub struct Listing {
     pub entries: Vec<Entry>,
     /// Why the folder could not be read; empty when it could.
     pub error: String,
+    /// True when the folder is an archive, or inside one.
+    pub packed: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
@@ -243,6 +256,8 @@ fn entry_of(path: &Path) -> Option<Entry> {
         size,
         size_text: if is_dir { String::new() } else { size_text(size) },
         modified: epoch(meta.modified()),
+        line: 0,
+        note: String::new(),
         name,
     })
 }
@@ -255,13 +270,25 @@ fn entry_of(path: &Path) -> Option<Entry> {
 pub fn pointer_list(dir: String, sort: SortBy, reverse: bool, hidden: bool) -> Listing {
     let read = match fs::read_dir(&dir) {
         Ok(r) => r,
-        Err(e) => return Listing { entries: Vec::new(), error: plain(&e) },
+        Err(e) => {
+            // Not a folder on the disk: it may be one inside an archive.
+            return match packed(&dir) {
+                Some((file, inner)) => list_packed(&file, &inner, sort, reverse, hidden),
+                None => Listing { entries: Vec::new(), error: plain(&e), packed: false },
+            };
+        }
     };
     let mut entries: Vec<Entry> = read
         .flatten()
         .filter_map(|d| entry_of(&d.path()))
         .filter(|e| (hidden || !e.hidden) && e.name != TRASH)
         .collect();
+    sort_entries(&mut entries, sort, reverse);
+    Listing { entries, error: String::new(), packed: false }
+}
+
+/// Folders first, then files, in the asked order.
+fn sort_entries(entries: &mut [Entry], sort: SortBy, reverse: bool) {
     entries.sort_by(|a, b| {
         let dirs = (b.kind == Kind::Dir).cmp(&(a.kind == Kind::Dir));
         let by_name = natural_cmp(&a.name, &b.name);
@@ -277,7 +304,6 @@ pub fn pointer_list(dir: String, sort: SortBy, reverse: bool, hidden: bool) -> L
         };
         dirs.then(if reverse { order.reverse() } else { order })
     });
-    Listing { entries, error: String::new() }
 }
 
 /// The path as steps from its volume's root, for the line on top of the
@@ -394,12 +420,18 @@ impl Copier {
     }
 }
 
-/// One file, written under a hidden name first and given its real name
-/// only when all of it is there. Keeps the time the file was changed.
+/// One file, with the time it was changed.
 fn copy_file(src: &Path, dest: &Path, how: &mut Copier) -> io::Result<()> {
+    let mut from = File::open(src)?;
+    let time = from.metadata().and_then(|m| m.modified()).ok();
+    write_file(&mut from, dest, time, how)
+}
+
+/// Bytes into a new file, written under a hidden name first and given its
+/// real name only when all of it is there.
+fn write_file(from: &mut dyn Read, dest: &Path, time: Option<SystemTime>, how: &mut Copier) -> io::Result<()> {
     let part = dest.with_file_name(format!(".{}.part", name_of(dest)));
     let mut run = || -> io::Result<()> {
-        let mut from = File::open(src)?;
         let mut to = File::create(&part)?;
         let buf = &mut how.buf[..];
         loop {
@@ -416,7 +448,7 @@ fn copy_file(src: &Path, dest: &Path, how: &mut Copier) -> io::Result<()> {
             to.write_all(&buf[..n])?;
             BYTES.fetch_add(n as u64, Atomic::Relaxed);
         }
-        if let Ok(t) = from.metadata().and_then(|m| m.modified()) {
+        if let Some(t) = time {
             let _ = to.set_modified(t);
         }
         if how.sync {
@@ -533,6 +565,20 @@ fn move_to(src: &Path, dest: &Path) -> Result<(), String> {
 #[uniffi::export]
 pub fn pointer_copy(src: String, dest_dir: String) -> Done {
     let (from, dir) = (Path::new(&src), Path::new(&dest_dir));
+    if pack_folder(&dest_dir) {
+        return done(Err(SEALED.into()));
+    }
+    // An item inside an archive is copied out of it.
+    if !exists(from) {
+        if let Some((file, inner)) = packed(&src) {
+            let dest = free_name(dir, &name_of(from));
+            return done(unpack(&file, &inner, &dest).map(|_| Undo {
+                kind: UndoKind::Copied,
+                from: src.clone(),
+                to: text_of(&dest),
+            }));
+        }
+    }
     if inside(from, dir) {
         return done(Err("A folder cannot go into itself.".into()));
     }
@@ -544,6 +590,12 @@ pub fn pointer_copy(src: String, dest_dir: String) -> Done {
 #[uniffi::export]
 pub fn pointer_move(src: String, dest_dir: String) -> Done {
     let (from, dir) = (Path::new(&src), Path::new(&dest_dir));
+    if pack_folder(&dest_dir) {
+        return done(Err(SEALED.into()));
+    }
+    if in_pack(&src) {
+        return done(Err("It can be copied out of an archive, not moved.".into()));
+    }
     if inside(from, dir) {
         return done(Err("A folder cannot go into itself.".into()));
     }
@@ -559,6 +611,9 @@ pub fn pointer_move(src: String, dest_dir: String) -> Done {
 pub fn pointer_rename(path: String, new_name: String) -> Done {
     let from = Path::new(&path);
     let result = (|| {
+        if in_pack(&path) {
+            return Err(SEALED.to_string());
+        }
         let name = good_name(&new_name)?;
         let dest = from.with_file_name(name);
         // "notes" to "Notes" names the same file where case is ignored.
@@ -579,6 +634,9 @@ pub fn pointer_rename(path: String, new_name: String) -> Done {
 #[uniffi::export]
 pub fn pointer_mkdir(dir: String, name: String) -> Done {
     let result = (|| {
+        if pack_folder(&dir) {
+            return Err(SEALED.to_string());
+        }
         let dest = Path::new(&dir).join(good_name(&name)?);
         fs::create_dir(&dest).map_err(|e| plain(&e))?;
         Ok(Undo { kind: UndoKind::Made, from: String::new(), to: text_of(&dest) })
@@ -602,7 +660,8 @@ pub fn pointer_trash(path: String, roots: Vec<String>) -> Done {
             return Err("That cannot go to the trash.".to_string());
         }
         if !exists(from) {
-            return Err("It is not there any more.".to_string());
+            let why = if packed(&path).is_some() { SEALED } else { "It is not there any more." };
+            return Err(why.to_string());
         }
         let now = SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis());
         let id = trash.join(format!("{}-{}", now, TRASH_COUNT.fetch_add(1, Atomic::Relaxed)));
@@ -738,6 +797,9 @@ pub fn pointer_search(root: String, query: String, hidden: bool, limit: u32) -> 
     if query.is_empty() {
         return out;
     }
+    if pack_folder(&root) {
+        return packed(&root).map_or(out, |(file, inner)| search_packed(&file, &inner, &query, hidden, limit as usize));
+    }
     let mut queue = VecDeque::from([PathBuf::from(&root)]);
     let mut seen = 0u32;
     while let Some(dir) = queue.pop_front() {
@@ -770,7 +832,7 @@ pub fn pointer_search(root: String, query: String, hidden: bool, limit: u32) -> 
 pub fn pointer_tree_size(paths: Vec<String>) -> TreeSize {
     let (mut files, mut bytes) = (0, 0);
     for p in &paths {
-        let (f, b) = tree_stats(Path::new(p));
+        let (f, b) = if in_pack(p) { pack_stats(p) } else { tree_stats(Path::new(p)) };
         files += f;
         bytes += b;
     }
@@ -819,6 +881,599 @@ pub fn pointer_synced(root: String) -> Vec<String> {
     }
     out.sort_by(|a, b| natural_cmp(a, b));
     out
+}
+
+// ---------- words inside files ----------
+
+/// A file larger than this is not searched for words.
+const GREP_MAX: u64 = 8 << 20;
+
+/// Text files under `root` with `query` in them, case ignored, the nearest
+/// first, each with the first line that has it. Pictures, sound, video and
+/// archives are passed by on their names. Any other file is opened, and
+/// read on only when its start looks like text. Stops like `pointer_search`.
+#[uniffi::export]
+pub fn pointer_grep(root: String, query: String, hidden: bool, limit: u32) -> Vec<Entry> {
+    let ticket = SEARCH.fetch_add(1, Atomic::Relaxed) + 1;
+    let needle = query.trim().to_lowercase();
+    let mut out = Vec::new();
+    if needle.is_empty() {
+        return out;
+    }
+    let mut queue = VecDeque::from([PathBuf::from(&root)]);
+    let mut seen = 0u32;
+    let mut buf = Vec::new();
+    while let Some(dir) = queue.pop_front() {
+        let Ok(read) = fs::read_dir(&dir) else { continue };
+        for d in read.flatten() {
+            seen += 1;
+            if seen > 300_000 || SEARCH.load(Atomic::Relaxed) != ticket {
+                return out;
+            }
+            let name = d.file_name().to_string_lossy().into_owned();
+            if name == TRASH || (!hidden && name.starts_with('.')) {
+                continue;
+            }
+            if d.file_type().map_or(false, |t| t.is_dir()) {
+                queue.push_back(d.path());
+                continue;
+            }
+            if !matches!(kind_of(&name, false), Kind::Text | Kind::Other) {
+                continue;
+            }
+            let path = d.path();
+            let Some((line, note)) = line_with(&path, &needle, &mut buf) else { continue };
+            out.extend(entry_of(&path).map(|e| Entry { line, note, ..e }));
+            if out.len() >= limit as usize {
+                return out;
+            }
+        }
+    }
+    out
+}
+
+/// The first line of a text file with `needle` in it. `buf` is the caller's,
+/// so a search of many files asks for memory once.
+fn line_with(path: &Path, needle: &str, buf: &mut Vec<u8>) -> Option<(u32, String)> {
+    let mut file = File::open(path).ok()?;
+    if file.metadata().ok()?.len() > GREP_MAX {
+        return None;
+    }
+    buf.clear();
+    // The first 4 KiB tell text from the rest. Only text is read on.
+    (&mut file).take(4096).read_to_end(buf).ok()?;
+    if buf.contains(&0) {
+        return None;
+    }
+    file.read_to_end(buf).ok()?;
+    first_hit(buf, needle)
+}
+
+/// The first line of `hay` with `needle` in it, case ignored: its number
+/// from 1, and its text. `needle` is in lower case.
+fn first_hit(hay: &[u8], needle: &str) -> Option<(u32, String)> {
+    if needle.is_empty() {
+        return None;
+    }
+    let newlines = |bytes: &[u8]| bytes.iter().filter(|&&b| b == b'\n').count();
+    let (line, from) = if needle.is_ascii() {
+        let at = hay.windows(needle.len()).position(|w| w.eq_ignore_ascii_case(needle.as_bytes()))?;
+        let start = hay[..at].iter().rposition(|&b| b == b'\n').map_or(0, |i| i + 1);
+        // Of a very long line, show the part the words are in.
+        (newlines(&hay[..at]), if at - start > 80 { at - 40 } else { start })
+    } else {
+        // Lower case can change how many bytes a letter takes, so the place
+        // is counted in lines, which it cannot change.
+        let low = String::from_utf8_lossy(hay).to_lowercase();
+        let line = newlines(&low.as_bytes()[..low.find(needle)?]);
+        (line, hay.split(|&b| b == b'\n').take(line).map(|l| l.len() + 1).sum())
+    };
+    let rest = hay.get(from..)?;
+    let end = rest.iter().position(|&b| b == b'\n').unwrap_or(rest.len());
+    let text: String = String::from_utf8_lossy(&rest[..end])
+        .trim_matches(|c: char| c.is_whitespace() || c == '\u{fffd}')
+        .chars()
+        .take(160)
+        .collect();
+    Some((line as u32 + 1, text))
+}
+
+// ---------- files from other apps ----------
+
+/// A name for a file another app hands over: one path step, nothing a name
+/// cannot have, and no dot in front, so the file does not land hidden.
+#[uniffi::export]
+pub fn pointer_safe_name(name: String) -> String {
+    safe_name(&name)
+}
+
+fn safe_name(name: &str) -> String {
+    let last = name.rsplit(['/', '\\']).next().unwrap_or("");
+    let kept: String = last.chars().filter(|c| !c.is_control()).collect();
+    let kept = kept.trim().trim_start_matches('.').trim();
+    if kept.is_empty() {
+        return "shared".into();
+    }
+    if kept.len() <= 200 {
+        return kept.to_string();
+    }
+    // Too long for a file name: the end of the stem goes, the ending stays.
+    let ext = match kept.rfind('.') {
+        Some(i) if kept.len() - i <= 12 => &kept[i..],
+        _ => "",
+    };
+    let mut end = 200 - ext.len();
+    while !kept.is_char_boundary(end) {
+        end -= 1;
+    }
+    format!("{}{}", &kept[..end], ext)
+}
+
+/// Give a file its real name. The shell wrote it into its folder under a
+/// waiting name, since only the shell can read what another app shares.
+/// A taken name gets a number.
+#[uniffi::export]
+pub fn pointer_keep(part: String, name: String) -> Done {
+    let from = Path::new(&part);
+    let result = (|| {
+        let dir = from.parent().ok_or("Where it should go is not known.")?;
+        let dest = free_name(dir, &safe_name(&name));
+        fs::rename(from, &dest).map_err(|e| {
+            let _ = fs::remove_file(from);
+            plain(&e)
+        })?;
+        Ok(Undo { kind: UndoKind::Copied, from: String::new(), to: text_of(&dest) })
+    })();
+    done(result)
+}
+
+/// Save text that another app shared as a file in `dir`.
+#[uniffi::export]
+pub fn pointer_save_text(dir: String, name: String, text: String) -> Done {
+    if pack_folder(&dir) {
+        return done(Err(SEALED.into()));
+    }
+    let dest = free_name(Path::new(&dir), &safe_name(&name));
+    let part = dest.with_file_name(format!(".{}.part", name_of(&dest)));
+    let result = fs::write(&part, text).and_then(|_| fs::rename(&part, &dest)).map_err(|e| {
+        let _ = fs::remove_file(&part);
+        plain(&e)
+    });
+    done(result.map(|_| Undo { kind: UndoKind::Copied, from: String::new(), to: text_of(&dest) }))
+}
+
+// ---------- archives as folders ----------
+
+// A zip or tar file is walked like a folder: "/sdcard/a.zip/docs" is the
+// folder "docs" inside a.zip. No such path is on the disk, so each function
+// that is handed one finds the archive on the way to it. An archive is
+// read and never changed: what is in it can be copied out, nothing more.
+
+const SEALED: &str = "An archive is read here, not changed.";
+
+#[derive(Clone, Copy, PartialEq)]
+enum Pack {
+    Zip,
+    Tar,
+    TarGz,
+}
+
+/// The kind of archive a name says it is; none for one not read here.
+fn pack_of(name: &str) -> Option<Pack> {
+    let name = name.to_ascii_lowercase();
+    if name.ends_with(".tar.gz") || name.ends_with(".tgz") {
+        Some(Pack::TarGz)
+    } else if name.ends_with(".tar") {
+        Some(Pack::Tar)
+    } else if name.ends_with(".zip") || name.ends_with(".jar") {
+        Some(Pack::Zip)
+    } else {
+        None
+    }
+}
+
+/// True when a file of this name opens as a folder.
+#[uniffi::export]
+pub fn pointer_opens(name: String) -> bool {
+    pack_of(&name).is_some()
+}
+
+/// The name without the archive ending: "photos" for "photos.tar.gz".
+fn pack_stem(name: &str) -> &str {
+    let lower = name.to_ascii_lowercase();
+    [".tar.gz", ".tgz", ".tar", ".zip", ".jar"]
+        .iter()
+        .find(|end| lower.ends_with(*end) && name.len() > end.len())
+        .and_then(|end| name.get(..name.len() - end.len()))
+        .unwrap_or(name)
+}
+
+/// A path that runs through an archive: the archive's file, and the path
+/// inside it ("" for its top). None for any other path, and that answer
+/// costs a look at the names, no more.
+fn packed(path: &str) -> Option<(PathBuf, String)> {
+    let full = Path::new(path);
+    let mut at = full;
+    loop {
+        if pack_of(&name_of(at)).is_some() && at.is_file() {
+            let inner = text_of(full.strip_prefix(at).ok()?);
+            return Some((at.to_path_buf(), inner.trim_matches('/').to_string()));
+        }
+        at = at.parent()?;
+    }
+}
+
+/// True for an item inside an archive.
+fn in_pack(path: &str) -> bool {
+    !exists(Path::new(path)) && packed(path).is_some()
+}
+
+/// True for a folder that is an archive, or inside one.
+fn pack_folder(dir: &str) -> bool {
+    !Path::new(dir).is_dir() && packed(dir).is_some()
+}
+
+/// An error whose words are plain already.
+#[derive(Debug)]
+struct Said(&'static str);
+
+impl std::fmt::Display for Said {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+impl std::error::Error for Said {}
+
+fn said(text: &'static str) -> io::Error {
+    io::Error::other(Said(text))
+}
+
+/// Why work on an archive failed, in words a person can read. What the
+/// unpacking code says about a broken archive is not such words.
+fn pack_plain(e: &io::Error) -> String {
+    if e.get_ref().is_some_and(|inner| inner.is::<Said>()) {
+        return e.to_string();
+    }
+    match e.kind() {
+        io::ErrorKind::InvalidData | io::ErrorKind::InvalidInput | io::ErrorKind::UnexpectedEof | io::ErrorKind::Other => {
+            "This archive cannot be read.".into()
+        }
+        _ => plain(e),
+    }
+}
+
+fn zip_error(e: zip::result::ZipError) -> io::Error {
+    use zip::result::ZipError;
+    match e {
+        ZipError::Io(e) => e,
+        ZipError::InvalidPassword => said("It is locked with a password."),
+        ZipError::UnsupportedArchive(why) if why == ZipError::PASSWORD_REQUIRED => said("It is locked with a password."),
+        ZipError::CompressionMethodNotSupported(_) => said("It is packed in a way this app cannot unpack."),
+        _ => said("This archive cannot be read."),
+    }
+}
+
+/// One item of an archive.
+struct Packed {
+    /// Its path inside the archive: "docs/a.txt".
+    path: String,
+    dir: bool,
+    size: u64,
+    /// Seconds since 1970; 0 when the archive does not say.
+    modified: i64,
+    /// A zip finds its items by number.
+    at: usize,
+}
+
+/// What is in an archive.
+struct Index {
+    file: PathBuf,
+    /// The file's size and time when it was read.
+    stamp: (u64, Option<SystemTime>),
+    items: Vec<Packed>,
+}
+
+// The archive last walked. Each step into one of its folders would
+// otherwise read the list again, and a .tar.gz has to be unpacked from
+// its start to be listed. A changed file is read anew.
+static INDEX: Mutex<Option<Arc<Index>>> = Mutex::new(None);
+
+fn index_of(file: &Path) -> Result<Arc<Index>, String> {
+    let meta = fs::metadata(file).map_err(|e| plain(&e))?;
+    let stamp = (meta.len(), meta.modified().ok());
+    let mut kept = INDEX.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(index) = kept.as_ref().filter(|i| i.file == file && i.stamp == stamp) {
+        return Ok(index.clone());
+    }
+    let items = with_parents(read_index(file).map_err(|e| pack_plain(&e))?);
+    let index = Arc::new(Index { file: file.to_path_buf(), stamp, items });
+    *kept = Some(index.clone());
+    Ok(index)
+}
+
+fn open_zip(file: &Path) -> io::Result<zip::ZipArchive<BufReader<File>>> {
+    zip::ZipArchive::new(BufReader::new(File::open(file)?)).map_err(zip_error)
+}
+
+fn read_index(file: &Path) -> io::Result<Vec<Packed>> {
+    let mut items = Vec::new();
+    match pack_of(&name_of(file)) {
+        Some(Pack::Zip) => {
+            let mut zip = open_zip(file)?;
+            for at in 0..zip.len() {
+                let Ok(f) = zip.by_index_raw(at) else { continue };
+                let Some(path) = f.enclosed_name().and_then(|p| clean(&p)) else { continue };
+                // A zip's own time has no time zone. Only the exact time
+                // some zips carry beside it is used.
+                let modified = f
+                    .extra_data_fields()
+                    .find_map(|x| match x {
+                        zip::ExtraField::ExtendedTimestamp(t) => t.mod_time().map(i64::from),
+                        _ => None,
+                    })
+                    .unwrap_or(0);
+                items.push(Packed { path, dir: f.is_dir(), size: f.size(), modified, at });
+            }
+        }
+        Some(_) => each_tar(file, |path, dir, size, modified, _| {
+            items.push(Packed { path, dir, size, modified, at: 0 });
+            Ok(true)
+        })?,
+        None => return Err(said("This kind of archive is not read here.")),
+    }
+    Ok(items)
+}
+
+/// Walk a tar file from its start. `each` gets an item's path, whether it
+/// is a folder, its size, its time and its bytes, and says whether to go
+/// on. Links and devices are left out: only files and folders count.
+fn each_tar(
+    file: &Path,
+    mut each: impl FnMut(String, bool, u64, i64, &mut dyn Read) -> io::Result<bool>,
+) -> io::Result<()> {
+    let raw = BufReader::new(File::open(file)?);
+    let bytes: Box<dyn Read> = match pack_of(&name_of(file)) {
+        Some(Pack::TarGz) => Box::new(flate2::read::MultiGzDecoder::new(raw)),
+        _ => Box::new(raw),
+    };
+    let mut tar = tar::Archive::new(bytes);
+    for entry in tar.entries()? {
+        let mut entry = entry?;
+        let kind = entry.header().entry_type();
+        if !kind.is_dir() && !kind.is_file() {
+            continue;
+        }
+        let Some(path) = entry.path().ok().and_then(|p| clean(&p)) else { continue };
+        let (size, time) = (entry.size(), entry.header().mtime().unwrap_or(0) as i64);
+        if !each(path, kind.is_dir(), size, time, &mut entry)? {
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// A path from an archive as plain steps: "docs/a.txt". None for one with
+/// ".." in it: unpacked, it would land outside the folder it is unpacked to.
+fn clean(path: &Path) -> Option<String> {
+    let mut steps: Vec<String> = Vec::new();
+    for part in path.components() {
+        match part {
+            Component::Normal(step) => steps.push(step.to_string_lossy().into_owned()),
+            Component::ParentDir => return None,
+            // A leading "/" or "./" is dropped.
+            _ => {}
+        }
+    }
+    (!steps.is_empty()).then(|| steps.join("/"))
+}
+
+/// Every folder on the way to an item gets an item of its own, before the
+/// item, since many archives list only their files. No path stays twice.
+fn with_parents(items: Vec<Packed>) -> Vec<Packed> {
+    let mut seen: HashSet<String> = HashSet::new();
+    let mut out = Vec::with_capacity(items.len());
+    for item in items {
+        for (i, _) in item.path.match_indices('/') {
+            let parent = &item.path[..i];
+            if !seen.contains(parent) {
+                seen.insert(parent.to_string());
+                out.push(Packed { path: parent.to_string(), dir: true, size: 0, modified: 0, at: 0 });
+            }
+        }
+        if seen.insert(item.path.clone()) {
+            out.push(item);
+        }
+    }
+    out
+}
+
+/// The rest of `path` under the folder `dir`: "" for `dir` itself, None
+/// when the path is elsewhere.
+fn below<'a>(path: &'a str, dir: &str) -> Option<&'a str> {
+    if dir.is_empty() {
+        return Some(path);
+    }
+    let rest = path.strip_prefix(dir)?;
+    if rest.is_empty() {
+        Some(rest)
+    } else {
+        rest.strip_prefix('/')
+    }
+}
+
+fn packed_entry(file: &Path, item: &Packed) -> Entry {
+    let name = item.path.rsplit('/').next().unwrap_or("").to_string();
+    Entry {
+        hidden: name.starts_with('.'),
+        kind: kind_of(&name, item.dir),
+        path: format!("{}/{}", text_of(file), item.path),
+        size: if item.dir { 0 } else { item.size },
+        size_text: if item.dir { String::new() } else { size_text(item.size) },
+        modified: item.modified,
+        line: 0,
+        note: String::new(),
+        name,
+    }
+}
+
+/// The items of one folder inside an archive; "" is its top.
+fn list_packed(file: &Path, inner: &str, sort: SortBy, reverse: bool, hidden: bool) -> Listing {
+    let failed = |error: String| Listing { entries: Vec::new(), error, packed: true };
+    let index = match index_of(file) {
+        Ok(index) => index,
+        Err(error) => return failed(error),
+    };
+    if !inner.is_empty() && !index.items.iter().any(|it| it.dir && it.path == inner) {
+        return failed("It is not there any more.".into());
+    }
+    let mut entries: Vec<Entry> = index
+        .items
+        .iter()
+        .filter(|it| below(&it.path, inner).is_some_and(|rest| !rest.is_empty() && !rest.contains('/')))
+        .map(|it| packed_entry(file, it))
+        .filter(|e| hidden || !e.hidden)
+        .collect();
+    sort_entries(&mut entries, sort, reverse);
+    Listing { entries, error: String::new(), packed: true }
+}
+
+/// Names with `query` in them, below a folder inside an archive.
+fn search_packed(file: &Path, inner: &str, query: &str, hidden: bool, limit: usize) -> Vec<Entry> {
+    let Ok(index) = index_of(file) else { return Vec::new() };
+    index
+        .items
+        .iter()
+        .filter(|it| {
+            below(&it.path, inner).is_some_and(|rest| {
+                !rest.is_empty()
+                    && (hidden || !rest.split('/').any(|step| step.starts_with('.')))
+                    && rest.rsplit('/').next().is_some_and(|name| name.to_lowercase().contains(query))
+            })
+        })
+        .take(limit)
+        .map(|it| packed_entry(file, it))
+        .collect()
+}
+
+/// Files and bytes of an item inside an archive, as the archive lists them.
+fn pack_stats(path: &str) -> (u64, u64) {
+    let Some((file, inner)) = packed(path) else { return (0, 0) };
+    let Ok(index) = index_of(&file) else { return (0, 0) };
+    index
+        .items
+        .iter()
+        .filter(|it| !it.dir && below(&it.path, &inner).is_some())
+        .fold((0, 0), |(files, bytes), it| (files + 1, bytes + it.size))
+}
+
+/// Copy the item at `inner` out of an archive to `dest`, a path nothing has
+/// yet; "" stands for all of the archive. What a failed or cancelled copy
+/// made is taken away again.
+fn unpack(file: &Path, inner: &str, dest: &Path) -> Result<(), String> {
+    let index = index_of(file)?;
+    let is_dir = inner.is_empty() || index.items.iter().any(|it| it.dir && it.path == inner);
+    if !is_dir && !index.items.iter().any(|it| it.path == inner) {
+        return Err("It is not there any more.".into());
+    }
+    let mut how = Copier::new(false);
+    // One item to its place under `dest`. `rel` has no ".." in it: `clean`
+    // saw to that, so nothing lands outside `dest`.
+    let mut put = |rel: &str, dir: bool, time: i64, from: &mut dyn Read| -> io::Result<()> {
+        if CANCEL.load(Atomic::Relaxed) {
+            return Err(io::Error::new(io::ErrorKind::Interrupted, "cancelled"));
+        }
+        let to = if rel.is_empty() { dest.to_path_buf() } else { dest.join(rel) };
+        if dir {
+            return fs::create_dir_all(&to);
+        }
+        if let Some(parent) = to.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let time = (time > 0).then(|| UNIX_EPOCH + Duration::from_secs(time as u64));
+        write_file(from, &to, time, &mut how)
+    };
+    let result = (|| -> io::Result<()> {
+        if is_dir {
+            fs::create_dir(dest)?;
+        }
+        if pack_of(&name_of(file)) != Some(Pack::Zip) {
+            // A tar is read from its start; a lone file ends the walk.
+            return each_tar(file, |path, dir, _, time, from| match below(&path, inner) {
+                Some(rel) => put(rel, dir, time, from).map(|_| is_dir),
+                None => Ok(true),
+            });
+        }
+        let mut zip = open_zip(file)?;
+        for item in &index.items {
+            let Some(rel) = below(&item.path, inner) else { continue };
+            if item.dir {
+                put(rel, true, 0, &mut io::empty())?;
+            } else {
+                put(rel, false, item.modified, &mut zip.by_index(item.at).map_err(zip_error)?)?;
+            }
+        }
+        Ok(())
+    })();
+    result.map_err(|e| {
+        if e.kind() != io::ErrorKind::AlreadyExists {
+            remove_tree(dest);
+        }
+        pack_plain(&e)
+    })
+}
+
+/// A file copied out of an archive to be looked at.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct Unpacked {
+    /// Where the copy is; empty when it could not be made.
+    pub path: String,
+    pub error: String,
+}
+
+/// Copy one file out of an archive into `cache`, to show it or to hand it
+/// to another app. A second ask for the same file finds the first copy.
+#[uniffi::export]
+pub fn pointer_unpack(path: String, cache: String) -> Unpacked {
+    let result: Result<String, String> = (|| {
+        let (file, inner) = packed(&path).ok_or("It is not in an archive.")?;
+        let index = index_of(&file)?;
+        if !index.items.iter().any(|it| !it.dir && it.path == inner) {
+            return Err("It is not there any more.".into());
+        }
+        // The folder's name is made of the archive, its time and the path
+        // inside it, so a changed archive gets a fresh copy.
+        let mut hash = DefaultHasher::new();
+        (&file, index.stamp, &inner).hash(&mut hash);
+        let dir = Path::new(&cache).join(format!("{:016x}", hash.finish()));
+        let dest = dir.join(name_of(Path::new(&inner)));
+        if !dest.is_file() {
+            fs::create_dir_all(&dir).map_err(|e| plain(&e))?;
+            unpack(&file, &inner, &dest)?;
+        }
+        Ok(text_of(&dest))
+    })();
+    match result {
+        Ok(path) => Unpacked { path, error: String::new() },
+        Err(error) => Unpacked { path: String::new(), error },
+    }
+}
+
+/// Unpack a whole archive into a new folder named after it, in `dest_dir`.
+#[uniffi::export]
+pub fn pointer_unpack_here(archive: String, dest_dir: String) -> Done {
+    let result = (|| {
+        if pack_folder(&dest_dir) {
+            return Err(SEALED.to_string());
+        }
+        let (file, _) = packed(&archive)
+            .filter(|(_, inner)| inner.is_empty())
+            .ok_or("This is not an archive that can be unpacked here.")?;
+        let dest = free_name(Path::new(&dest_dir), pack_stem(&name_of(&file)));
+        unpack(&file, "", &dest)?;
+        Ok(Undo { kind: UndoKind::Copied, from: archive.clone(), to: text_of(&dest) })
+    })();
+    done(result)
 }
 
 // ---------- marks and recent folders ----------
@@ -1162,6 +1817,245 @@ mod tests {
         assert_eq!(kind_of("a.tar.GZ", false), Kind::Archive);
         assert_eq!(kind_of(".bashrc", false), Kind::Other);
         assert_eq!(kind_of("photos.jpg", true), Kind::Dir);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A zip with a file, a file two folders down, an empty folder, and one
+    /// item whose path points out of the archive.
+    fn zip_at(path: &Path) {
+        use zip::write::SimpleFileOptions;
+        let stored = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let squeezed = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        let mut zip = zip::ZipWriter::new(File::create(path).unwrap());
+        zip.start_file("readme.txt", stored).unwrap();
+        zip.write_all(b"hello").unwrap();
+        zip.start_file("docs/deep/Notes.md", squeezed).unwrap();
+        zip.write_all(&b"line one\nline two\n".repeat(100)).unwrap();
+        zip.add_directory("empty", stored).unwrap();
+        zip.start_file("../outside.txt", stored).unwrap();
+        zip.write_all(b"no").unwrap();
+        zip.finish().unwrap();
+    }
+
+    #[test]
+    fn a_zip_is_walked_like_a_folder() {
+        let dir = scratch("zip-walk");
+        let zip = dir.join("a.zip");
+        zip_at(&zip);
+        assert!(pointer_opens("A.ZIP".into()) && pointer_opens("b.tar.gz".into()) && !pointer_opens("c.7z".into()));
+
+        let top = pointer_list(s(&zip), SortBy::Name, false, false);
+        assert_eq!((top.error.as_str(), top.packed), ("", true));
+        let got: Vec<(&str, Kind)> = top.entries.iter().map(|e| (e.name.as_str(), e.kind)).collect();
+        // The item that pointed out of the archive is not among them.
+        assert_eq!(got, vec![("docs", Kind::Dir), ("empty", Kind::Dir), ("readme.txt", Kind::Text)]);
+        assert_eq!(top.entries[2].size_text, "5 B");
+        assert_eq!(top.entries[0].path, s(&zip.join("docs")));
+
+        let deep = pointer_list(s(&zip.join("docs/deep")), SortBy::Name, false, false);
+        assert_eq!(deep.entries.len(), 1);
+        assert_eq!((deep.entries[0].name.as_str(), deep.entries[0].size), ("Notes.md", 1800));
+        assert!(pointer_list(s(&zip.join("empty")), SortBy::Name, false, false).entries.is_empty());
+        assert!(!pointer_list(s(&zip.join("none")), SortBy::Name, false, false).error.is_empty());
+        // A plain folder is not an archive, and a broken archive says so.
+        assert!(!pointer_list(s(&dir), SortBy::Name, false, false).packed);
+        fs::write(dir.join("bad.zip"), "not a zip").unwrap();
+        assert_eq!(pointer_list(s(&dir.join("bad.zip")), SortBy::Name, false, false).error, "This archive cannot be read.");
+
+        let found = pointer_search(s(&zip), "notes".into(), false, 10);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].path, s(&zip.join("docs/deep/Notes.md")));
+        assert!(pointer_search(s(&zip.join("empty")), "notes".into(), false, 10).is_empty());
+        let size = pointer_tree_size(vec![s(&zip.join("docs")), s(&zip.join("readme.txt"))]);
+        assert_eq!((size.files, size.bytes), (2, 1805));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn items_are_copied_out_of_an_archive_and_nothing_else() {
+        let _job = lock();
+        let dir = scratch("zip-out");
+        let zip = dir.join("a.zip");
+        zip_at(&zip);
+        let out = dir.join("out");
+        fs::create_dir(&out).unwrap();
+
+        let one = pointer_copy(s(&zip.join("readme.txt")), s(&out));
+        assert_eq!(one.error, "");
+        assert_eq!(fs::read_to_string(out.join("readme.txt")).unwrap(), "hello");
+        let tree = pointer_copy(s(&zip.join("docs")), s(&out));
+        assert_eq!(tree.error, "");
+        assert_eq!(fs::metadata(out.join("docs/deep/Notes.md")).unwrap().len(), 1800);
+        // A taken name gets a number, here too.
+        assert_eq!(pointer_copy(s(&zip.join("docs")), s(&out)).error, "");
+        assert_eq!(names(&out), vec!["docs", "docs (2)", "readme.txt"]);
+        assert_eq!(pointer_copy(s(&zip.join("none")), s(&out)).error, "It is not there any more.");
+
+        // The archive itself is not changed by any of these.
+        let before = fs::read(&zip).unwrap();
+        assert!(!pointer_move(s(&zip.join("readme.txt")), s(&out)).error.is_empty());
+        assert_eq!(pointer_copy(s(&out.join("readme.txt")), s(&zip)).error, SEALED);
+        assert_eq!(pointer_copy(s(&out.join("readme.txt")), s(&zip.join("docs"))).error, SEALED);
+        assert_eq!(pointer_move(s(&out.join("readme.txt")), s(&zip.join("docs"))).error, SEALED);
+        assert_eq!(pointer_mkdir(s(&zip.join("docs")), "new".into()).error, SEALED);
+        assert_eq!(pointer_rename(s(&zip.join("readme.txt")), "x".into()).error, SEALED);
+        assert_eq!(pointer_trash(s(&zip.join("readme.txt")), vec![s(&dir)]).error, SEALED);
+        assert_eq!(pointer_save_text(s(&zip), "n.txt".into(), "x".into()).error, SEALED);
+        assert_eq!(fs::read(&zip).unwrap(), before);
+        assert!(out.join("readme.txt").exists());
+
+        // All of it, into a folder named after the archive.
+        let all = pointer_unpack_here(s(&zip), s(&dir));
+        assert_eq!(all.error, "");
+        assert_eq!(names(&dir.join("a")), vec!["docs", "empty", "readme.txt"]);
+        assert!(dir.join("a/empty").is_dir());
+        assert!(!dir.join("outside.txt").exists() && !dir.join("a/outside.txt").exists());
+        assert_eq!(pointer_unpack_here(s(&zip), s(&dir)).error, "");
+        assert!(dir.join("a (2)/docs/deep/Notes.md").exists());
+        assert!(!pointer_unpack_here(s(&out.join("readme.txt")), s(&dir)).error.is_empty());
+        // Taking it back sends the new folder to the trash.
+        assert_eq!(pointer_undo(all.undo.unwrap(), vec![s(&dir)]).error, "");
+        assert!(!dir.join("a").exists());
+
+        // A cancelled one leaves nothing.
+        pointer_job_cancel();
+        assert_eq!(pointer_unpack_here(s(&zip), s(&out)).error, "Cancelled.");
+        assert!(!out.join("a").exists());
+        assert_eq!(pointer_copy(s(&zip.join("docs")), s(&dir)).error, "Cancelled.");
+        assert!(!dir.join("docs").exists());
+        pointer_job_start();
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_tar_gz_is_walked_and_unpacked_too() {
+        let _job = lock();
+        let dir = scratch("tgz");
+        let tgz = dir.join("b.tar.gz");
+        let gz = flate2::write::GzEncoder::new(File::create(&tgz).unwrap(), flate2::Compression::fast());
+        let mut tar = tar::Builder::new(gz);
+        for (name, data) in [("./box/a.txt", "aaa"), ("box/inner/b.txt", "bb"), ("top.txt", "t")] {
+            let mut head = tar::Header::new_gnu();
+            head.set_size(data.len() as u64);
+            head.set_mode(0o644);
+            head.set_mtime(1_700_000_000);
+            tar.append_data(&mut head, name, data.as_bytes()).unwrap();
+        }
+        // A link out of the archive: it is left out.
+        let mut link = tar::Header::new_gnu();
+        link.set_entry_type(tar::EntryType::Symlink);
+        link.set_size(0);
+        tar.append_link(&mut link, "box/passwd", "/etc/passwd").unwrap();
+        tar.into_inner().unwrap().finish().unwrap();
+
+        let top = pointer_list(s(&tgz), SortBy::Name, false, false);
+        let got: Vec<&str> = top.entries.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!((got, top.error.as_str()), (vec!["box", "top.txt"], ""));
+        assert_eq!(top.entries[1].modified, 1_700_000_000);
+        let inner = pointer_list(s(&tgz.join("box")), SortBy::Name, false, false);
+        let got: Vec<&str> = inner.entries.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(got, vec!["inner", "a.txt"]);
+
+        assert_eq!(pointer_copy(s(&tgz.join("box/inner/b.txt")), s(&dir)).error, "");
+        assert_eq!(fs::read_to_string(dir.join("b.txt")).unwrap(), "bb");
+        // The copy has the time the archive gives the file.
+        assert_eq!(epoch(fs::metadata(dir.join("b.txt")).unwrap().modified()), 1_700_000_000);
+        assert_eq!(pointer_copy(s(&tgz.join("box")), s(&dir)).error, "");
+        assert_eq!(fs::read_to_string(dir.join("box/inner/b.txt")).unwrap(), "bb");
+        assert!(fs::symlink_metadata(dir.join("box/passwd")).is_err());
+        assert_eq!(pointer_unpack_here(s(&tgz), s(&dir)).error, "");
+        assert_eq!(names(&dir.join("b")), vec!["box", "top.txt"]);
+        assert_eq!(pack_stem("b.tar.gz"), "b");
+        assert_eq!(pack_stem(".zip"), ".zip");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_file_is_unpacked_once_to_be_looked_at() {
+        let _job = lock();
+        let dir = scratch("zip-view");
+        let zip = dir.join("a.zip");
+        zip_at(&zip);
+        let cache = dir.join("cache");
+        let first = pointer_unpack(s(&zip.join("docs/deep/Notes.md")), s(&cache));
+        assert_eq!(first.error, "");
+        assert!(first.path.starts_with(&s(&cache)) && first.path.ends_with("/Notes.md"));
+        assert_eq!(fs::metadata(&first.path).unwrap().len(), 1800);
+        // The second ask finds the copy: the job flag would stop a new one.
+        pointer_job_cancel();
+        assert_eq!(pointer_unpack(s(&zip.join("docs/deep/Notes.md")), s(&cache)), first);
+        pointer_job_start();
+        assert!(!pointer_unpack(s(&zip.join("docs")), s(&cache)).error.is_empty());
+        assert!(!pointer_unpack(s(&dir.join("cache")), s(&cache)).error.is_empty());
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn words_are_found_inside_files() {
+        let dir = scratch("grep");
+        fs::create_dir_all(dir.join("sub")).unwrap();
+        fs::create_dir_all(dir.join(".hid")).unwrap();
+        fs::write(dir.join("a.txt"), "first\nthe Needle is here\nlast\n").unwrap();
+        fs::write(dir.join("sub/README"), "nothing\n\nneedle again").unwrap();
+        fs::write(dir.join("sub/photo.jpg"), "needle in a picture's bytes").unwrap();
+        fs::write(dir.join("blob.bin"), b"\0\0needle").unwrap();
+        fs::write(dir.join(".hid/c.txt"), "needle").unwrap();
+        fs::write(dir.join("long.json"), format!("{}needle{}", "x".repeat(500), "y".repeat(500))).unwrap();
+        fs::write(dir.join("norsk.txt"), "en\nto\n  Blåbær og RØMME\n").unwrap();
+
+        let found = pointer_grep(s(&dir), " NEEDLE ".into(), false, 50);
+        let mut got: Vec<(&str, u32, &str)> = found.iter().map(|e| (e.name.as_str(), e.line, e.note.as_str())).collect();
+        got.sort();
+        assert_eq!(got.len(), 3);
+        assert_eq!(got[0], ("README", 3, "needle again"));
+        assert_eq!(got[1], ("a.txt", 2, "the Needle is here"));
+        // Of the one long line, the part with the words is shown.
+        assert_eq!(got[2].1, 1);
+        assert!(got[2].2.contains("needle") && got[2].2.chars().count() == 160);
+        assert_eq!(pointer_grep(s(&dir), "needle".into(), true, 50).len(), 4);
+        assert_eq!(pointer_grep(s(&dir), "needle".into(), true, 2).len(), 2);
+        // Letters outside ASCII match with case ignored as well.
+        let norsk = pointer_grep(s(&dir), "rømme".into(), false, 50);
+        assert_eq!((norsk[0].line, norsk[0].note.as_str()), (3, "Blåbær og RØMME"));
+        assert!(pointer_grep(s(&dir), "".into(), false, 50).is_empty());
+        assert_eq!(first_hit(b"abc", ""), None);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_file_from_another_app_gets_a_safe_name_and_overwrites_nothing() {
+        for (given, want) in [
+            ("photo.jpg", "photo.jpg"),
+            ("../../etc/passwd", "passwd"),
+            ("C:\\Users\\x\\doc.pdf", "doc.pdf"),
+            ("  .hidden  ", "hidden"),
+            ("..", "shared"),
+            ("", "shared"),
+            ("a\nb\t.txt", "ab.txt"),
+            ("dir/", "shared"),
+        ] {
+            assert_eq!(safe_name(given), want, "{:?}", given);
+        }
+        let long = format!("{}.jpeg", "æ".repeat(300));
+        let cut = safe_name(&long);
+        assert!(cut.len() <= 200 && cut.ends_with(".jpeg") && cut.starts_with('æ'));
+
+        let dir = scratch("share");
+        fs::write(dir.join("photo.jpg"), "old").unwrap();
+        fs::write(dir.join(".photo.jpg.1.part"), "new").unwrap();
+        let kept = pointer_keep(s(&dir.join(".photo.jpg.1.part")), "sub/../photo.jpg".into());
+        assert_eq!(kept.error, "");
+        assert_eq!(names(&dir), vec!["photo (2).jpg", "photo.jpg"]);
+        assert_eq!(fs::read_to_string(dir.join("photo.jpg")).unwrap(), "old");
+        assert_eq!(fs::read_to_string(dir.join("photo (2).jpg")).unwrap(), "new");
+        assert!(!pointer_keep(s(&dir.join("gone.part")), "x".into()).error.is_empty());
+
+        assert_eq!(pointer_save_text(s(&dir), "A page.txt".into(), "https://example.org".into()).error, "");
+        assert_eq!(pointer_save_text(s(&dir), "A page.txt".into(), "second".into()).error, "");
+        assert_eq!(fs::read_to_string(dir.join("A page.txt")).unwrap(), "https://example.org");
+        assert_eq!(fs::read_to_string(dir.join("A page (2).txt")).unwrap(), "second");
+        assert_eq!(names(&dir).len(), 4);
+        assert!(!pointer_save_text(s(&dir.join("none")), "n.txt".into(), "x".into()).error.is_empty());
         fs::remove_dir_all(dir).unwrap();
     }
 }

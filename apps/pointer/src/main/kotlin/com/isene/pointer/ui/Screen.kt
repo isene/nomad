@@ -26,9 +26,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -41,11 +43,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.outlined.InsertDriveFile
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RestoreFromTrash
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
@@ -128,8 +132,10 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.memory.MemoryCache
 import coil.request.ImageRequest
+import coil.request.videoFrameMillis
 import com.isene.pointer.PointerViewModel
 import com.isene.pointer.Running
+import com.isene.pointer.SEARCH_MAX
 import com.isene.pointer.Sizing
 import com.isene.pointer.TEXT_MAX
 import com.isene.pointer.UiState
@@ -143,7 +149,10 @@ import uniffi.fe2o3_mobile_core.Entry
 import uniffi.fe2o3_mobile_core.Kind
 import uniffi.fe2o3_mobile_core.Mark
 import uniffi.fe2o3_mobile_core.SortBy
+import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import uniffi.fe2o3_mobile_core.Trashed
+import uniffi.fe2o3_mobile_core.pointerOpens
 import uniffi.fe2o3_mobile_core.pointerSizeText
 
 private val SORTS = listOf(
@@ -159,7 +168,7 @@ private fun stamp(seconds: Long): String =
     if (seconds <= 0) "" else STAMP.format(Instant.ofEpochSecond(seconds).atZone(ZoneId.systemDefault()))
 
 /** A path with its volume named the way people know it: "Phone/Download". */
-private fun short(path: String, volumes: List<Volume>): String {
+internal fun short(path: String, volumes: List<Volume>): String {
     val v = volumes.filter { path == it.path || path.startsWith(it.path + "/") }.maxByOrNull { it.path.length }
     return if (v == null) path else v.name + path.removePrefix(v.path)
 }
@@ -198,11 +207,17 @@ fun PointerScreen(vm: PointerViewModel) {
     var making by rememberSaveable { mutableStateOf(false) }
     var renaming by rememberSaveable { mutableStateOf<String?>(null) }
 
+    val hand: (Entry) -> Unit = { e ->
+        if (!Hand.open(ctx, e.path, e.kind)) vm.tell("No app here opens ${e.name}")
+    }
     val open: (Entry) -> Unit = { e ->
         when {
             e.kind == Kind.DIR -> vm.go(e.path)
+            // A file inside an archive is copied out before it is shown.
+            s.packed -> vm.unpack(e, hand)
+            e.kind == Kind.ARCHIVE && pointerOpens(e.name) -> vm.go(e.path)
             vm.view(e) -> {}
-            !Hand.open(ctx, e.path, e.kind) -> vm.tell("No app here opens ${e.name}")
+            else -> hand(e)
         }
     }
 
@@ -215,6 +230,7 @@ fun PointerScreen(vm: PointerViewModel) {
                     } else {
                         SearchBar(s.filter.orEmpty(), vm)
                     }
+                    if (s.tabs.size > 1) Tabs(s, vm)
                     Marks(s, vm)
                 }
             },
@@ -232,6 +248,7 @@ fun PointerScreen(vm: PointerViewModel) {
         PlaceSheet(
             s,
             onGo = { places = false; vm.go(it) },
+            onMark = { vm.toggleMark(it) },
             onTrash = { places = false; vm.openTrash() },
             onDismiss = { places = false },
         )
@@ -286,7 +303,8 @@ private fun Bar(s: UiState, shown: List<Entry>, vm: PointerViewModel, onPlaces: 
             Box {
                 IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    Choice("New folder") { menu = false; onNewFolder() }
+                    Choice("New tab") { menu = false; vm.newTab() }
+                    if (!s.packed) Choice("New folder") { menu = false; onNewFolder() }
                     Choice("Tag all") { menu = false; vm.tagAll(shown) }
                     Choice("Size of this folder") {
                         menu = false
@@ -376,41 +394,99 @@ private fun SearchBar(text: String, vm: PointerViewModel) {
     )
 }
 
+/** One tab per folder kept open. A tap moves to a tab; the cross closes
+ *  the one on screen. The row is there from the second tab on. */
+@Composable
+private fun Tabs(s: UiState, vm: PointerViewModel) {
+    val row = rememberLazyListState()
+    LaunchedEffect(s.tab, s.tabs.size) { row.animateScrollToItem(s.tab) }
+    LazyRow(
+        Modifier.fillMaxWidth(),
+        state = row,
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        itemsIndexed(s.tabs) { i, dir ->
+            val on = i == s.tab
+            Row(
+                Modifier.clip(RoundedCornerShape(10.dp))
+                    .background(if (on) MaterialTheme.colorScheme.secondaryContainer else Color.Transparent)
+                    .clickable { vm.switchTab(i) }
+                    .padding(start = 12.dp, end = if (on) 0.dp else 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    s.volumes.firstOrNull { it.path == dir }?.name ?: File(dir).name,
+                    Modifier.widthIn(max = 130.dp).padding(vertical = 10.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = if (on) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (on) {
+                    IconButton(onClick = { vm.closeTab(i) }, Modifier.size(40.dp)) {
+                        Icon(Icons.Filled.Close, "Close this tab", Modifier.size(18.dp))
+                    }
+                }
+            }
+        }
+        item { IconButton(onClick = { vm.newTab() }) { Icon(Icons.Filled.Add, "New tab") } }
+    }
+}
+
 /** The marked folders, one tap away. The star marks the folder on screen,
- *  or takes its mark off. */
+ *  or takes its mark off. A long press on a mark picks it up, to drag it
+ *  to another place in the row. */
 @Composable
 private fun Marks(s: UiState, vm: PointerViewModel) {
     val here = s.marks.any { it.path == s.dir }
-    LazyRow(
-        Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(start = 4.dp, end = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        item(key = "star") {
-            IconButton(onClick = vm::toggleMark) {
-                Icon(
-                    if (here) Icons.Filled.Star else Icons.Filled.StarBorder,
-                    if (here) "Take the mark off this folder" else "Mark this folder",
-                    tint = if (here) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+    val haptic = LocalHapticFeedback.current
+    val row = rememberLazyListState()
+    val drag = rememberReorderableLazyListState(row) { from, to ->
+        vm.moveMark(from.key as String, to.key as String)
+    }
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // An archive is no place to mark: nothing can be saved into it.
+        IconButton(onClick = { vm.toggleMark() }, enabled = !s.packed, modifier = Modifier.padding(start = 4.dp)) {
+            Icon(
+                if (here) Icons.Filled.Star else Icons.Filled.StarBorder,
+                if (here) "Take the mark off this folder" else "Mark this folder",
+                tint = if (here) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         if (s.marks.isEmpty()) {
-            item(key = "hint") {
-                Text(
-                    "Mark a folder to reach it in one tap",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-        items(s.marks, key = { it.path }) { m ->
-            FilterChip(
-                selected = m.path == s.dir,
-                onClick = { vm.go(m.path) },
-                label = { Text(m.name, maxLines = 1) },
+            Text(
+                "Mark a folder to reach it in one tap",
+                Modifier.weight(1f).padding(end = 12.dp),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+            return@Row
+        }
+        LazyRow(
+            Modifier.weight(1f),
+            state = row,
+            contentPadding = PaddingValues(start = 4.dp, end = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items(s.marks, key = { it.path }) { m ->
+                ReorderableItem(drag, key = m.path) { _ ->
+                    FilterChip(
+                        selected = m.path == s.dir,
+                        onClick = { vm.go(m.path) },
+                        label = { Text(m.name, maxLines = 1) },
+                        modifier = Modifier.longPressDraggableHandle(
+                            onDragStarted = { haptic.performHapticFeedback(HapticFeedbackType.LongPress) },
+                            // The new order is written once, when the mark is let go.
+                            onDragStopped = { vm.keepMarks() },
+                        ),
+                    )
+                }
+            }
         }
     }
 }
@@ -442,17 +518,36 @@ private fun Listing(
             when {
                 s.error.isNotEmpty() -> item(key = "note") { Message(s.error) }
                 s.found != null -> item(key = "note") {
-                    val more = if (shown.size >= 500) ", the first 500 shown" else ""
-                    Message("${shown.size} found below ${s.crumbs.lastOrNull()?.name.orEmpty()}$more")
+                    val more = if (shown.size >= SEARCH_MAX) ", the first $SEARCH_MAX shown" else ""
+                    val where = s.crumbs.lastOrNull()?.name.orEmpty()
+                    Message(
+                        if (s.inside) {
+                            "${shown.size} files below $where with \"$query\" in them$more"
+                        } else {
+                            "${shown.size} found below $where$more"
+                        },
+                    )
                 }
                 shown.isEmpty() -> item(key = "note") {
                     Message(if (query.isEmpty()) "Empty folder" else "No name here has \"$query\" in it")
+                }
+            }
+            // With hits on screen, the other kind of search is one tap away.
+            if (s.found != null && !s.packed) {
+                item(key = "other") {
+                    if (s.inside) {
+                        Deeper("Search the names instead", false) { vm.searchBelow() }
+                    } else {
+                        Deeper("Search inside the files instead", false) { vm.searchBelow(inside = true) }
+                    }
                 }
             }
             items(shown, key = { it.path }) { e ->
                 EntryRow(
                     e,
                     tagged = e.path in s.tagged,
+                    // Nothing inside an archive is on the disk to make a picture of.
+                    thumb = !s.packed,
                     detail = if (s.found != null) {
                         listOf(short(File(e.path).parent.orEmpty(), s.volumes), e.sizeText).filter { it.isNotEmpty() }
                     } else {
@@ -464,25 +559,41 @@ private fun Listing(
             }
             if (query.isNotEmpty() && s.found == null && s.error.isEmpty()) {
                 item(key = "below") {
-                    Row(
-                        Modifier.fillMaxWidth().clickable(enabled = !s.searching, onClick = vm::searchBelow)
-                            .padding(horizontal = 20.dp, vertical = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        if (s.searching) {
-                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Filled.Search, null, tint = MaterialTheme.colorScheme.primary)
-                        }
-                        Spacer(Modifier.width(16.dp))
-                        Text(
-                            if (s.searching) "Searching the folders below" else "Search the folders below too",
-                            color = MaterialTheme.colorScheme.primary,
-                        )
+                    Deeper(
+                        if (s.searching && !s.inside) "Searching the folders below" else "Search the folders below too",
+                        s.searching && !s.inside,
+                        enabled = !s.searching,
+                    ) { vm.searchBelow() }
+                }
+                // An archive is not unpacked to be searched.
+                if (!s.packed) {
+                    item(key = "inside") {
+                        Deeper(
+                            if (s.searching && s.inside) "Searching inside the files" else "Search inside the files",
+                            s.searching && s.inside,
+                            enabled = !s.searching,
+                        ) { vm.searchBelow(inside = true) }
                     }
                 }
             }
         }
+    }
+}
+
+/** A row that starts a search of every folder below this one. */
+@Composable
+private fun Deeper(label: String, busy: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clickable(enabled = enabled, onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (busy) {
+            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+        } else {
+            Icon(Icons.Filled.Search, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+        }
+        Spacer(Modifier.width(16.dp))
+        Text(label, color = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -507,9 +618,10 @@ private fun icon(kind: Kind): ImageVector = when (kind) {
     Kind.OTHER -> Icons.AutoMirrored.Outlined.InsertDriveFile
 }
 
-/** One item. A tap opens it; a tap on its picture, or a long press, tags it. */
+/** One item. A tap opens it; a tap on its picture, or a long press, tags it.
+ *  With `thumb`, a picture or a video shows what is in it. */
 @Composable
-private fun EntryRow(e: Entry, tagged: Boolean, detail: String, onOpen: () -> Unit, onTag: () -> Unit) {
+private fun EntryRow(e: Entry, tagged: Boolean, thumb: Boolean, detail: String, onOpen: () -> Unit, onTag: () -> Unit) {
     val haptic = LocalHapticFeedback.current
     Row(
         Modifier.fillMaxWidth()
@@ -530,12 +642,13 @@ private fun EntryRow(e: Entry, tagged: Boolean, detail: String, onOpen: () -> Un
                     Modifier.size(40.dp).background(MaterialTheme.colorScheme.primary, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) { Icon(Icons.Filled.Check, "Tagged", tint = MaterialTheme.colorScheme.onPrimary) }
-                e.kind == Kind.IMAGE -> AsyncImage(
+                thumb && e.kind == Kind.IMAGE -> AsyncImage(
                     model = File(e.path),
                     contentDescription = null,
                     modifier = Modifier.size(40.dp).clip(RoundedCornerShape(6.dp)),
                     contentScale = ContentScale.Crop,
                 )
+                thumb && e.kind == Kind.VIDEO -> VideoThumb(e.path)
                 else -> Icon(
                     icon(e.kind),
                     null,
@@ -562,7 +675,40 @@ private fun EntryRow(e: Entry, tagged: Boolean, detail: String, onOpen: () -> Un
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            // The line a search inside the files found.
+            if (e.note.isNotEmpty()) {
+                Text(
+                    "${e.line}: ${e.note}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
+    }
+}
+
+/** One frame of a video, taken a second in since the first is often black,
+ *  with a play mark on it. The film icon shows until the frame is read, and
+ *  stays when the phone cannot read the video. */
+@Composable
+private fun VideoThumb(path: String) {
+    val ctx = LocalContext.current
+    Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+        Icon(Icons.Outlined.Movie, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        AsyncImage(
+            model = remember(path) { ImageRequest.Builder(ctx).data(File(path)).videoFrameMillis(1000).build() },
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(6.dp)),
+            contentScale = ContentScale.Crop,
+        )
+        Icon(
+            Icons.Filled.PlayArrow,
+            null,
+            Modifier.align(Alignment.BottomEnd).size(16.dp).background(Color.Black.copy(alpha = 0.55f), CircleShape),
+            tint = Color.White,
+        )
     }
 }
 
@@ -613,6 +759,12 @@ private fun TagBar(s: UiState, vm: PointerViewModel, ctx: Context, onRename: (St
     val tagged = s.tagged.toList()
     val elsewhere = tagged.count { File(it).parent != s.dir }
     val idle = s.running == null
+    var menu by remember { mutableStateOf(false) }
+    // What only one tagged item can be: a folder to open in a tab, or an
+    // archive to unpack.
+    val one = tagged.singleOrNull()
+    val folder = remember(one) { one != null && File(one).isDirectory }
+    val archive = remember(one) { one != null && pointerOpens(File(one).name) && File(one).isFile }
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = vm::clearTags) { Icon(Icons.Filled.Close, "Take the tags off") }
@@ -633,23 +785,39 @@ private fun TagBar(s: UiState, vm: PointerViewModel, ctx: Context, onRename: (St
             IconButton(onClick = {
                 val files = tagged.filter { File(it).isFile }
                 when {
+                    tagged.any { !File(it).exists() } -> vm.tell("Copy it out of the archive first")
                     files.isEmpty() -> vm.tell("A folder cannot be shared")
                     !Hand.share(ctx, files) -> vm.tell("No app here takes them")
                 }
             }) { Icon(Icons.Filled.Share, "Share") }
-            IconButton(onClick = {
-                vm.size(if (tagged.size == 1) File(tagged[0]).name else "${tagged.size} items", tagged)
-            }) { Icon(Icons.Outlined.Info, "Size") }
             IconButton(onClick = vm::trashTagged, enabled = idle) { Icon(Icons.Outlined.Delete, "To the trash") }
+            Box {
+                IconButton(onClick = { menu = true }) { Icon(Icons.Filled.MoreVert, "More") }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    Choice("Size") {
+                        menu = false
+                        vm.size(if (one != null) File(one).name else "${tagged.size} items", tagged)
+                    }
+                    if (one != null && folder) Choice("Open in a new tab") { menu = false; vm.newTab(one) }
+                    if (one != null && archive && idle && !s.packed) {
+                        Choice("Unpack here") { menu = false; vm.unpackHere(one) }
+                    }
+                }
+            }
         }
         Row(
             Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            FilledTonalButton(onClick = vm::copyHere, enabled = idle, modifier = Modifier.weight(1f)) {
+            // Nothing is put into an archive.
+            FilledTonalButton(onClick = vm::copyHere, enabled = idle && !s.packed, modifier = Modifier.weight(1f)) {
                 Text("Copy here", maxLines = 1)
             }
-            FilledTonalButton(onClick = vm::moveHere, enabled = idle && elsewhere > 0, modifier = Modifier.weight(1f)) {
+            FilledTonalButton(
+                onClick = vm::moveHere,
+                enabled = idle && elsewhere > 0 && !s.packed,
+                modifier = Modifier.weight(1f),
+            ) {
                 Text("Move here", maxLines = 1)
             }
         }
@@ -659,31 +827,42 @@ private fun TagBar(s: UiState, vm: PointerViewModel, ctx: Context, onRename: (St
 // ---------- places ----------
 
 @Composable
-private fun PlaceSheet(s: UiState, onGo: (String) -> Unit, onTrash: () -> Unit, onDismiss: () -> Unit) {
+private fun PlaceSheet(
+    s: UiState,
+    onGo: (String) -> Unit,
+    onMark: (String) -> Unit,
+    onTrash: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val marked = remember(s.marks) { s.marks.map { it.path }.toSet() }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         LazyColumn(contentPadding = PaddingValues(bottom = 24.dp)) {
             item { Section("Storage") }
             items(s.volumes) { v ->
-                PlaceRow(Icons.Outlined.PhoneAndroid, v.name, v.space) { onGo(v.path) }
+                PlaceRow(Icons.Outlined.PhoneAndroid, v.name, v.space, v.path in marked, { onMark(v.path) }) { onGo(v.path) }
             }
             if (s.synced.isNotEmpty()) {
                 item { Section("Synced folders") }
-                items(s.synced) { p -> PlaceRow(Icons.Outlined.Sync, File(p).name, short(p, s.volumes)) { onGo(p) } }
+                items(s.synced) { p ->
+                    PlaceRow(Icons.Outlined.Sync, File(p).name, short(p, s.volumes), p in marked, { onMark(p) }) { onGo(p) }
+                }
             }
             if (s.recent.isNotEmpty()) {
                 item { Section("Recent") }
-                items(s.recent) { p -> PlaceRow(Icons.Outlined.History, File(p).name, short(p, s.volumes)) { onGo(p) } }
+                items(s.recent) { p ->
+                    PlaceRow(Icons.Outlined.History, File(p).name, short(p, s.volumes), p in marked, { onMark(p) }) { onGo(p) }
+                }
             }
             item {
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                PlaceRow(Icons.Outlined.Delete, "Trash", "Deleted items wait here until you empty it", onTrash)
+                PlaceRow(Icons.Outlined.Delete, "Trash", "Deleted items wait here until you empty it", onClick = onTrash)
             }
         }
     }
 }
 
 @Composable
-private fun Section(title: String) {
+internal fun Section(title: String) {
     Text(
         title,
         Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 4.dp),
@@ -692,10 +871,20 @@ private fun Section(title: String) {
     )
 }
 
+/** A place to go to. With `marked` given, a star at the end puts the place
+ *  among the marks on top, or takes it out. */
 @Composable
-private fun PlaceRow(icon: ImageVector, title: String, detail: String, onClick: () -> Unit) {
+internal fun PlaceRow(
+    icon: ImageVector,
+    title: String,
+    detail: String,
+    marked: Boolean? = null,
+    onMark: () -> Unit = {},
+    onClick: () -> Unit,
+) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 10.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick)
+            .padding(start = 20.dp, end = if (marked == null) 20.dp else 8.dp, top = 10.dp, bottom = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -709,6 +898,15 @@ private fun PlaceRow(icon: ImageVector, title: String, detail: String, onClick: 
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (marked != null) {
+            IconButton(onClick = onMark) {
+                Icon(
+                    if (marked) Icons.Filled.Star else Icons.Filled.StarBorder,
+                    if (marked) "Take the mark off $title" else "Mark $title",
+                    tint = if (marked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         }
@@ -837,7 +1035,11 @@ private fun ViewerActions(entry: Entry, vm: PointerViewModel, ctx: Context) {
  *  zoomed picture is moved with one finger and sized with two. */
 @Composable
 private fun Pictures(entry: Entry, shown: List<Entry>, vm: PointerViewModel, ctx: Context) {
-    val images = remember(shown) { shown.filter { it.kind == Kind.IMAGE } }.ifEmpty { listOf(entry) }
+    // A picture copied out of an archive is not among the items on screen,
+    // and is shown alone.
+    val images = remember(shown) {
+        shown.filter { it.kind == Kind.IMAGE }.takeIf { all -> all.any { it.path == entry.path } } ?: listOf(entry)
+    }
     val start = remember { images.indexOfFirst { it.path == entry.path }.coerceAtLeast(0) }
     val pager = rememberPagerState(initialPage = start) { images.size }
     var zoomed by remember { mutableStateOf(false) }
@@ -934,12 +1136,29 @@ private fun TextView(entry: Entry, text: String, vm: PointerViewModel, ctx: Cont
         },
     ) { pad ->
         val lines = remember(text) { text.lines() }
-        LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+        // The line a search inside the files found: the text opens there,
+        // two lines above it, and the line is marked.
+        val hit = entry.line.toInt().takeIf { it in 1..lines.size } ?: 0
+        val state = rememberLazyListState((hit - 3).coerceAtLeast(0))
+        LazyColumn(
+            Modifier.padding(pad).fillMaxSize(),
+            state,
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
+        ) {
             if (text.isEmpty()) {
                 item { Message(if (entry.size == 0UL) "The file is empty" else "This file is not text") }
             } else {
                 items(lines.size) { i ->
-                    Text(lines[i], fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        lines[i],
+                        if (i + 1 == hit) {
+                            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.tertiaryContainer)
+                        } else {
+                            Modifier
+                        },
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
                 if (entry.size.toLong() > TEXT_MAX) {
                     item { Message("The file goes on. Open it in another app for the rest.") }

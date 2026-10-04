@@ -34,7 +34,7 @@ fun volumes(ctx: Context): List<Volume> {
 private fun space(dir: File): String =
     "${pointerSizeText(dir.usableSpace.toULong())} free of ${pointerSizeText(dir.totalSpace.toULong())}"
 
-/** What the app remembers: marks, recent folders and how to sort. */
+/** What the app remembers: marks, recent folders, tabs and how to sort. */
 class Store(ctx: Context) {
     private val dir = ctx.filesDir
     private val prefs = ctx.getSharedPreferences("pointer", Context.MODE_PRIVATE)
@@ -65,6 +65,16 @@ class Store(ctx: Context) {
     var hidden: Boolean
         get() = prefs.getBoolean("hidden", false)
         set(v) = prefs.edit().putBoolean("hidden", v).apply()
+
+    /** The folder of each tab when the app was last left. */
+    val tabs: List<String> get() = lines(prefs.getString("tabs", "").orEmpty())
+
+    /** The tab that was on screen. */
+    val tab: Int get() = prefs.getInt("tab", 0)
+
+    /** Nothing is written when the tabs are as they were. */
+    fun saveTabs(dirs: List<String>, active: Int) =
+        prefs.edit().putString("tabs", dirs.joinToString("\n")).putInt("tab", active).apply()
 
     private fun lines(text: String) = text.lines().filter { it.isNotEmpty() }
 
