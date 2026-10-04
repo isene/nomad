@@ -4,6 +4,9 @@
 // APIs, no file I/O. The Kotlin shells wrap the platform side; this crate
 // stays portable so the host-side tests below cover the same code that
 // runs on the phone.
+//
+// One exception: `pointer` is a file manager, so its logic is file
+// handling. It uses std::fs only, and its tests run on real folders.
 
 uniffi::setup_scaffolding!();
 
@@ -20,3 +23,4 @@ pub mod xrpn;
 pub mod onepage;
 pub mod gaze;
 pub mod outside;
+pub mod pointer;

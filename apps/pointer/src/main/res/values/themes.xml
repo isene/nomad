@@ -1,0 +1,4 @@
+<resources>
+    <!-- Only the window behind the first frame; Compose paints the rest. -->
+    <style name="Theme.Pointer" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
