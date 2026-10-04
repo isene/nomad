@@ -103,6 +103,24 @@ pub struct OutsideDay {
     /// "07:54"; empty where the sun does not rise or set that day.
     pub sunrise: String,
     pub sunset: String,
+    /// The highest level of a warning that touches the day: 2 yellow,
+    /// 3 orange, 4 red; 0 for none.
+    pub warning: u32,
+}
+
+/// An official weather warning for the spot (MET Norway, so Norway only).
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct Warning {
+    /// 2 yellow, 3 orange, 4 red.
+    pub level: u32,
+    /// "Rain", "Gale"
+    pub event: String,
+    /// "Vestland"
+    pub area: String,
+    /// "Tomorrow 06:00 to Tue 6 Oct 12:00", by the spot's clock.
+    pub span: String,
+    /// What is expected, and what to do about it.
+    pub text: String,
 }
 
 #[derive(Debug, Clone, PartialEq, uniffi::Record)]
@@ -113,6 +131,8 @@ pub struct Outside {
     /// The best of the next seven days for being outside, as an index
     /// into `days`.
     pub best_day: Option<u32>,
+    /// The warnings in force or coming, the gravest first.
+    pub warnings: Vec<Warning>,
 }
 
 /// The spot's clock: seconds east of UTC, and the one change (summer time
@@ -160,6 +180,8 @@ pub struct Requests {
     pub storm_body: String,
     /// GET
     pub gfs_url: String,
+    /// GET; empty where MET Norway's warnings do not reach.
+    pub alerts_url: String,
 }
 
 // ---------- requests ----------
@@ -171,7 +193,7 @@ fragment S on ForecastPeriod { startTime endTime symbol precipitation \
 precipitationProbability temperature temperatureFeelslike windSpeed \
 windDirection gust }";
 
-/// The three requests for a spot. Coordinates go out with four decimals
+/// The requests for a spot. Coordinates go out with four decimals
 /// (11 metres), which is what MET asks for and lets its cache answer.
 #[uniffi::export]
 pub fn outside_requests(lat: f64, lon: f64, now: i64) -> Requests {
@@ -197,6 +219,13 @@ pub fn outside_requests(lat: f64, lon: f64, now: i64) -> Requests {
              &models=gfs_seamless&forecast_days=16&wind_speed_unit=ms&timeformat=unixtime",
             la, lo
         ),
+        // MET warns for Norway, its waters and Svalbard; the box is wide
+        // and a point outside any warning area gets an empty answer.
+        alerts_url: if (57.0..=82.0).contains(&lat) && (-10.0..=35.0).contains(&lon) {
+            format!("https://api.met.no/weatherapi/metalerts/2.0/current.json?lat={}&lon={}&lang=en", la, lo)
+        } else {
+            String::new()
+        },
     }
 }
 
@@ -498,9 +527,93 @@ pub fn outside_usable(source: u32, body: String) -> bool {
     let steps = match source {
         0 => parse_yr(&body),
         1 => parse_storm(&body),
-        _ => parse_gfs(&body),
+        2 => parse_gfs(&body),
+        // The warnings: an empty list is a good answer too.
+        _ => {
+            return serde_json::from_str::<Value>(&body)
+                .map_or(false, |v| v.get("features").map_or(false, Value::is_array))
+        }
     };
     !steps.is_empty()
+}
+
+/// MET Norway's MetAlerts: the warnings still to end, each with the time
+/// it starts and ends.
+fn parse_alerts(body: &str, tz: &Tz, now: i64) -> Vec<(Warning, i64, i64)> {
+    let body: Value = match serde_json::from_str(body) {
+        Ok(v) => v,
+        Err(_) => return Vec::new(),
+    };
+    let Some(features) = body.get("features").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    let today = tz.local(now).div_euclid(86400);
+    let mut out = Vec::new();
+    for f in features {
+        let Some(props) = f.get("properties") else { continue };
+        let text = |key: &str| props.get(key).and_then(Value::as_str).unwrap_or("").trim();
+        // Drills and tests are sent on the same feed.
+        if !matches!(text("status"), "" | "Actual") {
+            continue;
+        }
+        let time = |i: usize| {
+            f.pointer("/when/interval")?.as_array()?.get(i)?.as_str().and_then(iso_epoch)
+        };
+        let (Some(from), Some(to)) = (time(0), time(1)) else { continue };
+        if to <= now {
+            continue;
+        }
+        // "2; yellow; Moderate"
+        let level = text("awareness_level")
+            .split(';')
+            .next()
+            .and_then(|n| n.trim().parse::<u32>().ok())
+            .unwrap_or(2)
+            .clamp(2, 4);
+        let event = match text("eventAwarenessName") {
+            "" => text("event"),
+            name => name,
+        };
+        let stamp = |epoch: i64| {
+            let local = tz.local(epoch);
+            let minutes = local.rem_euclid(86400) / 60;
+            (local.div_euclid(86400), format!("{:02}:{:02}", minutes / 60, minutes % 60))
+        };
+        let ((day_a, clock_a), (day_z, clock_z)) = (stamp(from), stamp(to));
+        let span = if day_a == day_z {
+            format!("{} {} to {}", day_label(day_a, today), clock_a, clock_z)
+        } else {
+            format!("{} {} to {} {}", day_label(day_a, today), clock_a, day_label(day_z, today), clock_z)
+        };
+        let words = [text("description"), text("instruction")];
+        out.push((
+            Warning {
+                level,
+                event: event.to_string(),
+                area: text("area").to_string(),
+                span,
+                text: words.iter().filter(|w| !w.is_empty()).cloned().collect::<Vec<_>>().join(" "),
+            },
+            from,
+            to,
+        ));
+    }
+    // The gravest first, then the one that starts first.
+    out.sort_by_key(|(w, from, _)| (std::cmp::Reverse(w.level), *from));
+    out
+}
+
+/// "Today", "Tomorrow", "Wed 7 Oct"
+fn day_label(day: i64, today: i64) -> String {
+    match day - today {
+        0 => "Today".into(),
+        1 => "Tomorrow".into(),
+        _ => {
+            let (_, m, d) = civil_from_days(day);
+            let weekday = WEEKDAYS[(day + 4).rem_euclid(7) as usize];
+            format!("{} {} {}", weekday, d, MONTHS[(m - 1).clamp(0, 11) as usize])
+        }
+    }
 }
 
 /// In time order, none overlapping, none that ended before `now`.
@@ -723,18 +836,20 @@ fn best_stretch(scores: &[Option<f64>; 24]) -> Option<(f64, usize, usize)> {
     Some((mean, a, z))
 }
 
-/// Build the whole screen from the three cached bodies. A body that is
+/// Build the whole screen from the cached bodies. A forecast that is
 /// missing or will not parse leaves its column empty.
 #[uniffi::export]
 pub fn outside_build(
     yr: Option<String>,
     storm: Option<String>,
     gfs: Option<String>,
+    alerts: Option<String>,
     lat: f64,
     lon: f64,
     tz: Tz,
     now: i64,
 ) -> Outside {
+    let alerts = alerts.as_deref().map(|a| parse_alerts(a, &tz, now)).unwrap_or_default();
     let sources: [Vec<Step>; SOURCES] = [
         tidy(yr.as_deref().map(parse_yr).unwrap_or_default(), now),
         tidy(storm.as_deref().map(parse_storm).unwrap_or_default(), now),
@@ -820,14 +935,18 @@ pub fn outside_build(
         };
 
         let (level, disagreement) = agreement(&cells);
-        let weekday = WEEKDAYS[(day + 4).rem_euclid(7) as usize];
+        // A warning touches the day when any of its time falls inside it.
+        let warning = alerts
+            .iter()
+            .filter(|(_, from, to)| {
+                tz.local(*from).div_euclid(86400) <= day && day <= tz.local(*to - 1).div_euclid(86400)
+            })
+            .map(|(w, _, _)| w.level)
+            .max()
+            .unwrap_or(0);
         days.push(OutsideDay {
             date: date_text(day),
-            label: match day - today {
-                0 => "Today".into(),
-                1 => "Tomorrow".into(),
-                _ => format!("{} {} {}", weekday, d, MONTHS[(m - 1).clamp(0, 11) as usize]),
-            },
+            label: day_label(day, today),
             cells,
             rows: rows.into_iter().map(|(hour, cells)| HourRow { hour, cells }).collect(),
             agreement: level,
@@ -836,6 +955,7 @@ pub fn outside_build(
             best,
             sunrise,
             sunset,
+            warning,
         });
     }
 
@@ -856,6 +976,7 @@ pub fn outside_build(
             .collect(),
         days,
         best_day: best_day.map(|(_, i)| i as u32),
+        warnings: alerts.into_iter().map(|(w, _, _)| w).collect(),
     }
 }
 
@@ -1055,10 +1176,47 @@ mod tests {
         }
         assert!(!outside_usable(1, r#"{"errors":[{"message":"no"}],"data":null}"#.into()));
         assert!(outside_usable(0, yr_body()));
-        let out = outside_build(Some("x".into()), None, Some("{}".into()), 59.9, 10.7, OSLO, 0);
+        let out = outside_build(Some("x".into()), None, Some("{}".into()), Some("x".into()), 59.9, 10.7, OSLO, 0);
         assert!(out.days.is_empty());
         assert_eq!(out.now, vec![None, None, None]);
         assert_eq!(out.best_day, None);
+        assert!(out.warnings.is_empty());
+        assert!(!outside_usable(3, "not json".into()) && !outside_usable(3, "{}".into()));
+        assert!(outside_usable(3, r#"{"features":[]}"#.into()));
+    }
+
+    #[test]
+    fn warnings_are_asked_for_in_norway_only() {
+        assert!(outside_requests(60.39, 5.32, 0).alerts_url.ends_with("current.json?lat=60.3900&lon=5.3200&lang=en"));
+        assert_eq!(outside_requests(35.68, 139.69, 0).alerts_url, "");
+    }
+
+    #[test]
+    fn a_warning_marks_the_days_it_touches() {
+        let start = iso_epoch("2026-10-04T22:00:00Z").unwrap();
+        let gfs = gfs_hours(start, 96, |_| (10.0, 0.0, 2.0, 3));
+        let alerts = r#"{"features":[
+          {"properties":{"awareness_level":"2; yellow; Moderate","eventAwarenessName":"Gale","area":"Skagerrak",
+            "description":"Southwest near gale. ","instruction":"Stay ashore. ","status":"Actual"},
+           "when":{"interval":["2026-10-05T09:00:00+00:00","2026-10-05T18:00:00+00:00"]}},
+          {"properties":{"awareness_level":"3; orange; Severe","event":"rain","area":"Vestland","description":"Much rain."},
+           "when":{"interval":["2026-10-06T20:00:00+00:00","2026-10-07T04:00:00+00:00"]}},
+          {"properties":{"awareness_level":"4; red; Extreme","event":"wind","status":"Test"},
+           "when":{"interval":["2026-10-05T00:00:00+00:00","2026-10-08T00:00:00+00:00"]}},
+          {"properties":{"awareness_level":"2; yellow; Moderate","event":"ice"},
+           "when":{"interval":["2026-10-03T00:00:00+00:00","2026-10-04T12:00:00+00:00"]}}
+        ]}"#;
+        let out = outside_build(None, None, Some(gfs), Some(alerts.into()), 59.91, 10.75, OSLO, start);
+        // The test and the one that has ended are left out; orange comes first.
+        assert_eq!(out.warnings.len(), 2);
+        let (orange, yellow) = (&out.warnings[0], &out.warnings[1]);
+        assert_eq!((orange.level, orange.event.as_str(), orange.area.as_str()), (3, "rain", "Vestland"));
+        assert_eq!(orange.span, "Tomorrow 22:00 to Wed 7 Oct 06:00");
+        assert_eq!((yellow.level, yellow.event.as_str()), (2, "Gale"));
+        assert_eq!(yellow.span, "Today 11:00 to 20:00");
+        assert_eq!(yellow.text, "Southwest near gale. Stay ashore.");
+        let marks: Vec<u32> = out.days.iter().map(|d| d.warning).collect();
+        assert_eq!(marks, vec![2, 3, 3, 0]);
     }
 
     /// A GFS body with one step per hour from `start`, built by `f(hour index)`
@@ -1084,7 +1242,7 @@ mod tests {
         // 48 hours from Oslo midnight, 5 October 2026 (22:00 UTC the 4th).
         let start = iso_epoch("2026-10-04T22:00:00Z").unwrap();
         let gfs = gfs_hours(start, 48, |i| (10.0 + (i % 24) as f64 / 2.0, 0.0, 2.0, 0));
-        let out = outside_build(None, None, Some(gfs), 59.91, 10.75, OSLO, start);
+        let out = outside_build(None, None, Some(gfs), None, 59.91, 10.75, OSLO, start);
         assert_eq!(out.days.len(), 2);
         let day = &out.days[0];
         assert_eq!((day.date.as_str(), day.label.as_str()), ("2026-10-05", "Today"));
@@ -1107,7 +1265,7 @@ mod tests {
         let start = iso_epoch("2026-10-04T22:00:00Z").unwrap();
         let gfs = gfs_hours(start, 48, |_| (10.0, 0.0, 2.0, 3));
         // 15:30 local on the first day.
-        let out = outside_build(None, None, Some(gfs), 59.91, 10.75, OSLO, start + 15 * 3600 + 1800);
+        let out = outside_build(None, None, Some(gfs), None, 59.91, 10.75, OSLO, start + 15 * 3600 + 1800);
         assert_eq!(out.days[0].rows.first().map(|r| r.hour), Some(15));
         assert_eq!(out.days[0].rows.len(), 9);
     }
@@ -1119,7 +1277,7 @@ mod tests {
         let tz = Tz { offset: 7200, change_at: change, offset_after: 3600 };
         let start = iso_epoch("2026-10-24T22:00:00Z").unwrap(); // 00:00 local the 25th
         let gfs = gfs_hours(start, 30, |_| (5.0, 0.0, 2.0, 3));
-        let out = outside_build(None, None, Some(gfs), 59.91, 10.75, tz, start - 3600);
+        let out = outside_build(None, None, Some(gfs), None, 59.91, 10.75, tz, start - 3600);
         let day = out.days.iter().find(|d| d.date == "2026-10-25").unwrap();
         // 00, 01, 02, then 02 again as the clock goes back: the second
         // 02 replaces the first in the table, and the day has 25 hours.
@@ -1138,7 +1296,7 @@ mod tests {
             13..=16 => (16.0, 0.0, 3.0, 0),
             _ => (14.0, 0.0, 12.0, 3),
         });
-        let out = outside_build(None, None, Some(gfs), 59.91, 10.75, OSLO, start);
+        let out = outside_build(None, None, Some(gfs), None, 59.91, 10.75, OSLO, start);
         let day = &out.days[0];
         assert_eq!(day.best, "13–17");
         assert!(day.score.unwrap() >= 8, "{:?}", day.score);
@@ -1149,7 +1307,7 @@ mod tests {
     fn a_wet_cold_day_has_no_best_stretch() {
         let start = iso_epoch("2026-10-04T22:00:00Z").unwrap();
         let gfs = gfs_hours(start, 24, |_| (3.0, 2.5, 9.0, 65));
-        let out = outside_build(None, None, Some(gfs), 59.91, 10.75, OSLO, start);
+        let out = outside_build(None, None, Some(gfs), None, 59.91, 10.75, OSLO, start);
         assert_eq!(out.days[0].best, "");
         assert!(out.days[0].score.unwrap() <= 2);
         assert_eq!(out.best_day, None);
@@ -1188,7 +1346,7 @@ mod tests {
         let start = iso_epoch("2026-10-04T22:00:00Z").unwrap();
         // 27 steps: a whole first day and three hours of the next.
         let gfs = gfs_hours(start, 27, |_| (10.0, 0.0, 2.0, 3));
-        let out = outside_build(None, None, Some(gfs), 59.91, 10.75, OSLO, start);
+        let out = outside_build(None, None, Some(gfs), None, 59.91, 10.75, OSLO, start);
         assert_eq!(out.days.len(), 1);
     }
 
