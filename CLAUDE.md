@@ -155,6 +155,31 @@ when building the core. Same rule as the rest of Fe₂O₃.
   change inside the forecast. Search hits carry a zone name; a followed
   position uses the phone's own zone.
 
+### pointer (com.isene.pointer)
+
+- A file manager after the laptop's pointer. Signed with the tasks key.
+  All-files access (`MANAGE_EXTERNAL_STORAGE`) and no INTERNET
+  permission; keep it that way.
+- `core/src/pointer.rs` is the one core module that touches files
+  (`std::fs`). Its tests run on real folders. Three promises it must
+  keep: nothing is overwritten (a taken name gets a number), nothing is
+  deleted outright except by "empty the trash", and a failed or stopped
+  copy leaves no half file.
+- The trash is `<volume>/.pointer-trash/<id>/<item>` plus `<id>.info`
+  (where it was, and when). A delete is a rename on the same volume.
+- A move between volumes is a copy with `sync_all` per file, then a
+  count of files and bytes, then the removal of the source.
+- One batch runs at a time. The shell calls `pointer_job_start` before
+  each one (undo too), or an old cancel stops the new batch at once.
+- Kotlin filters the loaded list while the user types; only "search the
+  folders below" walks the disk. The folder is read again on resume only
+  when its change time moved (one `stat`).
+- A file goes to another app through a FileProvider (`root-path`
+  `storage/`), one grant per open or share.
+- Record names are plain (`Entry`, `Mark`, `Kind`, `Undo`, `Done`). All
+  core modules share one Kotlin package, so a new module must not reuse
+  them.
+
 ## Anti-patterns (don't drift into these)
 
 - Putting business logic in Kotlin because it's faster to prototype.
