@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -52,6 +53,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -75,6 +77,7 @@ import uniffi.fe2o3_mobile_core.Sky
 import uniffi.fe2o3_mobile_core.SourceDay
 import uniffi.fe2o3_mobile_core.Spot
 import uniffi.fe2o3_mobile_core.Step
+import uniffi.fe2o3_mobile_core.Warning
 
 // The left column holds the day or the hour; the three forecasts share
 // the rest of the width.
@@ -156,6 +159,7 @@ fun OutsideScreen(vm: OutsideViewModel) {
                 if (forecast == null) {
                     if (!ui.loading) item { Empty(spot != null, onPlaces = { places = true }, onHere = vm::useHere) }
                 } else {
+                    items(forecast.warnings) { WarningCard(it) }
                     item { Header() }
                     item { NowRow(forecast) }
                     forecast.bestDay?.let { best ->
@@ -248,8 +252,11 @@ private fun NowRow(forecast: Outside) {
                     if (feels != null && Math.abs(feels - step.temp) >= 2) {
                         Small("feels ${deg(feels)}")
                     }
-                    Rain(step.rain)
-                    Wind(step.wind, step.windDir, unit = true)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Rain(step.rain)
+                        Chance(step.chance)
+                    }
+                    Wind(step.wind, step.gust, step.windDir, unit = true)
                 }
             }
         }
@@ -266,6 +273,10 @@ private fun DayRow(day: OutsideDay, best: Boolean, onClick: () -> Unit) {
             Text(day.label, fontWeight = FontWeight.SemiBold, maxLines = 1)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(9.dp).background(agreementColor(day.agreement), CircleShape))
+                if (day.warning > 0u) {
+                    Spacer(Modifier.width(5.dp))
+                    WarningBadge(day.warning)
+                }
                 if (day.best.isNotEmpty()) {
                     Spacer(Modifier.width(6.dp))
                     Small(day.best)
@@ -343,10 +354,11 @@ private fun HourCell(step: Step?, modifier: Modifier) {
                 // Far ahead a forecast speaks for six hours at a time.
                 if (step.hours > 1u) Small(" ${step.hours}h")
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Rain(step.rain)
-                Wind(step.wind, step.windDir, unit = false)
+                Chance(step.chance)
             }
+            Wind(step.wind, step.gust, step.windDir, unit = false)
         }
     }
 }
@@ -358,9 +370,11 @@ private fun Footer(fetched: Long) {
             val at = Instant.ofEpochMilli(fetched).atZone(ZoneId.systemDefault())
             Small("Fetched ${DateTimeFormatter.ofPattern("d MMM HH:mm", Locale.ENGLISH).format(at)}.")
         }
-        Small("Rain in millimetres, wind in metres per second. The arrow shows where the wind blows.")
+        Small("Rain in millimetres, then the chance of rain.")
+        Small("Wind in metres per second, gusts in brackets. The arrow shows where the wind blows.")
         Small("The dot: green when the forecasts agree, amber when they differ, red when they disagree.")
         Small("Yr: MET Norway. Storm: TV 2. GFS: NOAA, through Open-Meteo. Place search: Open-Meteo and GeoNames.")
+        Small("Warnings: MET Norway, for Norway only.")
     }
 }
 
@@ -485,13 +499,70 @@ private fun Rain(mm: Double) {
     if (text.isNotEmpty()) Text("$text mm", style = MaterialTheme.typography.labelMedium, color = RainBlue)
 }
 
-/** Wind speed and an arrow pointing the way the wind blows. */
+/** The chance of rain; left out when it is under one in ten. */
 @Composable
-private fun Wind(speed: Double, from: Int, unit: Boolean) {
+private fun Chance(percent: Double?) {
+    if (percent != null && percent >= 10) {
+        Text("${whole(percent)}%", style = MaterialTheme.typography.labelMedium, color = RainBlue)
+    }
+}
+
+/** Wind speed, the gusts in brackets, and an arrow pointing the way the
+ *  wind blows. */
+@Composable
+private fun Wind(speed: Double, gust: Double?, from: Int, unit: Boolean) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Small(if (unit) "${whole(speed)} m/s" else whole(speed))
+        val gusts = if (gust != null) " (${whole(gust)})" else ""
+        Small(whole(speed) + gusts + if (unit) " m/s" else "")
         Small("↓", Modifier.padding(start = 3.dp).rotate(from.toFloat()))
     }
+}
+
+/** An official warning: what and when. A tap opens the full text. */
+@Composable
+private fun WarningCard(w: Warning) {
+    var open by rememberSaveable(w.event, w.span) { mutableStateOf(false) }
+    val (back, ink) = warningColors(w.level)
+    Column(
+        Modifier.fillMaxWidth()
+            .padding(horizontal = 12.dp, vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(back)
+            .clickable { open = !open }
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+    ) {
+        val level = when (w.level) {
+            4u -> "Red"
+            3u -> "Orange"
+            else -> "Yellow"
+        }
+        Text("⚠ $level warning: ${w.event.lowercase()}", color = ink, fontWeight = FontWeight.SemiBold)
+        Text(
+            listOf(w.span, w.area).filter { it.isNotEmpty() }.joinToString(" · "),
+            color = ink,
+            style = MaterialTheme.typography.labelMedium,
+        )
+        if (open && w.text.isNotEmpty()) {
+            Spacer(Modifier.height(6.dp))
+            Text(w.text, color = ink, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+/** The mark on a day a warning touches. */
+@Composable
+private fun WarningBadge(level: UInt) {
+    val (back, ink) = warningColors(level)
+    Box(Modifier.size(14.dp).background(back, RoundedCornerShape(3.dp)), contentAlignment = Alignment.Center) {
+        Text("!", color = ink, fontSize = 10.sp, lineHeight = 10.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+/** Background and text colour of a warning level: yellow, orange, red. */
+private fun warningColors(level: UInt): Pair<Color, Color> = when (level) {
+    4u -> Color(0xFFD32F2F) to Color.White
+    3u -> Color(0xFFF28C28) to Color(0xFF1A1A1A)
+    else -> Color(0xFFFFD93B) to Color(0xFF1A1A1A)
 }
 
 @Composable

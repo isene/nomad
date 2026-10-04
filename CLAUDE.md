@@ -144,6 +144,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
   can change without notice; the app must keep showing the other two
   columns when it fails. `outside_usable` guards the cache, so an error
   body never replaces a good forecast.
+- Warnings are a fourth body, `alerts`, from MET Norway's `metalerts`
+  (point query, English). `outside_requests` leaves its URL empty outside
+  a box around Norway, and the shell then skips the request.
 - Fetches happen in `onResume` only, and only for bodies older than 30
   minutes (10 on pull-to-refresh). No WorkManager, no widget.
 - The phone's position is rounded to two decimals before any request.

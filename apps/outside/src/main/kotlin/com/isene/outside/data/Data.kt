@@ -26,6 +26,9 @@ import uniffi.fe2o3_mobile_core.outsideSpotsText
 /** The three sources, in column order; the names are the cache file names. */
 val SOURCES = listOf("yr", "storm", "gfs")
 
+/** Everything fetched for a spot: the three forecasts, then the warnings. */
+val FILES = SOURCES + "alerts"
+
 /** Thin HTTP layer. Blocking: call on Dispatchers.IO. Null on any failure. */
 object Net {
     private val client = OkHttpClient.Builder().callTimeout(20, TimeUnit.SECONDS).build()

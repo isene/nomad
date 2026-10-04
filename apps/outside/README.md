@@ -7,6 +7,9 @@ Where they agree you can trust the day. Where they differ you see it at
 once.
 
 - Up to sixteen days ahead; tap a day for its hours.
+- Each hour shows the rain with its chance, and the wind with its gusts.
+- Official weather warnings for Norway on top, with a mark on each day
+  they touch. Tap a warning for its full text.
 - A dot per day: green when the forecasts agree, amber when they differ,
   red when they disagree. The open day says on what ("Rain: 0 to 14 mm").
 - A score from 0 to 10 for being outside, the day's best stretch
@@ -27,6 +30,9 @@ once.
 
 All three answer for any point on Earth, with no key and no account.
 Place search uses Open-Meteo's geocoder (GeoNames data).
+
+Warnings come from MET Norway's `metalerts`, which covers Norway, its
+waters and Svalbard. Other countries get no warnings yet.
 
 Storm has no public service for this. The app asks the same server
 TV 2's own page asks, so that column can stop working the day TV 2

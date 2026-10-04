@@ -7,6 +7,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.isene.outside.data.Cache
+import com.isene.outside.data.FILES
 import com.isene.outside.data.Here
 import com.isene.outside.data.Net
 import com.isene.outside.data.SOURCES
@@ -199,7 +200,7 @@ class OutsideViewModel(app: Application) : AndroidViewModel(app) {
         val (built, newest) = withContext(Dispatchers.IO) {
             val bodies = SOURCES.map { cache.read(key, it) }
             val built = if (bodies.all { it == null }) null else outsideBuild(
-                bodies[0], bodies[1], bodies[2], spot.lat, spot.lon, tz,
+                bodies[0], bodies[1], bodies[2], cache.read(key, FILES[3]), spot.lat, spot.lon, tz,
                 System.currentTimeMillis() / 1000,
             )
             built to SOURCES.maxOf { cache.fetched(key, it) }
@@ -216,9 +217,12 @@ class OutsideViewModel(app: Application) : AndroidViewModel(app) {
         paint(spot)
 
         val now = System.currentTimeMillis()
-        val stale = withContext(Dispatchers.IO) {
-            SOURCES.indices.filter {
-                val tried = maxOf(cache.fetched(key, SOURCES[it]), failed["$key/$it"] ?: 0L)
+        val (req, stale) = withContext(Dispatchers.IO) {
+            val req = outsideRequests(spot.lat, spot.lon, now / 1000)
+            req to FILES.indices.filter {
+                // Warnings are asked for only where MET Norway gives them.
+                if (it == 3 && req.alertsUrl.isEmpty()) return@filter false
+                val tried = maxOf(cache.fetched(key, FILES[it]), failed["$key/$it"] ?: 0L)
                 now - tried > staleMs
             }
         }
@@ -229,14 +233,13 @@ class OutsideViewModel(app: Application) : AndroidViewModel(app) {
 
         _ui.update { it.copy(loading = true, notice = "") }
         val got = withContext(Dispatchers.IO) {
-            val req = outsideRequests(spot.lat, spot.lon, now / 1000)
             coroutineScope {
                 stale.map { i ->
                     async {
                         val body = fetch(i, req)
                         // Only a body with a forecast in it replaces the old one.
                         if (body != null && outsideUsable(i.toUInt(), body)) {
-                            cache.write(key, SOURCES[i], body)
+                            cache.write(key, FILES[i], body)
                             true
                         } else {
                             false
@@ -258,7 +261,8 @@ class OutsideViewModel(app: Application) : AndroidViewModel(app) {
     private fun fetch(source: Int, req: Requests): String? = when (source) {
         0 -> Net.get(req.yrUrl)
         1 -> Net.post(req.stormUrl, req.stormBody)
-        else -> Net.get(req.gfsUrl)
+        2 -> Net.get(req.gfsUrl)
+        else -> Net.get(req.alertsUrl)
     }
 
     // ---- search and saved places ----
