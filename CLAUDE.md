@@ -175,7 +175,25 @@ when building the core. Same rule as the rest of Fe₂O₃.
   folders below" walks the disk. The folder is read again on resume only
   when its change time moved (one `stat`).
 - A file goes to another app through a FileProvider (`root-path`
-  `storage/`), one grant per open or share.
+  `storage/`, and `cache-path` `archive/` for files copied out of
+  archives), one grant per open or share.
+- An archive (zip, jar, tar, tgz, tar.gz) is a folder: the path
+  `<archive file>/<path inside>` is on no disk, and `packed()` finds the
+  archive on the way to it. Archives are read only. `clean()` drops every
+  entry with `..` in its path, and tar links are skipped, so nothing
+  unpacks outside its target folder. The list of the last archive is kept
+  in memory until the file's size or time changes.
+- `ShareActivity` is exported ("Save to folder" in the share sheet). It
+  must never write before the user taps a folder, so no Direct Share
+  shortcuts and no target folder taken from an intent. It reads
+  `content://` links only and refuses the app's own provider. The file
+  name goes through `pointer_safe_name`.
+- Tabs live in `UiState.tabs`, one back-trail each, at most eight, saved
+  in `onStop`. The marks row is dragged into order (`sh.calvin.reorderable`)
+  and written once, when the drag ends.
+- Search inside files (`pointer_grep`) reads text files up to 8 MiB and
+  only when the user asks. Video thumbnails come from `coil-video`, one
+  frame per visible row.
 - Record names are plain (`Entry`, `Mark`, `Kind`, `Undo`, `Done`). All
   core modules share one Kotlin package, so a new module must not reuse
   them.

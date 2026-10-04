@@ -42,6 +42,9 @@ getrandom = "0.2"
 # ChaCha20-Poly1305 seal). Pure Rust, cross-compiles as is.
 argon2 = "0.5"
 chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
+zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
+flate2 = "1.1.10"
+tar = { version = "0.4.46", default-features = false }
 
 [build-dependencies]
 uniffi = { version = "0.28", features = ["build"] }

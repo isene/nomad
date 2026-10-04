@@ -24,4 +24,9 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         vm.resume(Environment.isExternalStorageManager())
     }
+
+    override fun onStop() {
+        super.onStop()
+        vm.keep()
+    }
 }

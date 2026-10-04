@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Shared storage on every volume, the SD card too. The provider is not
-     exported: a file leaves the app one grant at a time, when the user
-     opens or shares it. -->
+<!-- Shared storage on every volume, the SD card too, and the files copied
+     out of archives to be looked at. The provider is not exported: a file
+     leaves the app one grant at a time, when the user opens or shares it. -->
 <paths>
     <root-path name="storage" path="storage/" />
+    <cache-path name="unpacked" path="archive/" />
 </paths>
