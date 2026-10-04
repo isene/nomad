@@ -40,6 +40,7 @@ prompt the changes that fit *your* phone.
 | <img src="apps/mail/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**kastrup**](apps/mail/) | Your Gmail inboxes, decoded by the same crate kastrup uses — bodies on demand, and an explicit Mark READ that reaches the laptop | [kastrup](https://github.com/isene/kastrup) |
 | <img src="apps/gaze/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**gaze**](apps/gaze/) | Web browser around Android's WebView: tabs sent to and from the laptop, the laptop's encrypted passwords and bookmarks, ad blocking, dark pages, and Claude to ask about the page | [gaze](https://github.com/isene/gaze) |
 | <img src="apps/fresh/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**fresh**](apps/fresh/) | The ten most recently installed apps, newest first: tap opens one, long-press for app info or uninstall | — |
+| <img src="apps/outside/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**outside**](apps/outside/) | Three weather forecasts side by side (Yr, Storm, GFS) for up to sixteen days, with the hours per day, a mark for how well they agree, and the best stretch for being outside | — |
 
 Each ships as its own signed APK with its own launcher icon, sideloaded from a
 Syncthing-synced folder.
@@ -54,6 +55,7 @@ nomad/
 │   ├── src/watchit/             TMDB models, parsers, filter/sort
 │   ├── src/amardice.rs          O6 engine + crit/fumble/fear tables
 │   ├── src/mail.rs              mail records + read state (fe2o3-mail)
+│   ├── src/outside.rs           three weather forecasts laid out by day and hour
 │   └── src/xrpn/                RPN stack engine, formatter, FOCAL interpreter
 ├── apps/<name>/                 Kotlin/Compose shells (one Gradle module each)
 ├── Cargo.toml                   workspace root

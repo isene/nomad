@@ -132,6 +132,26 @@ when building the core. Same rule as the rest of Fe₂O₃.
   (`com.anthropic.claude`), so the user's own plan answers and no API key
   lives on the phone. 0.1 had a Messages API client; 0.2 removed it.
 
+### outside (com.isene.outside)
+
+- Three weather forecasts for one place, in columns: 0 = Yr (MET Norway),
+  1 = Storm (TV 2), 2 = GFS (NOAA, through Open-Meteo). Signed with the
+  tasks key.
+- `core/src/outside.rs` builds the three requests, parses the bodies and
+  lays out days and hours. Kotlin fetches, caches the raw bodies in
+  `cacheDir/forecasts/<lat>_<lon>/` and draws.
+- Storm is TV 2's own page server (GraphQL, POST), not a public API. It
+  can change without notice; the app must keep showing the other two
+  columns when it fails. `outside_usable` guards the cache, so an error
+  body never replaces a good forecast.
+- Fetches happen in `onResume` only, and only for bodies older than 30
+  minutes (10 on pull-to-refresh). No WorkManager, no widget.
+- The phone's position is rounded to two decimals before any request.
+  The manifest asks for coarse location only.
+- The phone hands the core a `Tz`: the spot's offset now and the one
+  change inside the forecast. Search hits carry a zone name; a followed
+  position uses the phone's own zone.
+
 ## Anti-patterns (don't drift into these)
 
 - Putting business logic in Kotlin because it's faster to prototype.
