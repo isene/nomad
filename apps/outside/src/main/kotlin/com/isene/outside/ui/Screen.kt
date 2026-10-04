@@ -5,7 +5,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -81,7 +80,8 @@ import uniffi.fe2o3_mobile_core.Warning
 
 // The left column holds the day or the hour; the three forecasts share
 // the rest of the width.
-private val LABEL = 92.dp
+private val LABEL = 88.dp
+private val EDGE = 12.dp
 private val NAMES = listOf("Yr", "Storm", "GFS")
 
 private val RainBlue = Color(0xFF4A90D9)
@@ -220,7 +220,7 @@ private fun Empty(hasSpot: Boolean, onPlaces: () -> Unit, onHere: () -> Unit) {
 
 @Composable
 private fun Header() {
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+    Row(Modifier.fillMaxWidth().padding(start = EDGE, end = 4.dp, top = 4.dp, bottom = 4.dp)) {
         Spacer(Modifier.width(LABEL))
         NAMES.forEach { name ->
             Text(
@@ -234,13 +234,20 @@ private fun Header() {
     }
 }
 
+// In every row the three cells start at the top and have the same lines,
+// so the symbols, the temperatures and the wind line up across the
+// forecasts. A line that no cell needs is left out of the whole row.
+
 @Composable
 private fun NowRow(forecast: Outside) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Now", Modifier.width(LABEL), fontWeight = FontWeight.SemiBold)
+    val feelsLine = forecast.now.any { it != null && feels(it).isNotEmpty() }
+    val rainLine = forecast.now.any { it != null && wet(it.rain, it.chance) }
+    Row(Modifier.fillMaxWidth().padding(start = EDGE, end = 4.dp, top = 10.dp, bottom = 10.dp)) {
+        Text(
+            "Now",
+            Modifier.width(LABEL).align(Alignment.CenterVertically),
+            style = MaterialTheme.typography.titleSmall,
+        )
         forecast.now.forEach { step ->
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                 if (step == null) {
@@ -248,15 +255,9 @@ private fun NowRow(forecast: Outside) {
                 } else {
                     Text(symbol(step.sky, step.night), fontSize = 30.sp)
                     Text(deg(step.temp), style = MaterialTheme.typography.headlineSmall)
-                    val feels = step.feels
-                    if (feels != null && Math.abs(feels - step.temp) >= 2) {
-                        Small("feels ${deg(feels)}")
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Rain(step.rain)
-                        Chance(step.chance)
-                    }
-                    Wind(step.wind, step.gust, step.windDir, unit = true)
+                    if (feelsLine) Detail(feels(step))
+                    if (rainLine) RainLine(step.rain, step.chance)
+                    Wind(step.wind, step.gust, step.windDir)
                 }
             }
         }
@@ -265,12 +266,14 @@ private fun NowRow(forecast: Outside) {
 
 @Composable
 private fun DayRow(day: OutsideDay, best: Boolean, onClick: () -> Unit) {
+    val rainLine = day.cells.any { it != null && wet(it.rain, null) }
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        Modifier.fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(start = EDGE, end = 4.dp, top = 10.dp, bottom = 10.dp),
     ) {
-        Column(Modifier.width(LABEL)) {
-            Text(day.label, fontWeight = FontWeight.SemiBold, maxLines = 1)
+        Column(Modifier.width(LABEL).align(Alignment.CenterVertically)) {
+            Text(day.label, style = MaterialTheme.typography.titleSmall, maxLines = 1, softWrap = false)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(9.dp).background(agreementColor(day.agreement), CircleShape))
                 if (day.warning > 0u) {
@@ -278,29 +281,34 @@ private fun DayRow(day: OutsideDay, best: Boolean, onClick: () -> Unit) {
                     WarningBadge(day.warning)
                 }
                 if (day.best.isNotEmpty()) {
-                    Spacer(Modifier.width(6.dp))
-                    Small(day.best)
+                    Spacer(Modifier.width(5.dp))
+                    Detail(day.best)
                 }
                 if (best) {
-                    Spacer(Modifier.width(4.dp))
-                    Text("★", style = MaterialTheme.typography.labelMedium, color = Amber)
+                    Spacer(Modifier.width(3.dp))
+                    Detail("★", Amber)
                 }
             }
         }
-        day.cells.forEach { DayCell(it, Modifier.weight(1f)) }
+        day.cells.forEach { DayCell(it, rainLine, Modifier.weight(1f)) }
     }
 }
 
 @Composable
-private fun DayCell(cell: SourceDay?, modifier: Modifier) {
+private fun DayCell(cell: SourceDay?, rainLine: Boolean, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         if (cell == null) {
             Missing()
         } else {
             Text(symbol(cell.sky, false), fontSize = 22.sp)
-            Text("${deg(cell.tempMax)} / ${deg(cell.tempMin)}", style = MaterialTheme.typography.bodyMedium)
-            Rain(cell.rain)
-            Small("${whole(cell.wind)} m/s")
+            Text(
+                "${deg(cell.tempMax)} / ${deg(cell.tempMin)}",
+                style = MaterialTheme.typography.bodyMedium,
+                maxLines = 1,
+                softWrap = false,
+            )
+            if (rainLine) RainLine(cell.rain, null)
+            Detail("${whole(cell.wind)} m/s")
         }
     }
 }
@@ -311,7 +319,7 @@ private fun Hours(day: OutsideDay) {
     Column(
         Modifier.fillMaxWidth()
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(start = EDGE, end = 4.dp, top = 8.dp, bottom = 8.dp),
     ) {
         val lines = buildList {
             add(
@@ -330,21 +338,22 @@ private fun Hours(day: OutsideDay) {
         lines.forEach { Small(it) }
         Spacer(Modifier.height(6.dp))
         day.rows.forEach { row ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            val rainLine = row.cells.any { it != null && wet(it.rain, it.chance) }
+            Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                 Text(
                     String.format(Locale.ROOT, "%02d", row.hour.toInt()),
-                    Modifier.width(LABEL),
+                    Modifier.width(LABEL).align(Alignment.CenterVertically),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                row.cells.forEach { HourCell(it, Modifier.weight(1f)) }
+                row.cells.forEach { HourCell(it, rainLine, Modifier.weight(1f)) }
             }
         }
     }
 }
 
 @Composable
-private fun HourCell(step: Step?, modifier: Modifier) {
+private fun HourCell(step: Step?, rainLine: Boolean, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
         if (step != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -352,13 +361,10 @@ private fun HourCell(step: Step?, modifier: Modifier) {
                 Spacer(Modifier.width(4.dp))
                 Text(deg(step.temp), style = MaterialTheme.typography.bodyMedium)
                 // Far ahead a forecast speaks for six hours at a time.
-                if (step.hours > 1u) Small(" ${step.hours}h")
+                if (step.hours > 1u) Detail(" ${step.hours}h")
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Rain(step.rain)
-                Chance(step.chance)
-            }
-            Wind(step.wind, step.gust, step.windDir, unit = false)
+            if (rainLine) RainLine(step.rain, step.chance)
+            Wind(step.wind, step.gust, step.windDir)
         }
     }
 }
@@ -493,28 +499,41 @@ private fun Missing() {
     Text("·", color = MaterialTheme.colorScheme.outline)
 }
 
+/** The small lines inside a cell: one line each, never broken in two. */
 @Composable
-private fun Rain(mm: Double) {
-    val text = millimetres(mm)
-    if (text.isNotEmpty()) Text("$text mm", style = MaterialTheme.typography.labelMedium, color = RainBlue)
+private fun Detail(
+    text: String,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text,
+        modifier,
+        color = color,
+        style = MaterialTheme.typography.labelSmall.copy(letterSpacing = 0.sp),
+        maxLines = 1,
+        softWrap = false,
+    )
 }
 
-/** The chance of rain; left out when it is under one in ten. */
+/** Rain and its chance, "1.4 mm 83%". An empty line keeps its height. */
 @Composable
-private fun Chance(percent: Double?) {
-    if (percent != null && percent >= 10) {
-        Text("${whole(percent)}%", style = MaterialTheme.typography.labelMedium, color = RainBlue)
+private fun RainLine(mm: Double, chance: Double?) {
+    val rain = millimetres(mm)
+    val parts = buildList {
+        if (rain.isNotEmpty()) add("$rain mm")
+        if (chance != null && chance >= 10) add("${whole(chance)}%")
     }
+    Detail(parts.joinToString(" "), RainBlue)
 }
 
 /** Wind speed, the gusts in brackets, and an arrow pointing the way the
  *  wind blows. */
 @Composable
-private fun Wind(speed: Double, gust: Double?, from: Int, unit: Boolean) {
+private fun Wind(speed: Double, gust: Double?, from: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        val gusts = if (gust != null) " (${whole(gust)})" else ""
-        Small(whole(speed) + gusts + if (unit) " m/s" else "")
-        Small("↓", Modifier.padding(start = 3.dp).rotate(from.toFloat()))
+        Detail(whole(speed) + if (gust != null) " (${whole(gust)})" else "")
+        Detail("↓", modifier = Modifier.padding(start = 3.dp).rotate(from.toFloat()))
     }
 }
 
@@ -584,6 +603,15 @@ private fun symbol(sky: Sky, night: Boolean): String = when (sky) {
     Sky.SLEET -> "🌨️"
     Sky.SNOW -> "❄️"
     Sky.THUNDER -> "⛈️"
+}
+
+/** Whether a cell has anything for the rain line: rain, or a chance worth showing. */
+private fun wet(mm: Double, chance: Double?): Boolean = mm >= 0.05 || (chance != null && chance >= 10)
+
+/** "feels 8°" when it feels two degrees or more off the thermometer. */
+private fun feels(step: Step): String {
+    val f = step.feels
+    return if (f != null && Math.abs(f - step.temp) >= 2) "feels ${deg(f)}" else ""
 }
 
 // Whole numbers through Math.round, so -0.4 prints as 0 and never as -0.
