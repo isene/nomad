@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="amar">
+  <!-- The amar logo of the Fe2O3 suite in few shapes, so it reads at the size of an icon. -->
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.4" r="0.7">
+      <stop offset="0" stop-color="#2a2050"/>
+      <stop offset="0.55" stop-color="#15103a"/>
+      <stop offset="1" stop-color="#06051a"/>
+    </radialGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+    <linearGradient id="die" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2c2540"/>
+      <stop offset="1" stop-color="#13102a"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- The six-sided die Amar is played with -->
+  <g transform="rotate(-8 128 128)">
+    <rect x="68" y="68" width="120" height="120" rx="20" fill="url(#die)" stroke="url(#rust)" stroke-width="7"/>
+    <g fill="#f74c00">
+      <circle cx="102" cy="96" r="11"/>
+      <circle cx="154" cy="96" r="11"/>
+      <circle cx="102" cy="128" r="11"/>
+      <circle cx="154" cy="128" r="11"/>
+      <circle cx="102" cy="160" r="11"/>
+      <circle cx="154" cy="160" r="11"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="astro">
+  <!-- The astro logo of the Fe2O3 suite in few shapes, so it reads at the size of an icon. -->
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.55" r="0.55">
+      <stop offset="0" stop-color="#1c1d44"/>
+      <stop offset="0.6" stop-color="#0a0a22"/>
+      <stop offset="1" stop-color="#04041a"/>
+    </radialGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+    <linearGradient id="tube" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="0.55" stop-color="#b7410e"/>
+      <stop offset="1" stop-color="#5d2807"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- The star it looks at -->
+  <path d="M186 56 Q186 80 210 80 Q186 80 186 104 Q186 80 162 80 Q186 80 186 56 Z" fill="#ffe9a8"/>
+  <!-- The telescope on its box -->
+  <g transform="rotate(-32 128 138)">
+    <path d="M96 184 L160 184 L152 212 L104 212 Z" fill="#3a1d0a" stroke="url(#rust)" stroke-width="5" stroke-linejoin="round"/>
+    <rect x="152" y="96" width="20" height="14" rx="3" fill="#5d2807" stroke="#b7410e" stroke-width="3"/>
+    <rect x="104" y="70" width="48" height="116" rx="8" fill="url(#tube)"/>
+    <ellipse cx="128" cy="76" rx="19" ry="6" fill="#1a0d05"/>
+  </g>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="watchit">
+  <!-- The watchit logo of the Fe2O3 suite in few shapes, so it reads at the size of an icon. -->
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.5" r="0.65">
+      <stop offset="0" stop-color="#262042"/>
+      <stop offset="1" stop-color="#0a0614"/>
+    </radialGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+    <radialGradient id="screen" cx="0.5" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#fff6d8"/>
+      <stop offset="0.6" stop-color="#ffd890"/>
+      <stop offset="1" stop-color="#d99240"/>
+    </radialGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- A projector's lens, its beam, and the film on the screen -->
+  <polygon points="80,120 80,136 150,172 150,84" fill="#ffe9a8" opacity="0.3"/>
+  <rect x="150" y="76" width="58" height="104" rx="8" fill="url(#screen)" stroke="url(#rust)" stroke-width="6"/>
+  <polygon points="167,108 167,148 197,128" fill="#f74c00"/>
+  <circle cx="62" cy="128" r="20" fill="#0a0a14" stroke="url(#rust)" stroke-width="6"/>
+  <circle cx="62" cy="128" r="7" fill="#f74c00"/>
+</svg>

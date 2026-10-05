@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="gaze">
+  <!-- The gaze logo of the Fe2O3 suite in few shapes, so it reads at the size of an icon. -->
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.5" r="0.55">
+      <stop offset="0" stop-color="#1a1a2e"/>
+      <stop offset="1" stop-color="#06051a"/>
+    </radialGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+    <radialGradient id="iris" cx="0.45" cy="0.4" r="0.6">
+      <stop offset="0" stop-color="#ffb070"/>
+      <stop offset="0.55" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#7a2a08"/>
+    </radialGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- The eye, looking out -->
+  <path d="M34 128 Q128 40 222 128 Q128 216 34 128 Z" fill="#f4ead8" stroke="url(#rust)" stroke-width="7" stroke-linejoin="round"/>
+  <circle cx="128" cy="128" r="42" fill="url(#iris)"/>
+  <circle cx="128" cy="128" r="18" fill="#0a0a14"/>
+  <circle cx="143" cy="113" r="8" fill="#ffffff"/>
+</svg>
