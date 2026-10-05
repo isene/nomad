@@ -81,6 +81,7 @@ fun GazeApp(a: MainActivity) {
                 Screen.Settings -> SettingsScreen(a)
             }
             if (a.askMaster) MasterDialog(a)
+            a.heldLink?.let { LinkDialog(a, it) }
         }
     }
     LaunchedEffect(a.message) {
@@ -355,6 +356,29 @@ private fun Toggle(label: String, start: Boolean, save: (Boolean) -> Unit) {
             save(it)
         })
     }
+}
+
+/** What to do with a link that is held down. */
+@Composable
+private fun LinkDialog(a: MainActivity, url: String) {
+    val close = { a.heldLink = null }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text(shown(url), color = Dim, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        text = {
+            Column {
+                if (url.startsWith("http")) LinkChoice("Open in new tab") { close(); a.openBehind(url) }
+                LinkChoice("Copy link address") { close(); a.copyLink(url) }
+            }
+        },
+        confirmButton = {},
+    )
+}
+
+@Composable
+private fun LinkChoice(label: String, onClick: () -> Unit) {
+    Text(label, color = Color.White, fontSize = 16.sp,
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp))
 }
 
 @Composable
