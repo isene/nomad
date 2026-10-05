@@ -1,0 +1,37 @@
+#!/bin/bash
+# The launcher icon of a phone app, from the logo of the suite app it
+# mirrors. A phone app that has a twin in the suite carries the twin's
+# logo, so the two are known as one thing.
+#
+#   tools/logo <app> <logo.svg>
+#   tools/logo astro ../astro/img/astro.svg
+#
+# Writes the 15 launcher PNGs under apps/<app>. The plain and the round
+# icon are the logo as it is. The adaptive foreground has it at two
+# thirds of the canvas, since a launcher shows only the middle of that.
+#
+# Two steps are left to do by hand:
+# - Set ic_launcher_background in the app's colors.xml to the logo's
+#   dark tone.
+# - Take a <monochrome> line that names the foreground out of
+#   ic_launcher.xml. A round logo would show there as a plain disc.
+set -e
+export GIO_USE_VFS=local    # rsvg-convert needs no desktop file service
+app=$1 svg=$2
+res=$(dirname "$0")/../apps/$app/src/main/res
+
+if [ ! -d "$res" ] || [ ! -f "$svg" ]; then
+    echo "usage: tools/logo <app> <logo.svg>" >&2
+    exit 1
+fi
+
+for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
+    dir=$res/mipmap-${d%%:*} px=${d##*:}
+    rsvg-convert -w "$px" -h "$px" "$svg" -o "$dir/ic_launcher.png"
+    cp "$dir/ic_launcher.png" "$dir/ic_launcher_round.png"
+    # 48 dp is the plain icon, 72 dp the part of the 108 dp canvas kept.
+    rsvg-convert -w $((px * 3 / 2)) -h $((px * 3 / 2)) "$svg" |
+        magick - -background none -gravity center \
+            -extent $((px * 9 / 4))x$((px * 9 / 4)) "$dir/ic_launcher_foreground.png"
+done
+echo "apps/$app: launcher icon from $svg"
