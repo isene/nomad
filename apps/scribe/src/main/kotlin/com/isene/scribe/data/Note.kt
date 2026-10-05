@@ -7,7 +7,7 @@ import java.time.format.DateTimeFormatter
 /** A text file in the notes folder. */
 data class NoteRef(val uri: Uri, val name: String, val modified: Long, val size: Long)
 
-/** What the list shows of a note: read once, kept until the file changes. */
+/** What the list and the cards show of a note: read once, kept until the file changes. */
 class NoteInfo(text: String) {
     val tags: List<String> = tagsOf(text)
     val images: List<String> = imagesOf(text)
@@ -35,11 +35,14 @@ fun imagesOf(text: String): List<String> =
 
 private fun onlyTags(line: String): Boolean = line.split(' ').all { it.startsWith("#") && it.length > 1 }
 
-/** The first lines of a note, without its picture links and its line of tags. */
+/**
+ * The first lines of a note, without its picture links and its line of
+ * tags: as many as a card shows. The list shows the first three.
+ */
 fun previewOf(text: String): String =
     text.lineSequence().map { it.trim() }
         .filter { it.isNotEmpty() && !it.startsWith("![") && !onlyTags(it) }
-        .take(3).joinToString("\n") { it.take(120) }
+        .take(8).joinToString("\n") { it.take(120) }
 
 /** A file name for a note that has none yet: its first line of text. */
 fun titleOf(text: String): String {

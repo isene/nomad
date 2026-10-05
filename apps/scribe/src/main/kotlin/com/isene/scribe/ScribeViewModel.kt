@@ -37,6 +37,8 @@ class ScribeViewModel(app: Application) : AndroidViewModel(app) {
     val info = mutableStateMapOf<String, NoteInfo>()
     var loading by mutableStateOf(false); private set
     var sortMode by mutableStateOf(SortMode.MODIFIED); private set
+    /** The notes as cards, not as a list. */
+    var cards by mutableStateOf(Prefs.cards(app)); private set
     var query by mutableStateOf("")
     var tagFilter by mutableStateOf<String?>(null)
     private var refreshing = false
@@ -134,6 +136,11 @@ class ScribeViewModel(app: Application) : AndroidViewModel(app) {
 
     fun toggleSort() {
         sortMode = if (sortMode == SortMode.MODIFIED) SortMode.NAME else SortMode.MODIFIED
+    }
+
+    fun toggleCards() {
+        cards = !cards
+        Prefs.setCards(getApplication(), cards)
     }
 
     fun rename(ref: NoteRef, newName: String) {

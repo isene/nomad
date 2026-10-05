@@ -4,7 +4,7 @@
 
 # scribe
 
-![version](https://img.shields.io/badge/version-0.4.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.5.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Notes for the phone, with tags and pictures: plain Markdown files in a folder you share with your laptop. The touch companion to the Fe₂O₃ [scribe](https://github.com/isene/scribe) editor. Part of the [nomad](../../) mobile suite.
 
@@ -19,6 +19,9 @@ Every note is one text file, so nothing is locked inside the app.
 
 - **The list**: each note with its first lines, its tags, its date and its
   first picture. Newest first or A–Z. Search looks in names and in the text.
+- **Cards**: the grid icon shows the notes as cards, two side by side on
+  a phone: the picture, the name, the first lines and the tags. The rows
+  icon goes back to the list. The app remembers which one you left it in.
 - **Tags**: write `#idea` anywhere in a note. The tags of all notes sit in
   a row above the list; tap one to see only its notes. A note tagged
   `#pinned` stays at the top.
@@ -32,7 +35,7 @@ Every note is one text file, so nothing is locked inside the app.
 - **The editor**: the text and nothing else, with find in the note (▲▼ to
   step) and a word count. A button puts a tag in at the cursor.
 - Saves when you go back and when the app leaves the screen.
-- Per note: rename, duplicate, delete (the ⋮ menu).
+- Per note: rename, duplicate, delete (the ⋮ menu, or hold a card).
 - Also lists `.hl` and `.txt` files, and opens a text file another app
   hands it.
 - No permissions and no network. The folder is one you grant once.
