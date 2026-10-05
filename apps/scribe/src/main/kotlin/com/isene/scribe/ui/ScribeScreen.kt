@@ -5,25 +5,33 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
@@ -35,6 +43,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -46,6 +55,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Tag
+import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
@@ -159,6 +169,12 @@ private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
                 },
                 actions = {
                     if (vm.folderUri != null) {
+                        IconButton(onClick = { vm.toggleCards() }) {
+                            Icon(
+                                if (vm.cards) Icons.Filled.ViewAgenda else Icons.Filled.GridView,
+                                contentDescription = if (vm.cards) "Show as a list" else "Show as cards",
+                            )
+                        }
                         IconButton(onClick = { vm.toggleSort() }) {
                             Icon(
                                 if (vm.sortMode == SortMode.NAME) Icons.Filled.SortByAlpha
@@ -230,6 +246,27 @@ private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
                         "No notes here yet. Tap + to create one.", null, null,
                     )
                     visible.isEmpty() -> CenterPrompt("No notes match.", null, null)
+                    // Two cards side by side on a phone, more on a wider screen.
+                    // The room at the bottom keeps the last card clear of the + button.
+                    vm.cards -> LazyVerticalStaggeredGrid(
+                        columns = StaggeredGridCells.Adaptive(160.dp),
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = 88.dp),
+                        verticalItemSpacing = 8.dp,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(visible, key = { it.uri.toString() }) { ref ->
+                            NoteCard(
+                                ref,
+                                vm.info[ref.uri.toString()],
+                                vm,
+                                onClick = { vm.open(ref) },
+                                onRename = { renameRef = ref },
+                                onDuplicate = { vm.duplicate(ref) },
+                                onDelete = { deleteRef = ref },
+                            )
+                        }
+                    }
                     else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(visible, key = { it.uri.toString() }) { ref ->
                             NoteRow(
@@ -313,24 +350,92 @@ private fun NoteRow(
             IconButton(onClick = { menu = true }) {
                 Icon(Icons.Filled.MoreVert, contentDescription = "More")
             }
-            DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                DropdownMenuItem(
-                    text = { Text("Rename") },
-                    leadingIcon = { Icon(Icons.Filled.Edit, null) },
-                    onClick = { menu = false; onRename() },
+            NoteMenu(menu, { menu = false }, onRename, onDuplicate, onDelete)
+        }
+    }
+}
+
+/** A note as a card: its picture, its name, its first lines and its tags. Holding it opens the menu. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun NoteCard(
+    ref: NoteRef,
+    info: NoteInfo?,
+    vm: ScribeViewModel,
+    onClick: () -> Unit,
+    onRename: () -> Unit,
+    onDuplicate: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    var menu by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(12.dp)
+    Box {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
+                .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
+        ) {
+            info?.images?.firstOrNull()?.let { vm.pictureUri(it) }?.let { uri ->
+                Picture(uri, 480, Modifier.fillMaxWidth().height(120.dp), ContentScale.Crop)
+            }
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(
+                    ref.name.removeSuffix(".md"),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
-                DropdownMenuItem(
-                    text = { Text("Duplicate") },
-                    leadingIcon = { Icon(Icons.Filled.ContentCopy, null) },
-                    onClick = { menu = false; onDuplicate() },
-                )
-                DropdownMenuItem(
-                    text = { Text("Delete") },
-                    leadingIcon = { Icon(Icons.Filled.Delete, null) },
-                    onClick = { menu = false; onDelete() },
-                )
+                if (!info?.preview.isNullOrEmpty()) {
+                    Text(
+                        info!!.preview,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 8,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                info?.tags?.takeIf { it.isNotEmpty() }?.let { tags ->
+                    Text(
+                        tags.joinToString(" ") { "#$it" },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
+        NoteMenu(menu, { menu = false }, onRename, onDuplicate, onDelete)
+    }
+}
+
+/** Rename, duplicate or delete a note: the menu of a row and of a card. */
+@Composable
+private fun NoteMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onRename: () -> Unit,
+    onDuplicate: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        DropdownMenuItem(
+            text = { Text("Rename") },
+            leadingIcon = { Icon(Icons.Filled.Edit, null) },
+            onClick = { onDismiss(); onRename() },
+        )
+        DropdownMenuItem(
+            text = { Text("Duplicate") },
+            leadingIcon = { Icon(Icons.Filled.ContentCopy, null) },
+            onClick = { onDismiss(); onDuplicate() },
+        )
+        DropdownMenuItem(
+            text = { Text("Delete") },
+            leadingIcon = { Icon(Icons.Filled.Delete, null) },
+            onClick = { onDismiss(); onDelete() },
+        )
     }
 }
 
@@ -629,6 +734,8 @@ private fun AboutDialog(onClose: () -> Unit) {
                     "• Folder icon: pick your synced notes folder.\n" +
                         "• + starts a note. It is saved under its first line.\n" +
                         "• Tap a note to edit; the ⋮ menu renames, duplicates, or deletes.\n" +
+                        "• The grid icon shows the notes as cards, the rows icon as a list. " +
+                        "Hold a card for its menu.\n" +
                         "• Search looks in names and in the text; the sort icon toggles " +
                         "newest-first / A–Z. A note tagged #pinned stays on top.\n" +
                         "• A tag is #word anywhere in a note. Tap a tag above the list " +
