@@ -1,27 +1,37 @@
 #!/bin/bash
-# The launcher icon of a phone app, from the logo of the suite app it
-# mirrors. A phone app that has a twin in the suite carries the twin's
-# logo, so the two are known as one thing.
+# The launcher icon of a phone app, from apps/<app>/logo.svg.
 #
-#   tools/logo <app> <logo.svg>
-#   tools/logo astro ../astro/img/astro.svg
+#   tools/logo <app>
+#
+# A phone app that has a twin in the suite carries a simple drawing of the
+# twin's logo, so the two are known as one thing. The suite's own logo is
+# too busy for an icon: on a phone it is about 150 pixels wide.
+#
+# Rules for the drawing, on the suite's 256 by 256 canvas:
+# - The dark disc and the rust ring of the suite, the ring 7 wide.
+# - No words at all.
+# - The twin's main shape drawn large, in ten shapes or fewer.
+# - Main lines 6 wide or more, no line thinner than 3.
+# - No shape smaller than 10 across.
+# - Nothing that moves.
 #
 # Writes the 15 launcher PNGs under apps/<app>. The plain and the round
-# icon are the logo as it is. The adaptive foreground has it at two
+# icon are the drawing as it is. The adaptive foreground has it at two
 # thirds of the canvas, since a launcher shows only the middle of that.
 #
 # Two steps are left to do by hand:
-# - Set ic_launcher_background in the app's colors.xml to the logo's
-#   dark tone.
-# - Take a <monochrome> line that names the foreground out of
-#   ic_launcher.xml. A round logo would show there as a plain disc.
+# - Set ic_launcher_background in the app's colors.xml to the dark tone at
+#   the rim of the disc.
+# - Take a <monochrome> line out of ic_launcher.xml and
+#   ic_launcher_round.xml. A round logo would show there as a plain disc.
 set -e
 export GIO_USE_VFS=local    # rsvg-convert needs no desktop file service
-app=$1 svg=$2
+app=$1
+svg=$(dirname "$0")/../apps/$app/logo.svg
 res=$(dirname "$0")/../apps/$app/src/main/res
 
 if [ ! -d "$res" ] || [ ! -f "$svg" ]; then
-    echo "usage: tools/logo <app> <logo.svg>" >&2
+    echo "usage: tools/logo <app>   (reads apps/<app>/logo.svg)" >&2
     exit 1
 fi
 
@@ -34,4 +44,4 @@ for d in mdpi:48 hdpi:72 xhdpi:96 xxhdpi:144 xxxhdpi:192; do
         magick - -background none -gravity center \
             -extent $((px * 9 / 4))x$((px * 9 / 4)) "$dir/ic_launcher_foreground.png"
 done
-echo "apps/$app: launcher icon from $svg"
+echo "apps/$app: launcher icon from logo.svg"

@@ -120,8 +120,8 @@ android {
         applicationId = "com.isene.gaze"
         minSdk = 33
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.2.1"
+        versionCode = 5
+        versionName = "0.2.2"
         ndk { abiFilters += androidAbis.keys }
     }
 

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="kastrup">
+  <!-- The kastrup logo of the Fe2O3 suite in few shapes, so it reads at the size of an icon. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a1a2e"/>
+      <stop offset="1" stop-color="#0a0a14"/>
+    </linearGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- The hub, and three places messages come in from -->
+  <line x1="128" y1="100" x2="128" y2="68" stroke="#4c4" stroke-width="7" stroke-linecap="round"/>
+  <line x1="159" y1="154" x2="187" y2="170" stroke="#51afef" stroke-width="7" stroke-linecap="round"/>
+  <line x1="97" y1="154" x2="69" y2="170" stroke="#f80" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="128" cy="56" r="15" fill="#4c4"/>
+  <circle cx="197" cy="176" r="15" fill="#51afef"/>
+  <circle cx="59" cy="176" r="15" fill="#f80"/>
+  <circle cx="128" cy="136" r="36" fill="none" stroke="url(#rust)" stroke-width="7"/>
+  <circle cx="128" cy="136" r="12" fill="#f74c00"/>
+</svg>

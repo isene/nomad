@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="scribe">
+  <!-- The scribe logo of the Fe2O3 suite in few shapes, so it reads at the size of an icon. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a1a2e"/>
+      <stop offset="1" stop-color="#0a0a14"/>
+    </linearGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- Lines of text, the cursor in the second, the mode at the foot -->
+  <g stroke="#cfe8ff" stroke-width="10" stroke-linecap="round">
+    <line x1="58" y1="76" x2="200" y2="76"/>
+    <line x1="58" y1="110" x2="126" y2="110"/>
+    <line x1="58" y1="144" x2="184" y2="144"/>
+  </g>
+  <rect x="140" y="94" width="22" height="32" rx="3" fill="url(#rust)"/>
+  <rect x="53" y="168" width="72" height="24" rx="5" fill="#3a7aff"/>
+</svg>

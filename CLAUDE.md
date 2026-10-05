@@ -39,11 +39,12 @@ These come from the original mobile-architecture artifact. Do not drift.
   core is consumed via a Gradle dependency on the local `core` crate
   (cargo-ndk builds the per-ABI `.so` files; UniFFI generates the
   Kotlin bindings).
-- **An app with a twin in the Fe₂O₃ suite carries the twin's logo** as
-  its launcher icon, so the two are known as one thing. Make it with
-  `tools/logo <app> ../<twin>/img/<twin>.svg`, then follow the two steps
-  named at the top of that script. gaze, kastrup and pointer are done;
-  astro, gazette, rpnx, scribe and watchit still have icons of their own.
+- **An app with a twin in the Fe₂O₃ suite carries a simple drawing of
+  the twin's logo** as its launcher icon, so the two are known as one
+  thing. The suite's own logo is too busy at the size of an icon. Draw
+  `apps/<app>/logo.svg` by the rules at the top of `tools/logo`, then run
+  `tools/logo <app>`. All ten twins have one: amardice, astro, books, gaze,
+  gazette, mail, pointer, rpnx, scribe and watchit.
 
 ## Per-app responsibilities
 
@@ -226,7 +227,8 @@ when building the core. Same rule as the rest of Fe₂O₃.
 ## Verification before claiming a feature done
 
 1. `PATH="/usr/bin:$PATH" cargo test -p fe2o3-mobile-core` passes.
-2. `./gradlew :apps:<name>:assembleRelease` succeeds.
+2. `./gradlew :apps:<name>:assembleRelease` succeeds. One app per run:
+   the apps share one Rust build folder, so gradle refuses two together.
 3. APK installs in place over the previous version (no signature
    mismatch, no SAF URI loss).
 4. Glance widget actually rebuilds and shows current data.

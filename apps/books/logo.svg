@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="library">
+  <!-- The library logo of the Fe2O3 suite in few shapes, so it reads at the size of an icon. -->
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.42" r="0.7">
+      <stop offset="0" stop-color="#241c12"/>
+      <stop offset="1" stop-color="#0c0a07"/>
+    </radialGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4dd9a"/>
+      <stop offset="1" stop-color="#d9a93c"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- An open book, and a spark over it -->
+  <circle cx="128" cy="62" r="8" fill="#f4dd9a"/>
+  <g transform="translate(0,10)">
+    <path d="M128 96 C106 84 70 84 54 92 L54 178 C70 170 106 170 128 182 Z" fill="url(#gold)" fill-opacity="0.16"/>
+    <path d="M128 96 C150 84 186 84 202 92 L202 178 C186 170 150 170 128 182 Z" fill="url(#gold)" fill-opacity="0.1"/>
+    <g fill="none" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+      <path d="M128 96 L128 182" stroke="#e6c36b"/>
+      <path d="M128 96 C106 84 70 84 54 92 L54 178 C70 170 106 170 128 182" stroke="url(#gold)"/>
+      <path d="M128 96 C150 84 186 84 202 92 L202 178 C186 170 150 170 128 182" stroke="url(#gold)"/>
+    </g>
+    <g stroke="#f0d080" stroke-width="6" stroke-linecap="round" opacity="0.85">
+      <path d="M70 114 L112 118"/>
+      <path d="M70 140 L104 144"/>
+      <path d="M144 118 L186 114"/>
+      <path d="M144 144 L178 140"/>
+    </g>
+  </g>
+</svg>

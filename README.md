@@ -60,7 +60,7 @@ nomad/
 │   ├── src/pointer.rs           file manager: list, search, copy, move, trash, undo, archives
 │   └── src/xrpn/                RPN stack engine, formatter, FOCAL interpreter
 ├── apps/<name>/                 Kotlin/Compose shells (one Gradle module each)
-├── tools/logo                   launcher icon from the logo of an app's twin in the suite
+├── tools/logo                   launcher icon from an app's logo.svg
 ├── Cargo.toml                   workspace root
 ├── settings.gradle.kts          Gradle multi-project root
 └── gradle/libs.versions.toml    shared Android/Kotlin version catalog
