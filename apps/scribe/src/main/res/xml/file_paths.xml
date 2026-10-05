@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The camera app writes a new photo into cacheDir/camera. scribe copies
+     it into the notes folder and deletes it. Nothing else in the app's
+     storage is exposed. -->
+<paths>
+    <cache-path name="camera" path="camera/" />
+</paths>

@@ -36,9 +36,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        // The list is read when the app comes to the front, so notes that
+        // Syncthing brought in the meantime show up. Nothing runs between.
+        if (!vm.editing) vm.refresh()
+    }
+
     override fun onPause() {
         super.onPause()
         // Flush any unsaved edits when the app goes to background.
-        if (vm.openUri != null && vm.dirty) vm.save()
+        if (vm.editing && vm.dirty) vm.save()
     }
 }

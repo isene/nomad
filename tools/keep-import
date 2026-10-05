@@ -1,0 +1,177 @@
+#!/usr/bin/env python3
+"""Move Google Keep notes into a scribe notes folder.
+
+    tools/keep-import <takeout.zip or folder> <notes folder> [--check]
+
+Get the notes from takeout.google.com: untick everything, tick Keep, make
+the export and download the zip. Every note becomes one Markdown file:
+
+- The file is named after the note's title. A note with no title is named
+  after its first line.
+- Pictures go to img/ in the notes folder and sit at the top of the note
+  as ![](img/name.jpg), as Keep shows them.
+- A checklist becomes "- [ ] item" lines, a ticked item "- [x] item".
+- Labels become #tags on the last line. A pinned note gets #pinned.
+- Archived notes go to archive/. Notes in the bin are left out.
+- Each file carries the time the note was last edited.
+
+Colours, reminders and the people a note was shared with are left behind.
+Nothing in the notes folder is overwritten: a taken name gets a number.
+Run it again and a note that is there already is left alone.
+--check lists what would be written and writes nothing.
+"""
+import json
+import os
+import re
+import shutil
+import sys
+import tempfile
+import time
+import zipfile
+
+PICTURE = ('.jpg', '.jpeg', '.png', '.gif', '.webp')
+
+
+def keep_folder(root):
+    """The folder with the notes: the one that has the most .json files."""
+    best, most = None, 0
+    for folder, _, files in os.walk(root):
+        n = sum(f.endswith('.json') for f in files)
+        if n > most:
+            best, most = folder, n
+    return best
+
+
+def file_name(text):
+    """A title as a file name: one line, no slashes, at most 60 letters."""
+    line = next((l.strip() for l in text.splitlines() if l.strip()), '')
+    line = re.sub(r'[/\\:*?"<>|\x00-\x1f]', ' ', line)
+    line = re.sub(r'\s+', ' ', line).strip(' .')
+    return line[:60].rstrip(' .')
+
+
+def tag(label):
+    """A label as a tag: letters, digits, _ and -, starting with a letter."""
+    word = re.sub(r'[^\w-]+', '-', label.strip(), flags=re.UNICODE).strip('-')
+    return '#' + (word if word[:1].isalpha() else 'x' + word) if word else ''
+
+
+def free(folder, name, text, taken):
+    """A file name nothing in the folder has yet: name, name 2, name 3.
+    None when the note is there already, from an earlier run."""
+    n, pick = 1, name
+    while True:
+        path = os.path.join(folder, pick + '.md')
+        new = (folder, pick.lower()) not in taken
+        taken.add((folder, pick.lower()))
+        if new and not os.path.exists(path):
+            return pick + '.md'
+        if new and open(path, encoding='utf-8').read() == text:
+            return None
+        n += 1
+        pick = f'{name} {n}'
+
+
+def attachment(src, path):
+    """Takeout names a picture .jpeg in the note and .jpg on disk, or the other way."""
+    if os.path.exists(os.path.join(src, path)):
+        return path
+    stem = os.path.splitext(path)[0]
+    return next((f for f in os.listdir(src) if os.path.splitext(f)[0] == stem and not f.endswith(('.json', '.html'))), None)
+
+
+def note_text(note, links):
+    """The Markdown of one note. `links` are the lines for its attachments."""
+    parts = []
+    if links:
+        parts.append('\n'.join(links))
+    if note.get('listContent'):
+        parts.append('\n'.join(f"- [{'x' if i.get('isChecked') else ' '}] {i.get('text', '')}" for i in note['listContent']))
+    body = (note.get('textContent') or '').strip()
+    if body:
+        parts.append(body)
+    seen = '\n'.join(parts)
+    urls = [a for a in note.get('annotations', []) if a.get('url') and a['url'] not in seen]
+    if urls:
+        parts.append('\n'.join(f"[{a.get('title') or a['url']}]({a['url']})" for a in urls))
+    tags = [tag(l.get('name', '')) for l in note.get('labels', [])]
+    if note.get('isPinned'):
+        tags.append('#pinned')
+    tags = [t for t in dict.fromkeys(tags) if t]
+    if tags:
+        parts.append(' '.join(tags))
+    return '\n\n'.join(parts) + '\n'
+
+
+def main():
+    args = [a for a in sys.argv[1:] if a != '--check']
+    check = '--check' in sys.argv
+    if len(args) != 2:
+        sys.exit(__doc__)
+    source, notes = args
+    tmp = None
+    if os.path.isfile(source):
+        tmp = tempfile.mkdtemp(prefix='keep-')
+        with zipfile.ZipFile(source) as z:
+            z.extractall(tmp)
+        source = tmp
+    src = keep_folder(source)
+    if not src:
+        sys.exit('no Keep notes found in ' + args[0])
+
+    taken, count = set(), {'notes': 0, 'archived': 0, 'pictures': 0, 'bin': 0, 'empty': 0, 'there': 0}
+    for f in sorted(os.listdir(src)):
+        if not f.endswith('.json'):
+            continue
+        with open(os.path.join(src, f), encoding='utf-8') as fh:
+            note = json.load(fh)
+        if not isinstance(note, dict) or 'userEditedTimestampUsec' not in note:
+            continue
+        if note.get('isTrashed'):
+            count['bin'] += 1
+            continue
+        archived = bool(note.get('isArchived'))
+        folder = os.path.join(notes, 'archive') if archived else notes
+        up = '../' if archived else ''
+        links = []
+        for a in note.get('attachments', []):
+            path = attachment(src, a.get('filePath', ''))
+            if not path:
+                continue
+            # A name the link can carry: no spaces, no brackets.
+            name = re.sub(r'[\s()\[\]]', '-', path)
+            links.append(f"![]({up}img/{name})" if name.lower().endswith(PICTURE) else f"[{path}]({up}img/{name})")
+            count['pictures'] += 1
+            if not check:
+                os.makedirs(os.path.join(notes, 'img'), exist_ok=True)
+                if not os.path.exists(os.path.join(notes, 'img', name)):
+                    shutil.copy2(os.path.join(src, path), os.path.join(notes, 'img', name))
+        text = note_text(note, links)
+        if not text.strip():
+            count['empty'] += 1
+            continue
+        first = note.get('title') or note.get('textContent') or ' '.join(i.get('text', '') for i in note.get('listContent', [])[:1])
+        edited = int(note['userEditedTimestampUsec']) / 1e6
+        name = file_name(first) or 'Note ' + time.strftime('%Y-%m-%d %H.%M', time.localtime(edited))
+        name = free(folder, name, text, taken)
+        if not name:
+            count['there'] += 1
+            continue
+        count['archived' if archived else 'notes'] += 1
+        if check:
+            print(('archive/' if archived else '') + name)
+            continue
+        os.makedirs(folder, exist_ok=True)
+        path = os.path.join(folder, name)
+        with open(path, 'w', encoding='utf-8') as fh:
+            fh.write(text)
+        os.utime(path, (edited, edited))
+    if tmp:
+        shutil.rmtree(tmp)
+    print(f"{count['notes']} notes, {count['archived']} archived, {count['pictures']} pictures and other files; "
+          f"{count['bin']} in the bin and {count['empty']} empty left out, {count['there']} there already"
+          + (' (nothing written)' if check else ''))
+
+
+if __name__ == '__main__':
+    main()

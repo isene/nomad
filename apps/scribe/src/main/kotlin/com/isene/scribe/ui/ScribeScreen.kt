@@ -3,7 +3,10 @@ package com.isene.scribe.ui
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -19,7 +22,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -30,20 +35,24 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.SortByAlpha
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -59,18 +68,35 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.core.content.FileProvider
 import com.isene.scribe.ScribeViewModel
 import com.isene.scribe.SortMode
+import com.isene.scribe.data.NoteInfo
 import com.isene.scribe.data.NoteRef
+import com.isene.scribe.data.Pictures
+import com.isene.scribe.data.imagesOf
+import com.isene.scribe.data.withPicture
+import com.isene.scribe.data.withoutPicture
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -96,7 +122,7 @@ fun ScribeScreen(vm: ScribeViewModel) {
         }
     }
 
-    if (vm.openUri != null) {
+    if (vm.editing) {
         EditorScreen(vm)
     } else {
         FileListScreen(vm, onPickFolder = { pickFolder.launch(null) })
@@ -114,11 +140,11 @@ fun ScribeScreen(vm: ScribeViewModel) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
-    var showNew by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var renameRef by remember { mutableStateOf<NoteRef?>(null) }
     var deleteRef by remember { mutableStateOf<NoteRef?>(null) }
-    val visible = vm.visible()
+    val visible = vm.visible
+    val tags = vm.tags
 
     Scaffold(
         topBar = {
@@ -155,7 +181,7 @@ private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
         },
         floatingActionButton = {
             if (vm.folderUri != null) {
-                FloatingActionButton(onClick = { showNew = true }) {
+                FloatingActionButton(onClick = { vm.newNote() }) {
                     Icon(Icons.Filled.Add, contentDescription = "New note")
                 }
             }
@@ -176,8 +202,23 @@ private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
                             }
                         }
                     },
-                    placeholder = { Text("Filter by name") },
+                    placeholder = { Text("Search notes") },
                 )
+            }
+            if (vm.folderUri != null && tags.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    items(tags, key = { it.first.lowercase() }) { (tag, count) ->
+                        val picked = vm.tagFilter.equals(tag, ignoreCase = true)
+                        FilterChip(
+                            selected = picked,
+                            onClick = { vm.tagFilter = if (picked) null else tag },
+                            label = { Text("#$tag $count") },
+                        )
+                    }
+                }
             }
             Box(modifier = Modifier.fillMaxSize()) {
                 when {
@@ -188,11 +229,13 @@ private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
                     vm.notes.isEmpty() -> CenterPrompt(
                         "No notes here yet. Tap + to create one.", null, null,
                     )
-                    visible.isEmpty() -> CenterPrompt("No notes match \"${vm.query}\".", null, null)
+                    visible.isEmpty() -> CenterPrompt("No notes match.", null, null)
                     else -> LazyColumn(modifier = Modifier.fillMaxSize()) {
                         items(visible, key = { it.uri.toString() }) { ref ->
                             NoteRow(
                                 ref,
+                                vm.info[ref.uri.toString()],
+                                vm,
                                 onClick = { vm.open(ref) },
                                 onRename = { renameRef = ref },
                                 onDuplicate = { vm.duplicate(ref) },
@@ -206,16 +249,6 @@ private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
         }
     }
 
-    if (showNew) {
-        NameDialog(
-            title = "New note",
-            initial = "",
-            placeholder = "note.md",
-            confirmLabel = "Create",
-            onDismiss = { showNew = false },
-            onConfirm = { showNew = false; vm.createNote(it) },
-        )
-    }
     renameRef?.let { ref ->
         NameDialog(
             title = "Rename",
@@ -242,6 +275,8 @@ private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
 @Composable
 private fun NoteRow(
     ref: NoteRef,
+    info: NoteInfo?,
+    vm: ScribeViewModel,
     onClick: () -> Unit,
     onRename: () -> Unit,
     onDuplicate: () -> Unit,
@@ -253,14 +288,26 @@ private fun NoteRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(modifier = Modifier.weight(1f).padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(ref.name, style = MaterialTheme.typography.bodyLarge)
-            if (ref.modified > 0) {
+            Text(ref.name.removeSuffix(".md"), style = MaterialTheme.typography.bodyLarge)
+            if (!info?.preview.isNullOrEmpty()) {
                 Text(
-                    DATE_FMT.format(Instant.ofEpochMilli(ref.modified)),
-                    style = MaterialTheme.typography.bodySmall,
+                    info!!.preview,
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
+            val foot = listOfNotNull(
+                info?.tags?.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
+                if (ref.modified > 0) DATE_FMT.format(Instant.ofEpochMilli(ref.modified)) else null,
+            ).joinToString("  ·  ")
+            if (foot.isNotEmpty()) {
+                Text(foot, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+        info?.images?.firstOrNull()?.let { vm.pictureUri(it) }?.let { uri ->
+            Picture(uri, 160, Modifier.size(56.dp).clip(RoundedCornerShape(6.dp)), ContentScale.Crop)
         }
         Box {
             IconButton(onClick = { menu = true }) {
@@ -290,10 +337,36 @@ private fun NoteRow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditorScreen(vm: ScribeViewModel) {
-    var tfv by remember(vm.openUri) { mutableStateOf(TextFieldValue(vm.buffer)) }
-    var findOpen by remember(vm.openUri) { mutableStateOf(false) }
-    var findQuery by remember(vm.openUri) { mutableStateOf("") }
-    var matchIdx by remember(vm.openUri) { mutableStateOf(0) }
+    val ctx = LocalContext.current
+    // A new note gets its file, and so its URI, at the first save. The
+    // editor must not start over then, so it is keyed on the note opened.
+    var tfv by remember(vm.session) { mutableStateOf(TextFieldValue(vm.buffer)) }
+    var findOpen by remember(vm.session) { mutableStateOf(false) }
+    var findQuery by remember(vm.session) { mutableStateOf("") }
+    var matchIdx by remember(vm.session) { mutableStateOf(0) }
+    var pictureMenu by remember { mutableStateOf(false) }
+    var tagMenu by remember { mutableStateOf(false) }
+    var viewing by remember(vm.session) { mutableStateOf<String?>(null) }
+
+    fun setText(text: String, cursor: Int) {
+        tfv = TextFieldValue(text, TextRange(cursor.coerceIn(0, text.length)))
+        vm.edit(text)
+    }
+    fun addPicture(source: android.net.Uri, after: () -> Unit = {}) = vm.addPicture(source) { path ->
+        val text = withPicture(tfv.text, path)
+        setText(text, tfv.selection.start + text.length - tfv.text.length)
+        after()
+    }
+    val fromGallery = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) addPicture(uri)
+    }
+    // The camera app writes into one file in the cache; it is deleted once
+    // the picture has been copied into the notes folder.
+    val shot = remember { File(ctx.cacheDir, "camera/shot.jpg") }
+    val fromCamera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { taken ->
+        if (taken) addPicture(FileProvider.getUriForFile(ctx, ctx.packageName + ".files", shot)) { shot.delete() }
+    }
+    val pictures = remember(tfv.text) { imagesOf(tfv.text).mapNotNull { path -> vm.pictureUri(path)?.let { path to it } } }
 
     val matches = remember(tfv.text, findQuery) {
         if (findQuery.isBlank()) emptyList()
@@ -322,10 +395,17 @@ private fun EditorScreen(vm: ScribeViewModel) {
             TopAppBar(
                 title = {
                     Column {
-                        Text(vm.openName, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            vm.openName.removeSuffix(".md").ifEmpty { "New note" },
+                            style = MaterialTheme.typography.titleMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                         Text(
                             "$words words · $chars chars" + if (vm.dirty) " · ●" else "",
                             style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 },
@@ -337,6 +417,56 @@ private fun EditorScreen(vm: ScribeViewModel) {
                 actions = {
                     IconButton(onClick = { findOpen = !findOpen }) {
                         Icon(Icons.Filled.Search, contentDescription = "Find")
+                    }
+                    if (!vm.external) {
+                        Box {
+                            IconButton(onClick = { tagMenu = true }) {
+                                Icon(Icons.Filled.Tag, contentDescription = "Tag")
+                            }
+                            DropdownMenu(expanded = tagMenu, onDismissRequest = { tagMenu = false }) {
+                                // A tag is #word in the text. The menu types one the folder has already.
+                                val at = tfv.selection.start
+                                val gap = if (at > 0 && !tfv.text[at - 1].isWhitespace()) " " else ""
+                                (listOf("") + vm.tags.map { it.first }).forEach { tag ->
+                                    DropdownMenuItem(
+                                        text = { Text(if (tag.isEmpty()) "# new tag" else "#$tag") },
+                                        onClick = {
+                                            tagMenu = false
+                                            val word = "$gap#$tag" + if (tag.isEmpty()) "" else " "
+                                            setText(tfv.text.replaceRange(at, tfv.selection.end, word), at + word.length)
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        Box {
+                            IconButton(onClick = { pictureMenu = true }) {
+                                Icon(Icons.Filled.Image, contentDescription = "Picture")
+                            }
+                            DropdownMenu(expanded = pictureMenu, onDismissRequest = { pictureMenu = false }) {
+                                DropdownMenuItem(
+                                    text = { Text("From the gallery") },
+                                    leadingIcon = { Icon(Icons.Filled.Image, null) },
+                                    onClick = {
+                                        pictureMenu = false
+                                        fromGallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    },
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Take a photo") },
+                                    leadingIcon = { Icon(Icons.Filled.PhotoCamera, null) },
+                                    onClick = {
+                                        pictureMenu = false
+                                        try {
+                                            shot.parentFile?.mkdirs()
+                                            fromCamera.launch(FileProvider.getUriForFile(ctx, ctx.packageName + ".files", shot))
+                                        } catch (_: Exception) {
+                                            vm.message = "No camera app answered."
+                                        }
+                                    },
+                                )
+                            }
+                        }
                     }
                     IconButton(onClick = { vm.save() }, enabled = vm.dirty) {
                         Icon(
@@ -384,6 +514,21 @@ private fun EditorScreen(vm: ScribeViewModel) {
                 }
                 HorizontalDivider()
             }
+            if (pictures.isNotEmpty()) {
+                // The note's pictures above its text, as Keep shows them.
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(pictures) { (path, uri) ->
+                        Picture(
+                            uri, 400,
+                            Modifier.size(120.dp).clip(RoundedCornerShape(6.dp)).clickable { viewing = path },
+                            ContentScale.Crop,
+                        )
+                    }
+                }
+            }
             BasicTextField(
                 value = tfv,
                 onValueChange = {
@@ -399,6 +544,37 @@ private fun EditorScreen(vm: ScribeViewModel) {
             )
         }
     }
+
+    viewing?.let { path ->
+        val uri = vm.pictureUri(path)
+        Dialog(onDismissRequest = { viewing = null }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Column(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+                Box(modifier = Modifier.weight(1f).fillMaxWidth().clickable { viewing = null }) {
+                    if (uri != null) Picture(uri, 2048, Modifier.fillMaxSize(), ContentScale.Fit)
+                }
+                Row(modifier = Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    // The file stays in img/: another note may show it too.
+                    TextButton(onClick = {
+                        val text = withoutPicture(tfv.text, path)
+                        setText(text, tfv.selection.start - (tfv.text.length - text.length))
+                        viewing = null
+                    }) { Text("Take out of the note") }
+                    TextButton(onClick = { viewing = null }) { Text("Close") }
+                }
+            }
+        }
+    }
+}
+
+/** A picture from the notes folder, read off the main thread, no larger than [maxPx]. */
+@Composable
+private fun Picture(uri: android.net.Uri, maxPx: Int, modifier: Modifier, scale: ContentScale) {
+    val resolver = LocalContext.current.contentResolver
+    val picture by produceState<ImageBitmap?>(Pictures.cached(uri, maxPx), uri, maxPx) {
+        if (value == null) value = withContext(Dispatchers.IO) { Pictures.show(resolver, uri, maxPx) }
+    }
+    picture?.let { Image(bitmap = it, contentDescription = null, modifier = modifier, contentScale = scale) }
+        ?: Box(modifier.background(MaterialTheme.colorScheme.surfaceVariant))
 }
 
 @Composable
@@ -442,7 +618,7 @@ private fun AboutDialog(onClose: () -> Unit) {
         text = {
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 Text(
-                    "A distraction-free notes pad — the touch companion to the " +
+                    "A notes pad with tags and pictures, the touch companion to the " +
                         "Fe2O3 scribe editor.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -451,10 +627,16 @@ private fun AboutDialog(onClose: () -> Unit) {
                 Spacer(Modifier.size(4.dp))
                 Text(
                     "• Folder icon: pick your synced notes folder.\n" +
+                        "• + starts a note. It is saved under its first line.\n" +
                         "• Tap a note to edit; the ⋮ menu renames, duplicates, or deletes.\n" +
-                        "• Filter the list by name; the sort icon toggles newest-first / A–Z.\n" +
-                        "• In the editor: search icon finds text (▲▼ to step); word/char " +
-                        "count shows in the bar; edits auto-save on back and when you leave.\n" +
+                        "• Search looks in names and in the text; the sort icon toggles " +
+                        "newest-first / A–Z. A note tagged #pinned stays on top.\n" +
+                        "• A tag is #word anywhere in a note. Tap a tag above the list " +
+                        "to see only its notes.\n" +
+                        "• In the editor: # types a tag, the picture icon adds a picture " +
+                        "from the gallery or the camera. Pictures go to img/ in the folder.\n" +
+                        "• Search icon finds text (▲▼ to step); edits auto-save on back " +
+                        "and when you leave.\n" +
                         "• Shows .md / .hl / .txt files.",
                     style = MaterialTheme.typography.bodySmall,
                 )
