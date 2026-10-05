@@ -24,6 +24,8 @@ class Store(context: Context, private val prefs: Prefs) {
     private val local = context.filesDir
     val history = File(local, "history")
     val session = File(local, "session")
+    /** The pages each open tab came through, so "back" still works after a restart. */
+    val pages = File(local, "session.pages")
     val hosts = File(local, "hosts")
 
     private fun sync() = File(prefs.syncDir)

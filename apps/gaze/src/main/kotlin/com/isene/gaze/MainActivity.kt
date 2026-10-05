@@ -2,6 +2,8 @@ package com.isene.gaze
 
 import android.app.DownloadManager
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.ComponentName
 import android.content.Intent
 import android.graphics.Color
@@ -32,6 +34,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.lifecycleScope
+import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -77,6 +82,8 @@ class MainActivity : ComponentActivity() {
     var askMaster by mutableStateOf(false)
     var unlocking by mutableStateOf(false)
     var saveOffer by mutableStateOf<Login?>(null)
+    /** The link a finger is held on, while its menu shows. */
+    var heldLink by mutableStateOf<String?>(null)
     /** How far a pull past the top of the page has gone, 0 to 1 (1 reloads). */
     var pull by mutableFloatStateOf(0f)
     /** Bumped when the logins change, so the password list redraws. */
@@ -88,6 +95,8 @@ class MainActivity : ComponentActivity() {
     private var watcher: FileObserver? = null
     private var timersPaused = false
     private var bookmarksSeen = 0L
+    /** What the pages file holds, so an unchanged session is not written again. */
+    private var pagesWritten: ByteArray? = null
     private var fileCallback: ValueCallback<Array<Uri>>? = null
     private val pickFile = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(r.resultCode, r.data))
@@ -174,7 +183,11 @@ class MainActivity : ComponentActivity() {
         val web = tab.web ?: newWebView(this, tab).also { w ->
             tab.web = w
             darken(w, tab.url)
-            if (tab.url != "about:blank") w.loadUrl(tab.url)
+            // The pages the tab came through in the last run come back with
+            // it, so the back key walks them. Without them it opens its page.
+            val kept = tab.kept
+            tab.kept = null
+            if ((kept == null || !w.restorePages(kept)) && tab.url != "about:blank") w.loadUrl(tab.url)
         }
         tabs.forEach { t -> if (t !== tab) t.web?.onPause() }
         webHost.removeAllViews()
@@ -194,6 +207,23 @@ class MainActivity : ComponentActivity() {
     fun newBlankTab() {
         newTab("about:blank")
         editing = true
+    }
+
+    // ---------- a link held down ----------
+
+    fun holdLink(url: String) {
+        if (url.isNotEmpty() && !url.startsWith("javascript:")) heldLink = url
+    }
+
+    /** A tab behind this one: the page you are reading stays. It loads when you go to it. */
+    fun openBehind(url: String) {
+        tabs.add(Tab(url, ""))
+        say("Opened in a new tab")
+    }
+
+    /** Android shows what was copied by itself. */
+    fun copyLink(url: String) {
+        getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText("link", url))
     }
 
     fun closeTab(i: Int) {
@@ -223,12 +253,53 @@ class MainActivity : ComponentActivity() {
             tabs.forEach { append(gazeTabText(it.url, it.title)) }
         }
         runCatching { store.write(store.session, text.toByteArray()) }
+        savePages()
+    }
+
+    /**
+     * The pages each tab came through, beside the session. Android stops
+     * an app it cannot see whenever it wants the memory; without this the
+     * tabs came back with one page each, and the back key left gaze.
+     */
+    private fun savePages() {
+        val out = ByteArrayOutputStream()
+        runCatching {
+            DataOutputStream(out).use { d ->
+                d.writeInt(tabs.size)
+                tabs.forEach { t ->
+                    val url = t.url.toByteArray()
+                    val pages = t.web?.pages() ?: t.kept
+                    d.writeInt(url.size)
+                    d.write(url)
+                    d.writeInt(pages?.size ?: 0)
+                    pages?.let { d.write(it) }
+                }
+            }
+        }.onFailure { return }
+        val bytes = out.toByteArray()
+        if (bytes.contentEquals(pagesWritten)) return
+        runCatching { store.write(store.pages, bytes) }.onSuccess { pagesWritten = bytes }
     }
 
     private fun restoreSession() {
         val lines = store.readText(store.session).lines()
         lines.drop(1).mapNotNull { gazeTabParse(it) }.forEach { tabs.add(Tab(it.url, it.title)) }
         current = (lines.firstOrNull()?.toIntOrNull() ?: 0).coerceIn(0, maxOf(0, tabs.lastIndex))
+        restorePages()
+    }
+
+    /** Each tab gets its pages back, when the file is about these tabs. */
+    private fun restorePages() {
+        runCatching {
+            DataInputStream(store.pages.inputStream().buffered()).use { d ->
+                if (d.readInt() != tabs.size) return
+                tabs.forEach { t ->
+                    val url = String(ByteArray(d.readInt()).also { d.readFully(it) })
+                    val pages = ByteArray(d.readInt()).also { d.readFully(it) }
+                    if (url == t.url && pages.isNotEmpty()) t.kept = pages
+                }
+            }
+        }
     }
 
     /** A link from another app, or text shared to gaze. True when it opened a tab. */

@@ -2,7 +2,9 @@
 
 The laptop browser's best parts on the phone, around Android's own WebView.
 
-- **Tabs** that come back after a restart. Only the tab you look at loads.
+- **Tabs** that come back after a restart, each with the pages it came through. Only the tab you look at loads.
+- **Back** walks the pages of the tab, one at a time, to the first. One more press leaves gaze.
+- **Hold a link** to open it in a new tab behind this one, or to copy its address.
 - **Tabs sent across:** the menu's *Send to laptop* opens the page in gaze on the laptop, and `:send` there opens it here.
 - **Passwords:** the laptop's encrypted file, the same master password. Login pages are filled, and a new or changed password is offered for saving.
 - **Bookmarks** shared with the laptop; the address line suggests them first, then the pages you visit most.

@@ -3,6 +3,9 @@ package com.isene.gaze
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
 import android.webkit.JavascriptInterface
@@ -17,6 +20,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
 
 /** One tab. Its WebView is made when the tab is first shown. */
 class Tab(url: String, title: String) {
@@ -24,7 +30,43 @@ class Tab(url: String, title: String) {
     var title by mutableStateOf(title)
     var progress by mutableIntStateOf(100)
     var web: WebView? = null
+    /** The pages the tab came through in the last run, until its WebView is made. */
+    var kept: ByteArray? = null
 }
+
+/**
+ * The pages this WebView came through, as bytes for a file: what it keeps
+ * for "back" and "forward". Null when it has been nowhere.
+ */
+fun WebView.pages(): ByteArray? {
+    val state = Bundle()
+    if (saveState(state) == null) return null
+    val out = ByteArrayOutputStream()
+    DataOutputStream(out).use { d ->
+        for (key in state.keySet()) {
+            val bytes = state.getByteArray(key) ?: continue
+            d.writeUTF(key)
+            d.writeInt(bytes.size)
+            d.write(bytes)
+        }
+    }
+    return out.toByteArray().takeIf { it.isNotEmpty() }
+}
+
+/**
+ * Give a new WebView the pages a tab came through; it opens the last one.
+ * False when the bytes are of no use.
+ */
+fun WebView.restorePages(saved: ByteArray): Boolean = runCatching {
+    val state = Bundle()
+    DataInputStream(saved.inputStream()).use { d ->
+        while (d.available() > 0) {
+            val key = d.readUTF()
+            state.putByteArray(key, ByteArray(d.readInt()).also { d.readFully(it) })
+        }
+    }
+    restoreState(state) != null
+}.getOrDefault(false)
 
 /**
  * A WebView that reloads when you pull down past the top of the page.
@@ -85,6 +127,21 @@ fun newWebView(a: MainActivity, tab: Tab): WebView = PageView(a).apply {
         setSupportMultipleWindows(false)
     }
     addJavascriptInterface(Bridge(a, tab), "gazeBridge")
+
+    // Holding a link asks what to do with it. Holding anything else keeps
+    // WebView's own answer: marking text.
+    setOnLongClickListener {
+        val type = hitTestResult.type
+        if (type != WebView.HitTestResult.SRC_ANCHOR_TYPE && type != WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
+            return@setOnLongClickListener false
+        }
+        // The address comes back as a message, also for a picture inside a link.
+        requestFocusNodeHref(Handler(Looper.getMainLooper()) { m ->
+            a.holdLink(m.data.getString("url").orEmpty())
+            true
+        }.obtainMessage())
+        true
+    }
 
     webViewClient = object : WebViewClient() {
         // Everything a page pulls in is checked against the ad list. The
