@@ -3,14 +3,15 @@
 #
 #   tools/logo <app>
 #
-# A phone app that has a twin in the suite carries a simple drawing of the
-# twin's logo, so the two are known as one thing. The suite's own logo is
-# too busy for an icon: on a phone it is about 150 pixels wide.
+# Every phone app has the same kind of icon. One that has a twin in the
+# suite carries a simple drawing of the twin's logo, so the two are known as
+# one thing. The suite's own logo is too busy for an icon: on a phone it is
+# about 150 pixels wide. One with no twin carries a drawing of what it does.
 #
 # Rules for the drawing, on the suite's 256 by 256 canvas:
 # - The dark disc and the rust ring of the suite, the ring 7 wide.
 # - No words at all.
-# - The twin's main shape drawn large, in ten shapes or fewer.
+# - The main shape drawn large, in ten shapes or fewer.
 # - Main lines 6 wide or more, no line thinner than 3.
 # - No shape smaller than 10 across.
 # - Nothing that moves.
