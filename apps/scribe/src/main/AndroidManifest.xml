@@ -2,7 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- No permissions: the notes folder is reached through a SAF tree URI
-         the user grants once. -->
+         the user grants once. A picture comes from the system's photo
+         picker or from the camera app, which need none either. -->
 
     <application
         android:allowBackup="true"
@@ -31,6 +32,18 @@
                 <data android:mimeType="text/*" />
             </intent-filter>
         </activity>
+
+        <!-- Gives the camera app one file to write a photo into, and
+             exposes nothing else. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 
 </manifest>

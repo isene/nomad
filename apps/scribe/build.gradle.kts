@@ -6,9 +6,9 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// scribe is a distraction-free text editor: pure Kotlin/Compose, no Rust
-// core (plain-text .md/.hl/.txt editing needs no shared logic). SAF handles
-// file I/O; nothing leaves the device.
+// scribe is a notes pad: pure Kotlin/Compose, no Rust core (plain-text
+// .md/.hl/.txt notes with #tags and pictures need no shared logic). SAF
+// handles file I/O; nothing leaves the device.
 
 val keyProps = Properties().apply {
     val f = project.file("key.properties")
@@ -23,8 +23,8 @@ android {
         applicationId = "com.isene.scribe"
         minSdk = 33
         targetSdk = 35
-        versionCode = 6
-        versionName = "0.3.2"
+        versionCode = 7
+        versionName = "0.4.0"
     }
 
     signingConfigs {
@@ -73,7 +73,6 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
-    implementation(libs.androidx.documentfile)
 
     debugImplementation(libs.androidx.ui.tooling)
 }
