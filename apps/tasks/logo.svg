@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="tasks">
+  <!-- tasks has no twin in the Fe2O3 suite. Its icon is drawn by the rules the twins' icons follow. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a1a2e"/>
+      <stop offset="1" stop-color="#0a0a14"/>
+    </linearGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- Three things to do, the first one done -->
+  <g fill="none" stroke="url(#rust)" stroke-width="7">
+    <rect x="58" y="62" width="36" height="36" rx="6"/>
+    <rect x="58" y="110" width="36" height="36" rx="6"/>
+    <rect x="58" y="158" width="36" height="36" rx="6"/>
+  </g>
+  <g stroke="#cfe8ff" stroke-width="10" stroke-linecap="round">
+    <line x1="114" y1="80" x2="198" y2="80"/>
+    <line x1="114" y1="128" x2="198" y2="128"/>
+    <line x1="114" y1="176" x2="180" y2="176"/>
+  </g>
+  <polyline points="66,80 75,90 92,66" fill="none" stroke="#4c4" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -39,12 +39,14 @@ These come from the original mobile-architecture artifact. Do not drift.
   core is consumed via a Gradle dependency on the local `core` crate
   (cargo-ndk builds the per-ABI `.so` files; UniFFI generates the
   Kotlin bindings).
-- **An app with a twin in the Fe₂O₃ suite carries a simple drawing of
-  the twin's logo** as its launcher icon, so the two are known as one
-  thing. The suite's own logo is too busy at the size of an icon. Draw
+- **Every app's launcher icon is one kind of drawing**: the suite's dark
+  disc and rust ring, with a few large shapes inside. An app with a twin
+  in the Fe₂O₃ suite carries a simple drawing of the twin's logo, so the
+  two are known as one thing; the suite's own logo is too busy at the size
+  of an icon. An app with no twin (fresh, hyperlist, onepage, outside, ref,
+  relay, tasks, vox) gets a drawing of what it does. Draw
   `apps/<app>/logo.svg` by the rules at the top of `tools/logo`, then run
-  `tools/logo <app>`. All ten twins have one: amardice, astro, books, gaze,
-  gazette, mail, pointer, rpnx, scribe and watchit.
+  `tools/logo <app>`. All eighteen apps have one.
 
 ## Per-app responsibilities
 

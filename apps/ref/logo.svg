@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="ref">
+  <!-- ref has no twin in the Fe2O3 suite. Its icon is drawn by the rules the twins' icons follow. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a1a2e"/>
+      <stop offset="1" stop-color="#0a0a14"/>
+    </linearGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- A lens over two lines of text -->
+  <line x1="148" y1="146" x2="194" y2="192" stroke="url(#rust)" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="112" cy="110" r="48" fill="#0a0a14" stroke="#cfe8ff" stroke-width="10"/>
+  <g stroke="#f80" stroke-width="9" stroke-linecap="round">
+    <line x1="88" y1="98" x2="136" y2="98"/>
+    <line x1="88" y1="122" x2="122" y2="122"/>
+  </g>
+</svg>
