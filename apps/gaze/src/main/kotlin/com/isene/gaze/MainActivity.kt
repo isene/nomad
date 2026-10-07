@@ -34,6 +34,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.lifecycleScope
+import androidx.webkit.ProfileStore
+import androidx.webkit.WebViewFeature
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -64,6 +66,9 @@ private const val HOSTS_URL = "https://raw.githubusercontent.com/StevenBlack/hos
 /** The Claude app, which takes the page for "Ask Claude". */
 private const val CLAUDE_APP = "com.anthropic.claude"
 private const val PAGE_MAX = 100_000
+
+/** How the WebView profiles of private tabs are named, with a time after it. */
+private const val PRIVATE = "private-"
 
 class MainActivity : ComponentActivity() {
     lateinit var prefs: Prefs
@@ -98,6 +103,8 @@ class MainActivity : ComponentActivity() {
     /** What the pages file holds, so an unchanged session is not written again. */
     private var pagesWritten: ByteArray? = null
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+    /** The WebView profile the private tabs share, while one of them has a page. */
+    private var privateName: String? = null
     private val pickFile = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
         fileCallback?.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(r.resultCode, r.data))
         fileCallback = null
@@ -122,6 +129,7 @@ class MainActivity : ComponentActivity() {
             addView(fullscreen)
         })
 
+        dropPrivateLeftovers()
         restoreSession()
         if (!handle(intent)) {
             if (tabs.isEmpty()) newBlankTab() else show(current)
@@ -180,7 +188,7 @@ class MainActivity : ComponentActivity() {
         if (tabs.isEmpty()) return
         current = i.coerceIn(0, tabs.lastIndex)
         val tab = tabs[current]
-        val web = tab.web ?: newWebView(this, tab).also { w ->
+        val web = tab.web ?: (newWebView(this, tab) ?: return dropTab(tab)).also { w ->
             tab.web = w
             darken(w, tab.url)
             // The pages the tab came through in the last run come back with
@@ -209,16 +217,68 @@ class MainActivity : ComponentActivity() {
         editing = true
     }
 
+    // ---------- private tabs ----------
+
+    /** WebView can keep a second set of cookies apart since its version 110 or so. */
+    private fun privateTabsWork(): Boolean = WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)
+
+    private fun tooOld() = say("This phone's WebView is too old for private tabs")
+
+    fun newPrivateTab() {
+        if (!privateTabsWork()) return tooOld()
+        tabs.add(Tab("about:blank", "", private = true))
+        show(tabs.lastIndex)
+        editing = true
+    }
+
+    /**
+     * The profile the private tabs share: their cookies, cache and site
+     * data. It is made for the first private page, under a name no earlier
+     * one had, so a new round of private tabs starts as a stranger.
+     */
+    fun privateProfile(): String = privateName ?: "$PRIVATE${System.currentTimeMillis()}".also {
+        ProfileStore.getInstance().getOrCreateProfile(it)
+        privateName = it
+    }
+
+    /** With the last private tab go its cookies, cache and site data. */
+    private fun endPrivate() {
+        val name = privateName ?: return
+        privateName = null
+        // WebView lets go of a profile once its last page is gone, one beat later.
+        webHost.post { runCatching { ProfileStore.getInstance().deleteProfile(name) } }
+    }
+
+    /** Private pages that Android cut short left their profile on disk. It goes now. */
+    private fun dropPrivateLeftovers() {
+        if (!privateTabsWork()) return
+        runCatching {
+            val all = ProfileStore.getInstance()
+            all.allProfileNames.filter { it.startsWith(PRIVATE) }.forEach { all.deleteProfile(it) }
+        }
+    }
+
+    /** A private tab that got no profile of its own is closed, never loaded. */
+    private fun dropTab(tab: Tab) {
+        tabs.remove(tab)
+        say("Could not open a private tab")
+        if (tabs.isEmpty()) newBlankTab() else show(current)
+    }
+
     // ---------- a link held down ----------
 
     fun holdLink(url: String) {
         if (url.isNotEmpty() && !url.startsWith("javascript:")) heldLink = url
     }
 
-    /** A tab behind this one: the page you are reading stays. It loads when you go to it. */
-    fun openBehind(url: String) {
-        tabs.add(Tab(url, ""))
-        say("Opened in a new tab")
+    /**
+     * A tab behind this one: the page you are reading stays. It loads when
+     * you go to it. From a private tab it is private too.
+     */
+    fun openBehind(url: String, private: Boolean = current()?.private == true) {
+        if (private && !privateTabsWork()) return tooOld()
+        tabs.add(Tab(url, "", private))
+        say(if (private) "Opened in a private tab" else "Opened in a new tab")
     }
 
     /** Android shows what was copied by itself. */
@@ -233,6 +293,7 @@ class MainActivity : ComponentActivity() {
             webHost.removeView(it)
             it.destroy()
         }
+        if (t.private && tabs.none { it.private }) endPrivate()
         if (i < current) current--
         if (tabs.isEmpty()) newBlankTab() else show(current)
     }
@@ -248,12 +309,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun saveSession() {
+        // Private tabs are in no file. The current tab is the kept one at or before it.
+        val kept = tabs.filter { !it.private }
+        val at = (tabs.take(current + 1).count { !it.private } - 1).coerceAtLeast(0)
         val text = buildString {
-            appendLine(current)
-            tabs.forEach { append(gazeTabText(it.url, it.title)) }
+            appendLine(at)
+            kept.forEach { append(gazeTabText(it.url, it.title)) }
         }
         runCatching { store.write(store.session, text.toByteArray()) }
-        savePages()
+        savePages(kept)
     }
 
     /**
@@ -261,12 +325,12 @@ class MainActivity : ComponentActivity() {
      * an app it cannot see whenever it wants the memory; without this the
      * tabs came back with one page each, and the back key left gaze.
      */
-    private fun savePages() {
+    private fun savePages(kept: List<Tab>) {
         val out = ByteArrayOutputStream()
         runCatching {
             DataOutputStream(out).use { d ->
-                d.writeInt(tabs.size)
-                tabs.forEach { t ->
+                d.writeInt(kept.size)
+                kept.forEach { t ->
                     val url = t.url.toByteArray()
                     val pages = t.web?.pages() ?: t.kept
                     d.writeInt(url.size)
@@ -350,6 +414,8 @@ class MainActivity : ComponentActivity() {
     fun pageFinished(tab: Tab, web: WebView, url: String) {
         tab.url = url
         if (tab === current()) bookmarked = places.isBookmarked(url)
+        // A private tab is in no history, and a login is filled only when asked.
+        if (tab.private) return
         val line = places.visit(url, tab.title)
         if (line.isNotEmpty()) runCatching { store.history.appendText(line) }
         if (url.startsWith("http")) offerLogin(tab, web, url)
@@ -383,7 +449,8 @@ class MainActivity : ComponentActivity() {
     /** A message from the page script. */
     fun fromPage(tab: Tab, json: String) {
         val m = runCatching { JSONObject(json) }.getOrNull() ?: return
-        if (m.optString("t") != "login" || !vault.unlocked) return
+        // Nothing from a private tab is offered for saving.
+        if (m.optString("t") != "login" || !vault.unlocked || tab.private) return
         // The site is the tab's own address, never what the page claims.
         val page = Uri.parse(tab.web?.url ?: return)
         val login = Login("${page.scheme}://${page.authority}", m.optString("username"), m.optString("password"), 0uL)
@@ -596,7 +663,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    fun download(url: String, agent: String, disposition: String?, mime: String?) {
+    fun download(tab: Tab, url: String, agent: String, disposition: String?, mime: String?) {
         if (!url.startsWith("http")) return say("gaze cannot save this kind of download")
         val name = URLUtil.guessFileName(url, disposition, mime)
         val req = DownloadManager.Request(Uri.parse(url))
@@ -604,7 +671,10 @@ class MainActivity : ComponentActivity() {
             .addRequestHeader("User-Agent", agent)
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
-        CookieManager.getInstance().getCookie(url)?.let { req.addRequestHeader("Cookie", it) }
+        // A private tab's download carries the private cookies, never yours.
+        val cookies = if (tab.private) privateName?.let { ProfileStore.getInstance().getProfile(it)?.cookieManager }
+                      else CookieManager.getInstance()
+        cookies?.getCookie(url)?.let { req.addRequestHeader("Cookie", it) }
         runCatching { getSystemService(DownloadManager::class.java).enqueue(req) }
             .onSuccess { say("Downloading $name") }
             .onFailure { say("Could not download $name") }

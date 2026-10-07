@@ -68,6 +68,9 @@ val Panel = Color(0xFF14131F)
 val Dim = Color(0xFF9A98A8)
 val Bad = Color(0xFFFF6B6B)
 
+/** Stands before a private tab, in the tab list and on the address line. */
+const val PRIVATE_MARK = "⊘"
+
 @Composable
 fun GazeApp(a: MainActivity) {
     MaterialTheme(colorScheme = darkColorScheme(primary = Accent, surface = Panel, background = Color.Black)) {
@@ -183,6 +186,7 @@ private fun AddressBar(a: MainActivity, tab: Tab?) {
             )
         } else {
             val url = tab?.url ?: ""
+            if (tab?.private == true) Text("$PRIVATE_MARK ", color = Accent)
             Text(
                 if (url == "about:blank" || url.isEmpty()) "Where to?" else shown(url),
                 color = if (url == "about:blank") Dim else Color.White,
@@ -202,6 +206,7 @@ private fun Menu(a: MainActivity) {
     val dark = tab?.let { a.prefs.darkFor(uniffi.fe2o3_mobile_core.gazeSiteKey(it.url)) } ?: a.prefs.dark
     val items: List<Pair<String, () -> Unit>> = listOf(
         "New tab" to { a.newBlankTab() },
+        "New private tab" to { a.newPrivateTab() },
         "Forward" to { tab?.web?.goForward(); Unit },
         "Reload" to { tab?.web?.reload(); Unit },
         (if (a.bookmarked) "Remove bookmark" else "Bookmark") to { a.toggleBookmark() },
@@ -258,16 +263,22 @@ private fun TabsScreen(a: MainActivity) {
         LazyColumn(Modifier.weight(1f)) {
             itemsIndexed(a.tabs) { i, t ->
                 val title = t.title.ifEmpty { if (t.url == "about:blank") "New tab" else shown(t.url) }
-                Row2(title, shown(t.url), i == a.current, {
+                Row2(if (t.private) "$PRIVATE_MARK $title" else title, shown(t.url), i == a.current, {
                     a.show(i)
                     a.screen = Screen.Browser
                 }) { a.closeTab(i) }
             }
         }
-        TextButton(onClick = {
-            a.screen = Screen.Browser
-            a.newBlankTab()
-        }, modifier = Modifier.fillMaxWidth()) { Text("+ New tab", color = Accent) }
+        Row(Modifier.fillMaxWidth()) {
+            TextButton(onClick = {
+                a.screen = Screen.Browser
+                a.newBlankTab()
+            }, modifier = Modifier.weight(1f)) { Text("+ New tab", color = Accent) }
+            TextButton(onClick = {
+                a.screen = Screen.Browser
+                a.newPrivateTab()
+            }, modifier = Modifier.weight(1f)) { Text("+ Private tab", color = Accent) }
+        }
     }
 }
 
@@ -367,7 +378,10 @@ private fun LinkDialog(a: MainActivity, url: String) {
         title = { Text(shown(url), color = Dim, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         text = {
             Column {
-                if (url.startsWith("http")) LinkChoice("Open in new tab") { close(); a.openBehind(url) }
+                // From a private tab every new tab is private.
+                val private = a.current()?.private == true
+                if (url.startsWith("http") && !private) LinkChoice("Open in new tab") { close(); a.openBehind(url) }
+                if (url.startsWith("http")) LinkChoice("Open in private tab") { close(); a.openBehind(url, private = true) }
                 LinkChoice("Copy link address") { close(); a.copyLink(url) }
             }
         },

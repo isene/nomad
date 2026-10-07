@@ -8,6 +8,8 @@ import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import android.webkit.JavascriptInterface
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -19,13 +21,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.webkit.WebViewCompat
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 
-/** One tab. Its WebView is made when the tab is first shown. */
-class Tab(url: String, title: String) {
+/**
+ * One tab. Its WebView is made when the tab is first shown. A private tab
+ * is in no history and no file, and keeps its cookies apart from the rest.
+ */
+class Tab(url: String, title: String, val private: Boolean = false) {
     var url by mutableStateOf(url)
     var title by mutableStateOf(title)
     var progress by mutableIntStateOf(100)
@@ -74,8 +80,14 @@ fun WebView.restorePages(saved: ByteArray): Boolean = runCatching {
  * no scrolling left, so a map or a scrolling panel keeps its drag.
  */
 @SuppressLint("ViewConstructor")
-class PageView(private val a: MainActivity) : WebView(a) {
+class PageView(private val a: MainActivity, private val tab: Tab) : WebView(a) {
     private val far = 120 * resources.displayMetrics.density
+
+    /** In a private tab the keyboard is asked to learn nothing of what is typed. */
+    override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? =
+        super.onCreateInputConnection(outAttrs).also {
+            if (tab.private) outAttrs.imeOptions = outAttrs.imeOptions or EditorInfo.IME_FLAG_NO_PERSONALIZED_LEARNING
+        }
     private var atTop = false
     private var past = false
     private var from = -1f
@@ -113,8 +125,27 @@ class PageView(private val a: MainActivity) : WebView(a) {
     }
 }
 
+/**
+ * The WebView of a tab. Null for a private tab that could not get its own
+ * profile: such a tab must not load at all, or it would use your cookies.
+ */
 @SuppressLint("SetJavaScriptEnabled")
-fun newWebView(a: MainActivity, tab: Tab): WebView = PageView(a).apply {
+fun newWebView(a: MainActivity, tab: Tab): WebView? {
+    val view = PageView(a, tab)
+    if (tab.private) {
+        // WebView takes this only before anything else is done with the view.
+        if (runCatching { WebViewCompat.setProfile(view, a.privateProfile()) }.isFailure) {
+            view.destroy()
+            return null
+        }
+        // Android's own autofill neither fills nor saves in a private tab.
+        view.importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+    }
+    return view.apply { setUp(a, tab) }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+private fun WebView.setUp(a: MainActivity, tab: Tab) {
     settings.apply {
         javaScriptEnabled = true
         domStorageEnabled = true
@@ -196,7 +227,7 @@ fun newWebView(a: MainActivity, tab: Tab): WebView = PageView(a).apply {
         override fun onHideCustomView() = a.hideFullscreen(fromPage = true)
     }
 
-    setDownloadListener { url, agent, disposition, mime, _ -> a.download(url, agent, disposition, mime) }
+    setDownloadListener { url, agent, disposition, mime, _ -> a.download(tab, url, agent, disposition, mime) }
 }
 
 /** What the page script says reaches the app here, on a WebView thread. */
