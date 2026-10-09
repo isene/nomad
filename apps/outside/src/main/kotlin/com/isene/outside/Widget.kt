@@ -21,7 +21,10 @@ import android.provider.AlarmClock
 import android.provider.Settings
 import android.view.View
 import android.widget.RemoteViews
+import com.isene.outside.data.Cache
+import com.isene.outside.data.SOURCES
 import com.isene.outside.data.Store
+import com.isene.outside.data.tzOf
 import java.time.Instant
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
@@ -31,6 +34,7 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import uniffi.fe2o3_mobile_core.Almanac
+import uniffi.fe2o3_mobile_core.outsideRainHours
 import uniffi.fe2o3_mobile_core.outsideSky
 
 /**
@@ -39,8 +43,8 @@ import uniffi.fe2o3_mobile_core.outsideSky
  *
  * The clocks move by themselves, inside the launcher. This code runs on
  * the full hour and when something the widget shows has changed: the next
- * alarm, the volume, the clock's zone, the place. It has no timer of its
- * own, and nothing here runs while no widget is placed.
+ * alarm, the volume, the clock's zone, the place or its forecast. It has
+ * no timer of its own, and nothing here runs while no widget is placed.
  *
  * It is plain RemoteViews and not Glance: TextClock and AnalogClock exist
  * only there, and Glance starts a worker for every update.
@@ -64,6 +68,10 @@ class ClockWidget : AppWidgetProvider() {
         private const val SQUARE = 92f
         private const val RADIUS = 37.5f
         private const val RIM = 1.14f
+
+        /** A forecast older than this says too little about the next
+         *  twelve hours to paint rain from. */
+        private const val FRESH_MS = 12 * 3_600_000L
 
         /** Where Android keeps what the sound line shows. */
         private val SOUND = listOf(
@@ -117,7 +125,18 @@ class ClockWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.moon, if (spot != null) sky.moon else "")
             views.setTextViewText(R.id.lit, "${sky.lit}%")
             views.setTextViewText(R.id.phase, sky.phase)
-            views.setImageViewBitmap(R.id.marks, marks(ctx, now.hour, alarm, sky.takeIf { spot != null }))
+
+            // Rain is from the forecasts the app last fetched for that
+            // place. The widget fetches nothing itself.
+            val rain = spot?.let {
+                val cache = Cache(ctx)
+                val key = cache.key(it)
+                val oldest = System.currentTimeMillis() - FRESH_MS
+                val bodies = SOURCES.map { s -> if (cache.fetched(key, s) > oldest) cache.read(key, s) else null }
+                if (bodies.all { b -> b == null }) null
+                else outsideRainHours(bodies[0], bodies[1], bodies[2], tzOf(""), now.toEpochSecond())
+            } ?: emptyList()
+            views.setImageViewBitmap(R.id.marks, marks(ctx, rain, alarm, sky.takeIf { spot != null }))
 
             views.setOnClickPendingIntent(R.id.left, open(ctx, Intent(AlarmClock.ACTION_SHOW_ALARMS)))
             views.setOnClickPendingIntent(R.id.clock, open(ctx, app("com.isene.rpnx", "com.isene.rpnx.MainActivity")))
@@ -164,10 +183,10 @@ class ClockWidget : AppWidgetProvider() {
             .addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
             .setClassName(pkg, activity)
 
-        /** What the dial cannot draw by itself: the tick of the hour now
-         *  in blue, and on the rim an icon at the time of the next alarm,
-         *  of sunrise and of sunset. */
-        private fun marks(ctx: Context, hour: Int, alarm: ZonedDateTime?, sky: Almanac?): Bitmap {
+        /** What the dial cannot draw by itself: a blue tick for each hour
+         *  with rain among the next twelve, and on the rim an icon at the
+         *  time of the next alarm, of sunrise and of sunset. */
+        private fun marks(ctx: Context, rain: List<UInt>, alarm: ZonedDateTime?, sky: Almanac?): Bitmap {
             val dp = ctx.resources.displayMetrics.density
             val size = (SQUARE * dp).roundToInt()
             val mid = size / 2f
@@ -179,10 +198,12 @@ class ClockWidget : AppWidgetProvider() {
                 color = 0xFFACCCF3.toInt()
                 strokeWidth = 1.2f * dp
             }
-            canvas.save()
-            canvas.rotate(hour % 12 * 30f, mid, mid)
-            canvas.drawLine(mid, mid - 0.964f * radius, mid, mid - 0.838f * radius, blue)
-            canvas.restore()
+            for (tick in rain) {
+                canvas.save()
+                canvas.rotate(tick.toInt() * 30f, mid, mid)
+                canvas.drawLine(mid, mid - 0.964f * radius, mid, mid - 0.838f * radius, blue)
+                canvas.restore()
+            }
 
             // `clock` is a time of day in hours; the dial shows twelve.
             fun icon(id: Int, color: Long, width: Float, clock: Double) {

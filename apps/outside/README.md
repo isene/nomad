@@ -25,17 +25,21 @@ once.
 A clock for the home screen, one row tall and the full width.
 
 - Left: the time, the date with the week number, and the next alarm.
-- Middle: an analog clock. The tick of the hour now is blue. Small icons
-  on the rim mark the next alarm, sunrise and sunset.
+- Middle: an analog clock. A blue tick marks each hour with rain among
+  the next twelve. Small icons on the rim mark the next alarm, sunrise
+  and sunset.
 - Right: the ringer mode with the ring and alarm volume, the sign the sun
   is in, sunrise and sunset, moonrise and moonset, how much of the moon
   is lit, and its phase.
 - Tap the left part for the clock app and the right part for outside.
   The clock opens [rpnx](../rpnx/), when that is installed.
 
-The sun and the moon are for the place where outside last saw the phone.
-The widget never asks for the position itself, so open outside after a
-journey.
+The sun, the moon and the rain are for the place where outside last saw
+the phone. The widget never asks for the position itself, so open outside
+after a journey.
+
+The rain is from the forecast outside last fetched, since the widget
+fetches nothing. A forecast older than twelve hours paints no blue ticks.
 
 ## Sources
 
