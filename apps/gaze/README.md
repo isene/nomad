@@ -4,7 +4,8 @@ The laptop browser's best parts on the phone, around Android's own WebView.
 
 - **Tabs** that come back after a restart, each with the pages it came through. Only the tab you look at loads.
 - **Back** walks the pages of the tab, one at a time, to the first. One more press leaves gaze.
-- **Hold a link** to open it in a new tab behind this one, or to copy its address.
+- **Hold a link** to open it in a new tab behind this one, to download it, or to copy its address.
+- **Downloads** land in the phone's Downloads. A sound file or a film plays when you tap its link. *Download link* on a held link saves it. *Download page* in the menu saves what the tab shows. A file a page makes itself, such as a recording or an export, is saved too.
 - **Private tabs:** *New private tab* in the menu, or hold a link. Marked ⊘. A private tab is in no history, is not kept over a restart, and does not see the cookies of your other tabs. A link opened from one is private too. When the last one closes, their cookies, cache and site data go. If Android stops gaze first, they go at the next start. No login is filled or offered for saving unless you pick *Fill password*. The site and your network still see your address.
 - **Tabs sent across:** the menu's *Send to laptop* opens the page in gaze on the laptop, and `:send` there opens it here.
 - **Passwords:** the laptop's encrypted file, the same master password. Login pages are filled, and a new or changed password is offered for saving.
