@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The minute hand of the widget's clock, pointing at 12, and the blue ring
+     of the centre, which lies on top of both hands. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="92dp"
+    android:height="92dp"
+    android:viewportWidth="92"
+    android:viewportHeight="92">
+    <path
+        android:pathData="M46,53.05V15.77"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="0.67" />
+    <path
+        android:pathData="M46,43.9a2.1,2.1 0 1,0 0,4.2 a2.1,2.1 0 1,0 0,-4.2"
+        android:fillColor="#000000"
+        android:strokeColor="#AFCBF2"
+        android:strokeWidth="0.55" />
+</vector>

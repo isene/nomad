@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The face of the widget's clock: a ring, a thin tick for each minute and a
+     thick one for each hour, the one at 12 in grey. It is 92 dp square like
+     the two hands, because AnalogClock lays all three centre on centre. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="92dp"
+    android:height="92dp"
+    android:viewportWidth="92"
+    android:viewportHeight="92">
+    <path
+        android:pathData="M46,8.5a37.5,37.5 0 1,0 0,75 a37.5,37.5 0 1,0 0,-75"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="0.62" />
+    <path
+        android:pathData="M49.53,12.43L49.76,10.2M53.02,12.99L53.48,10.79M56.43,13.9L57.12,11.76M59.73,15.17L60.64,13.11M65.84,18.7L67.16,16.88M68.58,20.92L70.09,19.25M71.08,23.42L72.75,21.91M73.3,26.16L75.12,24.84M76.83,32.27L78.89,31.36M78.1,35.57L80.24,34.88M79.01,38.98L81.21,38.52M79.57,42.47L81.8,42.24M79.57,49.53L81.8,49.76M79.01,53.02L81.21,53.48M78.1,56.43L80.24,57.12M76.83,59.73L78.89,60.64M73.3,65.84L75.12,67.16M71.08,68.58L72.75,70.09M68.58,71.08L70.09,72.75M65.84,73.3L67.16,75.12M59.73,76.83L60.64,78.89M56.43,78.1L57.12,80.24M53.02,79.01L53.48,81.21M49.53,79.57L49.76,81.8M42.47,79.57L42.24,81.8M38.98,79.01L38.52,81.21M35.57,78.1L34.88,80.24M32.27,76.83L31.36,78.89M26.16,73.3L24.84,75.12M23.42,71.08L21.91,72.75M20.92,68.58L19.25,70.09M18.7,65.84L16.88,67.16M15.17,59.73L13.11,60.64M13.9,56.43L11.76,57.12M12.99,53.02L10.79,53.48M12.43,49.53L10.2,49.76M12.43,42.47L10.2,42.24M12.99,38.98L10.79,38.52M13.9,35.57L11.76,34.88M15.17,32.27L13.11,31.36M18.7,26.16L16.88,24.84M20.92,23.42L19.25,21.91M23.42,20.92L21.91,19.25M26.16,18.7L24.84,16.88M32.27,15.17L31.36,13.11M35.57,13.9L34.88,11.76M38.98,12.99L38.52,10.79M42.47,12.43L42.24,10.2"
+        android:strokeColor="#909090"
+        android:strokeWidth="0.3" />
+    <path
+        android:pathData="M61.71,18.79L64.07,14.69M73.21,30.29L77.31,27.92M77.42,46L82.15,46M73.21,61.71L77.31,64.07M61.71,73.21L64.07,77.31M46,77.42L46,82.15M30.29,73.21L27.92,77.31M18.79,61.71L14.69,64.08M14.58,46L9.85,46M18.79,30.29L14.69,27.92M30.29,18.79L27.92,14.69"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.1" />
+    <path
+        android:pathData="M46,14.58L46,9.85"
+        android:strokeColor="#B4B4B4"
+        android:strokeWidth="1.1" />
+</vector>

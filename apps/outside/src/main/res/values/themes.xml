@@ -1,4 +1,15 @@
 <resources>
     <!-- Only the window behind the first frame; Compose paints the rest. -->
     <style name="Theme.Outside" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- A line of text in the home-screen widget. -->
+    <style name="WidgetText">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">9.8dp</item>
+    </style>
 </resources>

@@ -23,4 +23,11 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         vm.resume()
     }
+
+    // The widget takes its place from this app, so it gets the news on the
+    // way out.
+    override fun onStop() {
+        super.onStop()
+        ClockWidget.refresh(this)
+    }
 }

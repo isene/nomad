@@ -108,8 +108,17 @@ class Store(ctx: Context) {
     }
 
     fun remember(spot: Spot, here: Boolean) {
-        prefs.edit().putString("last", outsideSpotsText(listOf(spot))).putBoolean("here", here).apply()
+        val text = outsideSpotsText(listOf(spot))
+        val edit = prefs.edit().putString("last", text).putBoolean("here", here)
+        if (here) edit.putString("phone", text)
+        edit.apply()
     }
+
+    /** Where the app last saw the phone itself, for the widget's sun and
+     *  moon. Looking up the weather somewhere else must not move them.
+     *  The spot last shown, when the app has never followed the phone. */
+    fun here(): Spot? =
+        outsideSpotsParse(prefs.getString("phone", "") ?: "").firstOrNull() ?: last()?.first
 }
 
 /** The phone's own position and the name of the place there. */

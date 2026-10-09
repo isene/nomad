@@ -20,6 +20,23 @@ once.
 - The last forecast stays on the phone, so the app opens with numbers
   when there is no network.
 
+## Widget
+
+A clock for the home screen, one row tall and the full width.
+
+- Left: the time, the date with the week number, and the next alarm.
+- Middle: an analog clock. The tick of the hour now is blue. Small icons
+  on the rim mark the next alarm, sunrise and sunset.
+- Right: the ringer mode with the ring and alarm volume, the sign the sun
+  is in, sunrise and sunset, moonrise and moonset, how much of the moon
+  is lit, and its phase.
+- Tap the left part for the clock app and the right part for outside.
+  The clock opens [rpnx](../rpnx/), when that is installed.
+
+The sun and the moon are for the place where outside last saw the phone.
+The widget never asks for the position itself, so open outside after a
+journey.
+
 ## Sources
 
 | Column | From | Reach |
@@ -41,7 +58,10 @@ changes its page. The other two columns keep working when it does.
 ## Battery and privacy
 
 - The app fetches when you open it, and only what is older than half an
-  hour. Nothing runs in the background.
+  hour. Without the widget, nothing runs in the background.
+- The home screen draws the widget's clocks by itself. The app is run on
+  the full hour, and when the next alarm or the volume changes. It never
+  wakes a sleeping phone, and the widget uses no network.
 - The phone's position is rounded to about a kilometre before it leaves
   the phone. The app asks for coarse location only.
 - No account, no tracking, no ads.
@@ -52,3 +72,5 @@ changes its page. The other two columns keep working when it does.
   lays out the days and hours. It is pure Rust with tests.
 - The Kotlin side fetches, keeps the answers in the cache folder and
   draws the screens.
+- `Widget.kt` is the widget. Its sun and moon come from `outside_sky` in
+  the core.

@@ -1036,6 +1036,88 @@ pub fn outside_spots_parse(text: String) -> Vec<Spot> {
     serde_json::from_str(&text).unwrap_or_default()
 }
 
+// ---------- the sky, for the home-screen widget ----------
+
+/// What the widget shows of the sky, for one place at one hour.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct Almanac {
+    /// The sign the sun is in, "LIBRA".
+    pub sign: String,
+    /// "07:41 - 18:28"; empty on a day with no sunrise or sunset.
+    pub sun: String,
+    /// The same for the moon.
+    pub moon: String,
+    /// How much of the moon's face is lit, 0 to 100.
+    pub lit: u32,
+    /// "Waning Crescent"
+    pub phase: String,
+    /// Sunrise and sunset as clock hours, 7.7 for 07:42; -1 when there
+    /// is none.
+    pub sunrise: f64,
+    pub sunset: f64,
+}
+
+const SIGNS: [&str; 12] = [
+    "ARIES", "TAURUS", "GEMINI", "CANCER", "LEO", "VIRGO",
+    "LIBRA", "SCORPIO", "SAGITTARIUS", "CAPRICORN", "AQUARIUS", "PISCES",
+];
+
+/// How far along the sun's yearly path a body is, in degrees from where
+/// the sun stands at the March equinox.
+fn along_sun_path(ra: f64, dec: f64) -> f64 {
+    // The tilt of the Earth's axis.
+    let tilt = 23.436_f64.to_radians();
+    let (ra, dec) = (ra.to_radians(), dec.to_radians());
+    (ra.sin() * tilt.cos() + dec.tan() * tilt.sin()).atan2(ra.cos()).to_degrees().rem_euclid(360.0)
+}
+
+/// The sky for the widget. `hour` is the local clock, 23.5 for 23:30, and
+/// `tz_hours` is that clock's distance east of UTC.
+///
+/// The lit part comes from the angle between sun and moon at that hour.
+/// `orbit::moon_phase` counts days of an average month instead, and is a
+/// day off near new moon.
+#[uniffi::export]
+pub fn outside_sky(year: i32, month: u32, day: u32, hour: f64, lat: f64, lon: f64, tz_hours: f64) -> Almanac {
+    let (_, bodies) = orbit::sky_at(year, month, day, hour, lat, lon, tz_hours);
+    let at = |name: &str| bodies.iter().find(|b| b.0 == name).map(|b| (b.1, b.2)).unwrap_or((0.0, 0.0));
+    let (sun_ra, sun_dec) = at("sun");
+    let (moon_ra, moon_dec) = at("moon");
+
+    let sun_at = along_sun_path(sun_ra, sun_dec);
+    // How far the moon is ahead of the sun: 0 at new moon, 180 at full.
+    let ahead = (along_sun_path(moon_ra, moon_dec) - sun_at).rem_euclid(360.0);
+    // The moon gains 12 degrees a day, so 6 to each side is the day itself.
+    let phase = match ahead {
+        a if !(6.0..354.0).contains(&a) => "New Moon",
+        a if a < 84.0 => "Waxing Crescent",
+        a if a < 96.0 => "First Quarter",
+        a if a < 174.0 => "Waxing Gibbous",
+        a if a < 186.0 => "Full Moon",
+        a if a < 264.0 => "Waning Gibbous",
+        a if a < 276.0 => "Last Quarter",
+        _ => "Waning Crescent",
+    };
+    let (d1, d2) = (sun_dec.to_radians(), moon_dec.to_radians());
+    let apart = d1.sin() * d2.sin() + d1.cos() * d2.cos() * (sun_ra - moon_ra).to_radians().cos();
+
+    let line = |t: &Option<(String, String)>| t.as_ref().map(|(r, s)| format!("{r} - {s}")).unwrap_or_default();
+    let sun = orbit::sun_times(year, month, day, lat, lon, tz_hours);
+    let (sunrise, sunset) = sun
+        .as_ref()
+        .and_then(|(r, s)| Some((clock_hours(r)?, clock_hours(s)?)))
+        .unwrap_or((-1.0, -1.0));
+    Almanac {
+        sign: SIGNS[(sun_at / 30.0) as usize % 12].to_string(),
+        sun: line(&sun),
+        moon: line(&orbit::moon_times(year, month, day, lat, lon, tz_hours)),
+        lit: ((1.0 - apart) * 50.0).round() as u32,
+        phase: phase.to_string(),
+        sunrise,
+        sunset,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1370,5 +1452,40 @@ mod tests {
         assert_eq!(outside_spots_parse(outside_spots_text(hits.clone())), hits);
         assert!(outside_spots_parse("broken".into()).is_empty());
         assert!(outside_search_hits("{}".into()).is_empty());
+    }
+
+    #[test]
+    fn the_sky_for_the_widget() {
+        // Oslo, 9 October 2026 at 23:20, summer time. New moon came 18
+        // hours later.
+        let s = outside_sky(2026, 10, 9, 23.0 + 20.0 / 60.0, 59.91, 10.75, 2.0);
+        assert_eq!(s.sign, "LIBRA");
+        assert_eq!(s.phase, "Waning Crescent");
+        assert!(s.lit <= 2, "lit {}", s.lit);
+        assert!(s.sun.starts_with("07:4") && s.sun.contains(" - 18:2"), "{}", s.sun);
+        assert!(s.moon.starts_with("05:5") && s.moon.contains(" - 17:"), "{}", s.moon);
+        assert!((s.sunrise - 7.7).abs() < 0.1 && (s.sunset - 18.5).abs() < 0.1);
+
+        // Full moon was 26 October at 05:12 Oslo time, the first quarter
+        // 18 October at 18:13.
+        let full = outside_sky(2026, 10, 26, 5.2, 59.91, 10.75, 1.0);
+        assert_eq!((full.phase.as_str(), full.lit), ("Full Moon", 100));
+        assert_eq!(full.sign, "SCORPIO");
+        let half = outside_sky(2026, 10, 18, 18.2, 59.91, 10.75, 2.0);
+        assert_eq!(half.phase, "First Quarter");
+        assert!((49..=51).contains(&half.lit), "lit {}", half.lit);
+        // Two days on it is past the quarter.
+        assert_eq!(outside_sky(2026, 10, 20, 18.2, 59.91, 10.75, 2.0).phase, "Waxing Gibbous");
+
+        // The sun crossed into Aries on 20 March 2026 at 15:46 Oslo time.
+        assert_eq!(outside_sky(2026, 3, 20, 12.0, 59.91, 10.75, 1.0).sign, "PISCES");
+        assert_eq!(outside_sky(2026, 3, 20, 18.0, 59.91, 10.75, 1.0).sign, "ARIES");
+
+        // Tromsø at midsummer: the sun does not set, so there is no line.
+        let north = outside_sky(2026, 6, 21, 12.0, 69.65, 18.96, 2.0);
+        assert_eq!((north.sun.as_str(), north.sunrise, north.sunset), ("", -1.0, -1.0));
+        // The sun had crossed into Cancer that morning, at 10:24.
+        assert_eq!(north.sign, "CANCER");
+        assert_eq!(outside_sky(2026, 6, 21, 9.0, 69.65, 18.96, 2.0).sign, "GEMINI");
     }
 }

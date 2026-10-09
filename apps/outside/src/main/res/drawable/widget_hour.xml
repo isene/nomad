@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The hour hand of the widget's clock, pointing at 12. AnalogClock turns it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="92dp"
+    android:height="92dp"
+    android:viewportWidth="92"
+    android:viewportHeight="92">
+    <path
+        android:pathData="M46,50.76V23.61"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.35" />
+</vector>
