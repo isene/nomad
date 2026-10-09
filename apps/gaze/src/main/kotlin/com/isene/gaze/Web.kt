@@ -27,11 +27,16 @@ import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 
+/** How many tabs this run has made. */
+private var made = 0
+
 /**
  * One tab. Its WebView is made when the tab is first shown. A private tab
  * is in no history and no file, and keeps its cookies apart from the rest.
  */
 class Tab(url: String, title: String, val private: Boolean = false) {
+    /** What the tab list knows it by, so a tab keeps its row while it is dragged. */
+    val id = made++
     var url by mutableStateOf(url)
     var title by mutableStateOf(title)
     var progress by mutableIntStateOf(100)

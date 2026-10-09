@@ -3,6 +3,8 @@ package com.isene.gaze
 import android.os.Environment
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
@@ -20,6 +22,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
@@ -40,8 +43,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +55,8 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
@@ -61,7 +68,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 val Accent = Color(0xFFF74C00)
 val Panel = Color(0xFF14131F)
@@ -261,13 +270,66 @@ private fun Row2(title: String, sub: String, strong: Boolean, onClick: () -> Uni
 @Composable
 private fun TabsScreen(a: MainActivity) {
     Sheet("Tabs", a) {
-        LazyColumn(Modifier.weight(1f)) {
-            itemsIndexed(a.tabs) { i, t ->
+        val list = rememberLazyListState()
+        val scope = rememberCoroutineScope()
+        // The tab that is held and dragged, and how far it is drawn from its row, in pixels.
+        var held by remember { mutableStateOf<Tab?>(null) }
+        var shift by remember { mutableFloatStateOf(0f) }
+        LazyColumn(
+            Modifier.weight(1f).pointerInput(Unit) {
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { at ->
+                        shift = 0f
+                        held = list.layoutInfo.visibleItemsInfo
+                            .firstOrNull { at.y >= it.offset && at.y < it.offset + it.size }
+                            ?.let { a.tabs.getOrNull(it.index) }
+                    },
+                    onDrag = { change, by ->
+                        change.consume()
+                        val rows = list.layoutInfo.visibleItemsInfo
+                        val from = a.tabs.indexOf(held)
+                        val me = rows.firstOrNull { it.index == from }
+                        if (me != null) {
+                            shift += by.y
+                            val top = me.offset + shift // where the held tab is drawn
+                            val middle = top + me.size / 2
+                            val over = rows.firstOrNull { it.index != from && middle >= it.offset && middle < it.offset + it.size }
+                            if (over != null) {
+                                // The list keeps its first row in place by its key, and would follow the moved tab.
+                                if (from == list.firstVisibleItemIndex || over.index == list.firstVisibleItemIndex) {
+                                    list.requestScrollToItem(list.firstVisibleItemIndex, list.firstVisibleItemScrollOffset)
+                                }
+                                a.moveTab(from, over.index)
+                                shift += me.offset - over.offset
+                            }
+                            // Past the top or the bottom the list scrolls, and the tab stays under the finger.
+                            val view = list.layoutInfo
+                            val past = when {
+                                top < view.viewportStartOffset -> top - view.viewportStartOffset
+                                top + me.size > view.viewportEndOffset -> top + me.size - view.viewportEndOffset
+                                else -> 0f
+                            }
+                            if (past != 0f) scope.launch { shift += list.scrollBy(past) }
+                        }
+                    },
+                    onDragEnd = { held = null },
+                    onDragCancel = { held = null },
+                )
+            },
+            state = list,
+        ) {
+            itemsIndexed(a.tabs, key = { _, t -> t.id }) { i, t ->
                 val title = t.title.ifEmpty { if (t.url == "about:blank") "New tab" else shown(t.url) }
-                Row2(if (t.private) "$PRIVATE_MARK $title" else title, shown(t.url), i == a.current, {
-                    a.show(i)
-                    a.screen = Screen.Browser
-                }) { a.closeTab(i) }
+                val lifted = t === held
+                Box(if (lifted) Modifier.zIndex(1f).graphicsLayer { translationY = shift }.background(Panel) else Modifier.animateItem()) {
+                    Row2(if (t.private) "$PRIVATE_MARK $title" else title, shown(t.url), i == a.current, {
+                        // Letting go of a held tab is not a tap on it.
+                        if (held == null) {
+                            a.show(i)
+                            a.screen = Screen.Browser
+                        }
+                    }) { a.closeTab(i) }
+                }
             }
         }
         Row(Modifier.fillMaxWidth()) {

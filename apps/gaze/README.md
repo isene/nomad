@@ -2,7 +2,7 @@
 
 The laptop browser's best parts on the phone, around Android's own WebView.
 
-- **Tabs** that come back after a restart, each with the pages it came through. Only the tab you look at loads.
+- **Tabs** that come back after a restart, each with the pages it came through. Only the tab you look at loads. Hold a tab in the list and drag it to move it.
 - **Back** walks the pages of the tab, one at a time, to the first. One more press leaves gaze.
 - **Hold a link** to open it in a new tab behind this one, to download it, or to copy its address.
 - **Downloads** land in the phone's Downloads. A sound file or a film plays when you tap its link. *Download link* on a held link saves it. *Download page* in the menu saves what the tab shows. A file a page makes itself, such as a recording or an export, is saved too.
