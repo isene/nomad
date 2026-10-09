@@ -384,6 +384,14 @@ class MainActivity : ComponentActivity() {
         if (tabs.isEmpty()) newBlankTab() else show(current)
     }
 
+    /** A tab dragged to another row of the list. The tab on screen stays the one on screen. */
+    fun moveTab(from: Int, to: Int) {
+        if (from == to || from !in tabs.indices || to !in tabs.indices) return
+        val shown = current()
+        tabs.add(to, tabs.removeAt(from))
+        current = tabs.indexOf(shown).coerceAtLeast(0)
+    }
+
     /** Go where the address line says, in this tab. */
     fun open(input: String) {
         val url = gazeToUri(input, prefs.search)

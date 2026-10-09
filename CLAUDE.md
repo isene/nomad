@@ -145,6 +145,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
   that bridge, so `filePiece` takes a piece only under a key that
   `fromBlob` made for a download the page itself started, and only from
   that tab. `Saver` writes through MediaStore and never over a file.
+- The tab list is reordered by hold and drag (0.4.2): the gesture sits on
+  the list, a held tab is drawn `shift` pixels from its row, and
+  `moveTab` keeps `current` on the tab that is on screen. Each `Tab` has
+  an `id` as its list key. Not tried on a phone by Claude.
 
 ### outside (com.isene.outside)
 
