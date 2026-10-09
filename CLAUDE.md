@@ -179,7 +179,13 @@ when building the core. Same rule as the rest of Fe₂O₃.
     manifest and enabled while a widget is placed.
   - The dial and the two hands are vectors of one 92 dp square, because
     `AnalogClock` lays them centre on centre. `refresh` draws the blue
-    tick of the hour and the rim icons into a bitmap on top.
+    rain ticks and the rim icons into a bitmap on top.
+  - A blue tick is an hour with rain among the next twelve, from
+    `outside_rain_hours` in the core: 0.1 mm or more as the mean of the
+    sources. `refresh` reads the three cached bodies for `Store.here()`
+    and skips one older than twelve hours. That is three file reads and
+    one parse a run; the widget never fetches. Geir chose rain for the
+    blue on 2026-10-10 (it was the hour now in 0.3.0).
   - `TextClock` has no week number, so `refresh` writes the week into
     the date pattern as quoted text.
   - `outside_sky` in the core gives the sign, the rise and set lines and

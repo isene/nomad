@@ -10,6 +10,7 @@ import com.isene.outside.BuildConfig
 import java.io.File
 import java.time.Instant
 import java.time.ZoneId
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.resume
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -58,6 +59,9 @@ class Cache(ctx: Context) {
     private val root = File(ctx.cacheDir, "forecasts")
 
     private fun file(key: String, source: String) = File(File(root, key), "$source.json")
+
+    /** The name a place's forecasts are kept under. */
+    fun key(spot: Spot): String = String.format(Locale.ROOT, "%.4f_%.4f", spot.lat, spot.lon)
 
     fun read(key: String, source: String): String? = try {
         file(key, source).takeIf { it.isFile }?.readText()

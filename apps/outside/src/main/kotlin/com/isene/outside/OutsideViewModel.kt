@@ -14,7 +14,6 @@ import com.isene.outside.data.SOURCES
 import com.isene.outside.data.Store
 import com.isene.outside.data.tzOf
 import java.time.ZoneId
-import java.util.Locale
 import kotlin.math.round
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -208,7 +207,7 @@ class OutsideViewModel(app: Application) : AndroidViewModel(app) {
         _ui.update { it.copy(forecast = built, fetched = newest) }
     }
 
-    private fun key(spot: Spot): String = String.format(Locale.ROOT, "%.4f_%.4f", spot.lat, spot.lon)
+    private fun key(spot: Spot): String = cache.key(spot)
 
     /** Show what the cache has, then fetch the bodies older than `staleMs`
      *  and show again. */
