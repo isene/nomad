@@ -205,6 +205,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - Tabs live in `UiState.tabs`, one back-trail each, at most eight, saved
   in `onStop`. The marks row is dragged into order (`sh.calvin.reorderable`)
   and written once, when the drag ends.
+- A text file is shown in Android's own `TextView` inside a `ScrollView`
+  (through `AndroidView`), so text can be marked and copied. Keep it:
+  Compose's `SelectionContainer` over a list of lines copies them with no
+  line ends between, and forgets the lines that scrolled away.
 - Search inside files (`pointer_grep`) reads text files up to 8 MiB and
   only when the user asks. Video thumbnails come from `coil-video`, one
   frame per visible row.

@@ -28,9 +28,10 @@ taken back.
 - **Search.** Typing narrows the folder on screen. One more tap searches
   every folder below it, by name or for words inside the text files.
 - **Pictures and text open in the app.** Swipe through the pictures of a
-  folder, double-tap to zoom. Everything else opens in the app the phone
-  picks for it; an APK goes to the installer. Pictures and videos show
-  what is in them right in the list.
+  folder, double-tap to zoom. Hold a finger on a word in a text file to
+  mark it, drag the two handles, and copy. Everything else opens in the
+  app the phone picks for it; an APK goes to the installer. Pictures and
+  videos show what is in them right in the list.
 - **Places.** The phone's storage and the SD card with their free space,
   the folders Syncthing shares, and the folders you last worked in. The
   star on a row marks that place.
