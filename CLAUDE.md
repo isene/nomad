@@ -139,6 +139,12 @@ when building the core. Same rule as the rest of Fe₂O₃.
   "Ask Claude" shares the page's text to the Claude app
   (`com.anthropic.claude`), so the user's own plan answers and no API key
   lives on the phone. 0.1 had a Messages API client; 0.2 removed it.
+- Downloads: a web address goes to Android's DownloadManager. A `blob:`
+  address can only be read by its page, so `blobScript` runs there and
+  posts the bytes through `gazeBridge` in pieces. Every page can call
+  that bridge, so `filePiece` takes a piece only under a key that
+  `fromBlob` made for a download the page itself started, and only from
+  that tab. `Saver` writes through MediaStore and never over a file.
 
 ### outside (com.isene.outside)
 

@@ -213,6 +213,7 @@ private fun Menu(a: MainActivity) {
         "Bookmarks" to { a.screen = Screen.Bookmarks },
         "Send to laptop" to { a.sendToLaptop() },
         "Share" to { a.share() },
+        "Download page" to { a.downloadUrl(tab?.web?.url) },
         "Ask Claude" to { a.askClaude() },
         "Fill password" to { a.fillLogin() },
         (if (dark) "Light here" else "Dark here") to { a.toggleDark() },
@@ -382,6 +383,8 @@ private fun LinkDialog(a: MainActivity, url: String) {
                 val private = a.current()?.private == true
                 if (url.startsWith("http") && !private) LinkChoice("Open in new tab") { close(); a.openBehind(url) }
                 if (url.startsWith("http")) LinkChoice("Open in private tab") { close(); a.openBehind(url, private = true) }
+                // A link to a sound file or a film plays when tapped. This saves it.
+                if (url.startsWith("http")) LinkChoice("Download link") { close(); a.downloadUrl(url) }
                 LinkChoice("Copy link address") { close(); a.copyLink(url) }
             }
         },

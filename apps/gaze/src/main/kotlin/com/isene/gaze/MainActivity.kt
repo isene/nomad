@@ -5,13 +5,17 @@ import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ComponentName
+import android.content.ContentResolver
+import android.content.ContentValues
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
 import android.os.FileObserver
+import android.provider.MediaStore
 import android.provider.Settings
+import android.util.Base64
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -40,6 +44,7 @@ import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
+import java.io.OutputStream
 import java.net.HttpURLConnection
 import java.net.URL
 import kotlinx.coroutines.Dispatchers
@@ -59,6 +64,86 @@ import uniffi.fe2o3_mobile_core.gazeTabText
 import uniffi.fe2o3_mobile_core.gazeToUri
 
 enum class Screen { Browser, Tabs, Bookmarks, Passwords, Settings }
+
+/** The most a page may hand over as one file. */
+private const val HANDOVER_MAX = 1L shl 30
+
+/** A download a page hands over in pieces. The file is opened by the first piece. */
+private class Handover(val tab: Tab, var name: String, val mime: String?) {
+    var file: Saver? = null
+}
+
+/**
+ * A new file in the phone's Downloads, through MediaStore: no permission
+ * needed, and a name that is taken gets a number, so nothing is ever
+ * written over. The file stays hidden from other apps until [done].
+ */
+private class Saver(private val resolver: ContentResolver, name: String, mime: String?) {
+    private val uri: Uri
+    private val out: OutputStream
+    private var size = 0L
+
+    init {
+        val row = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+            // A bare "some file" type would glue .bin to a good name.
+            if (mime != null && mime != "application/octet-stream") put(MediaStore.MediaColumns.MIME_TYPE, mime)
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+        uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, row) ?: throw IOException("no place in Downloads")
+        out = resolver.openOutputStream(uri) ?: run {
+            resolver.delete(uri, null, null)
+            throw IOException("Downloads will not open")
+        }
+    }
+
+    fun write(bytes: ByteArray) {
+        size += bytes.size
+        if (size > HANDOVER_MAX) throw IOException("too large")
+        out.write(bytes)
+    }
+
+    fun done() {
+        out.close()
+        resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+    }
+
+    fun drop() {
+        runCatching { out.close() }
+        runCatching { resolver.delete(uri, null, null) }
+    }
+}
+
+/** A file name a page suggested, cut down to a bare name. Null when nothing usable is left. */
+private fun safeName(name: String): String? =
+    name.substringAfterLast('/').substringAfterLast('\\').filter { !it.isISOControl() }.trim().trimStart('.')
+        .take(120).takeIf { it.isNotEmpty() }
+
+/**
+ * Runs in the page: reads the file behind a blob: address and posts it to
+ * the app in pieces of 384 kB, each as base64, the last one marked. The
+ * name comes from the page's own download link where there is one.
+ */
+private fun blobScript(url: String, key: String): String = """
+(async (url, key) => {
+  const post = (m) => gazeBridge.post(JSON.stringify(Object.assign({t: 'file', k: key}, m)));
+  try {
+    const link = Array.from(document.querySelectorAll('a[download]')).find((a) => a.href === url);
+    const blob = await (await fetch(url)).blob();
+    const step = 384 * 1024;
+    let at = 0;
+    do {
+      const bytes = new Uint8Array(await blob.slice(at, at + step).arrayBuffer());
+      let text = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+      at += step;
+      post({n: link ? link.download : '', d: btoa(text), end: at >= blob.size});
+    } while (at < blob.size);
+  } catch (e) {
+    post({fail: true});
+  }
+})(${JSONObject.quote(url)}, ${JSONObject.quote(key)});
+""".trimIndent()
 
 /** Steven Black's unified hosts list: ads and trackers, public domain. */
 private const val HOSTS_URL = "https://raw.githubusercontent.com/StevenBlack/hosts/master/hosts"
@@ -289,6 +374,7 @@ class MainActivity : ComponentActivity() {
     fun closeTab(i: Int) {
         if (i !in tabs.indices) return
         val t = tabs.removeAt(i)
+        dropHandovers(t)
         t.web?.let {
             webHost.removeView(it)
             it.destroy()
@@ -450,6 +536,7 @@ class MainActivity : ComponentActivity() {
     fun fromPage(tab: Tab, json: String) {
         val m = runCatching { JSONObject(json) }.getOrNull() ?: return
         // Nothing from a private tab is offered for saving.
+        if (m.optString("t") == "file") return filePiece(tab, m)
         if (m.optString("t") != "login" || !vault.unlocked || tab.private) return
         // The site is the tab's own address, never what the page claims.
         val page = Uri.parse(tab.web?.url ?: return)
@@ -663,9 +750,33 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    // ---------- downloads ----------
+
+    /**
+     * A download the page asked for, or one you asked for with "Download
+     * link" or "Download page". A web address goes to Android's download
+     * manager. A file the page made itself (a recording, an export) has a
+     * blob: or data: address that only the page can read, so the page
+     * hands its bytes over.
+     */
     fun download(tab: Tab, url: String, agent: String, disposition: String?, mime: String?) {
-        if (!url.startsWith("http")) return say("gaze cannot save this kind of download")
         val name = URLUtil.guessFileName(url, disposition, mime)
+        when {
+            url.startsWith("http") -> fromWeb(tab, url, agent, name, mime)
+            url.startsWith("blob:") -> fromBlob(tab, url, name, mime)
+            url.startsWith("data:") -> fromData(url, name, mime)
+            else -> say("gaze cannot save this kind of download")
+        }
+    }
+
+    /** "Download link" on a held link and "Download page" in the menu: a sound file plays when tapped, this saves it. */
+    fun downloadUrl(url: String?) {
+        val tab = current() ?: return
+        if (url.isNullOrEmpty() || url == "about:blank") return say("Nothing to download here")
+        download(tab, url, tab.web?.settings?.userAgentString.orEmpty(), null, null)
+    }
+
+    private fun fromWeb(tab: Tab, url: String, agent: String, name: String, mime: String?) {
         val req = DownloadManager.Request(Uri.parse(url))
             .setMimeType(mime)
             .addRequestHeader("User-Agent", agent)
@@ -678,6 +789,68 @@ class MainActivity : ComponentActivity() {
         runCatching { getSystemService(DownloadManager::class.java).enqueue(req) }
             .onSuccess { say("Downloading $name") }
             .onFailure { say("Could not download $name") }
+    }
+
+    /** Downloads a page is handing over, by the key each one got from this app. */
+    private val handovers = HashMap<String, Handover>()
+
+    /**
+     * Ask the page for the bytes behind a blob: address. The script reads
+     * them and posts them in pieces under a key made here, for this one
+     * download. [filePiece] takes nothing without that key.
+     */
+    private fun fromBlob(tab: Tab, url: String, name: String, mime: String?) {
+        val web = tab.web ?: return
+        val key = java.util.UUID.randomUUID().toString()
+        handovers[key] = Handover(tab, name, mime)
+        say("Downloading $name")
+        web.evaluateJavascript(blobScript(url, key), null)
+    }
+
+    /** One piece of a file a page hands over. Called for every "file" message from a page. */
+    private fun filePiece(tab: Tab, m: JSONObject) {
+        val key = m.optString("k")
+        val h = handovers[key] ?: return
+        if (h.tab !== tab) return
+        fun drop() {
+            handovers.remove(key)
+            h.file?.drop()
+            say("Could not download ${h.name}")
+        }
+        if (m.optBoolean("fail")) return drop()
+        runCatching {
+            val file = h.file ?: run {
+                // The name the page gave its link, where it gave one.
+                safeName(m.optString("n"))?.let { h.name = it }
+                Saver(contentResolver, h.name, h.mime).also { h.file = it }
+            }
+            file.write(Base64.decode(m.optString("d"), Base64.DEFAULT))
+            if (m.optBoolean("end")) {
+                file.done()
+                handovers.remove(key)
+                say("Saved ${h.name} in Downloads")
+            }
+        }.onFailure { drop() }
+    }
+
+    /** A data: address has the file in the address itself. */
+    private fun fromData(url: String, name: String, mime: String?) {
+        runCatching {
+            val comma = url.indexOf(',')
+            require(comma > 0)
+            val head = url.substring(5, comma)
+            val body = url.substring(comma + 1)
+            val bytes = if (head.endsWith(";base64")) Base64.decode(body, Base64.DEFAULT) else Uri.decode(body).toByteArray()
+            val file = Saver(contentResolver, name, mime ?: head.substringBefore(';').ifEmpty { null })
+            runCatching { file.write(bytes); file.done() }.onFailure { file.drop() }.getOrThrow()
+        }.onSuccess { say("Saved $name in Downloads") }
+            .onFailure { say("Could not download $name") }
+    }
+
+    /** A page that closes takes its unfinished downloads with it. */
+    private fun dropHandovers(tab: Tab) {
+        handovers.values.filter { it.tab === tab }.forEach { it.file?.drop() }
+        handovers.values.removeAll { it.tab === tab }
     }
 
     fun chooseFile(cb: ValueCallback<Array<Uri>>, params: WebChromeClient.FileChooserParams) {
