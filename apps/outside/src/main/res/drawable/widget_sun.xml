@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The sun, for the widget's line of sunrise and sunset. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:pathData="M12,6.8a5.2,5.2 0 1,0 0,10.4 a5.2,5.2 0 1,0 0,-10.4"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5" />
+    <path
+        android:pathData="M12,3.4L12,0.6M18.08,5.92L20.06,3.94M20.6,12L23.4,12M18.08,18.08L20.06,20.06M12,20.6L12,23.4M5.92,18.08L3.94,20.06M3.4,12L0.6,12M5.92,5.92L3.94,3.94"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+</vector>

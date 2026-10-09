@@ -166,7 +166,29 @@ when building the core. Same rule as the rest of Fe₂O₃.
   (point query, English). `outside_requests` leaves its URL empty outside
   a box around Norway, and the shell then skips the request.
 - Fetches happen in `onResume` only, and only for bodies older than 30
-  minutes (10 on pull-to-refresh). No WorkManager, no widget.
+  minutes (10 on pull-to-refresh). No WorkManager.
+- The widget (`Widget.kt`, since 0.3.0) copies a KWGT design to the
+  pixel: `res/layout/clock_widget.xml` has the measured sizes, all in dp.
+  - It is plain `RemoteViews`, not Glance. `TextClock` and `AnalogClock`
+    move by themselves in the launcher and exist only there, and Glance
+    starts a worker for every update.
+  - `ClockWidget.refresh` is run by events only: an exact `RTC` alarm on
+    the full hour (never `RTC_WAKEUP`), `WidgetEvents` for a new next
+    alarm or a set clock, a content-trigger job (`WidgetSound`) for the
+    volume, and `MainActivity.onStop`. `WidgetEvents` is disabled in the
+    manifest and enabled while a widget is placed.
+  - The dial and the two hands are vectors of one 92 dp square, because
+    `AnalogClock` lays them centre on centre. `refresh` draws the blue
+    tick of the hour and the rim icons into a bitmap on top.
+  - `TextClock` has no week number, so `refresh` writes the week into
+    the date pattern as quoted text.
+  - `outside_sky` in the core gives the sign, the rise and set lines and
+    the lit part of the moon. The lit part is from the angle between sun
+    and moon at that hour; `orbit::moon_phase` is a day off near new moon.
+  - The place is `Store.here()`: where the app last saw the phone. The
+    widget asks for no position and uses no network.
+  - Not tried on a phone by Claude. The drawings were laid over the
+    user's screenshot on the laptop and match within two pixels.
 - The phone's position is rounded to two decimals before any request.
   The manifest asks for coarse location only.
 - The phone hands the core a `Tz`: the spot's offset now and the one

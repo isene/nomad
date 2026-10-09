@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The home-screen widget, 100 dp tall. The two TextClocks and the
+     AnalogClock move by themselves. ClockWidget fills in the rest; the
+     texts written here are what the widget picker shows (Oslo, 9 October
+     2026). The clock has no second hand, so it is redrawn once a minute.
+     Every size is in dp, text too, so the look stays the same whatever
+     font size the phone is set to. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:ignore="ContentDescription,HardcodedText,SpUsage">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="100dp"
+        android:layout_gravity="center_vertical"
+        android:baselineAligned="false"
+        android:orientation="horizontal">
+
+        <!-- Left: the time, the date, the next alarm. A tap opens the clock app. -->
+        <FrameLayout
+            android:id="@+id/left"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:paddingStart="1.7dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextClock
+                    style="@style/WidgetText"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="2.7dp"
+                    android:format12Hour="HH:mm"
+                    android:format24Hour="HH:mm"
+                    android:textSize="42.7dp" />
+
+                <!-- The date and the alarm share a left edge, so they sit
+                     in a box of their own under the time. -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="-2.6dp"
+                    android:orientation="vertical">
+
+                    <TextClock
+                        android:id="@+id/date"
+                        style="@style/WidgetText"
+                        android:paddingStart="1.4dp"
+                        android:paddingEnd="1.4dp"
+                        android:format12Hour="yyyy-MM-dd EEE"
+                        android:format24Hour="yyyy-MM-dd EEE"
+                        android:textSize="11dp" />
+
+                    <LinearLayout
+                        android:id="@+id/alarm_row"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10.2dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:layout_width="10dp"
+                            android:layout_height="10dp"
+                            android:layout_marginBottom="1.3dp"
+                            android:src="@drawable/widget_alarm" />
+
+                        <TextView
+                            android:id="@+id/alarm"
+                            style="@style/WidgetText"
+                            android:layout_marginStart="1.9dp"
+                            android:text="Mon 07:00" />
+                    </LinearLayout>
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
+
+        <!-- Middle: the clock, and on top of it the marks ClockWidget
+             draws. A tap opens rpnx. -->
+        <FrameLayout
+            android:id="@+id/clock"
+            android:layout_width="92dp"
+            android:layout_height="92dp">
+
+            <AnalogClock
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:dial="@drawable/widget_dial"
+                android:hand_hour="@drawable/widget_hour"
+                android:hand_minute="@drawable/widget_minute"
+                android:hand_second="@null" />
+
+            <ImageView
+                android:id="@+id/marks"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+        </FrameLayout>
+
+        <!-- Right: the sound setting, the sun's sign, the sun and the
+             moon. A tap opens outside. -->
+        <FrameLayout
+            android:id="@+id/right"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:paddingEnd="6dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/sound"
+                    style="@style/WidgetText"
+                    android:layout_marginTop="12.2dp"
+                    android:text="NORMAL   R: 50   A:  75" />
+
+                <TextView
+                    android:id="@+id/sign"
+                    style="@style/WidgetText"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="6.5dp"
+                    android:text="LIBRA" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2.2dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="10dp"
+                        android:layout_height="10dp"
+                        android:layout_marginStart="0.7dp"
+                        android:src="@drawable/widget_sun" />
+
+                    <TextView
+                        android:id="@+id/sun"
+                        style="@style/WidgetText"
+                        android:layout_marginStart="15.3dp"
+                        android:text="07:41 - 18:28" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="3.2dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:layout_width="8.7dp"
+                        android:layout_height="8.7dp"
+                        android:layout_marginStart="1.15dp"
+                        android:src="@drawable/widget_moon" />
+
+                    <TextView
+                        android:id="@+id/moon"
+                        style="@style/WidgetText"
+                        android:layout_marginStart="16.15dp"
+                        android:text="05:56 - 17:39" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2.8dp"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/lit"
+                        style="@style/WidgetText"
+                        android:layout_marginStart="3dp"
+                        android:minWidth="22.7dp"
+                        android:text="1%" />
+
+                    <TextView
+                        android:id="@+id/phase"
+                        style="@style/WidgetText"
+                        android:text="Waning Crescent" />
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
+    </LinearLayout>
+</FrameLayout>

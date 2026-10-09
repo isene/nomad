@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No update period: ClockWidget is run by the events it needs, never by a timer. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/widget_description"
+    android:initialLayout="@layout/clock_widget"
+    android:minWidth="300dp"
+    android:minHeight="92dp"
+    android:minResizeWidth="250dp"
+    android:minResizeHeight="40dp"
+    android:previewLayout="@layout/clock_widget"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="5"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

@@ -5,6 +5,12 @@
     <!-- Coarse is enough for weather: the forecast is asked for a point on
          a one-kilometre grid. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- For the widget: to be run on the full hour, when the tick of the
+         hour moves. The alarm never wakes a sleeping phone. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- For the widget: the clock app asks for this of whoever opens its
+         list of alarms. -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
     <application
         android:allowBackup="true"
@@ -25,6 +31,37 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <receiver
+            android:name=".ClockWidget"
+            android:exported="false"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/clock_widget" />
+        </receiver>
+
+        <!-- Off until a widget is placed, so a phone without one never
+             starts the app for these. -->
+        <receiver
+            android:name=".WidgetEvents"
+            android:enabled="false"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.app.action.NEXT_ALARM_CLOCK_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".WidgetSound"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
     </application>
 
 </manifest>

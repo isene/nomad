@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">outside</string>
+    <string name="widget_name">Clock and sky</string>
+    <string name="widget_description">The time, an analog clock, the next alarm, and the day\'s sun and moon.</string>
 </resources>
