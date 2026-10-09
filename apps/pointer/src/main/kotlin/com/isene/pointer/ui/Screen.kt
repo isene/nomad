@@ -4,6 +4,12 @@ package com.isene.pointer.ui
 
 import android.app.Activity
 import android.content.Context
+import android.graphics.Typeface
+import android.graphics.text.LineBreaker
+import android.text.Layout
+import android.text.SpannableString
+import android.text.style.BackgroundColorSpan
+import android.widget.ScrollView
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -114,6 +120,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -129,6 +136,8 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.view.doOnLayout
 import coil.compose.AsyncImage
 import coil.memory.MemoryCache
 import coil.request.ImageRequest
@@ -1135,35 +1144,76 @@ private fun TextView(entry: Entry, text: String, vm: PointerViewModel, ctx: Cont
             )
         },
     ) { pad ->
-        val lines = remember(text) { text.lines() }
-        // The line a search inside the files found: the text opens there,
-        // two lines above it, and the line is marked.
-        val hit = entry.line.toInt().takeIf { it in 1..lines.size } ?: 0
-        val state = rememberLazyListState((hit - 3).coerceAtLeast(0))
-        LazyColumn(
-            Modifier.padding(pad).fillMaxSize(),
-            state,
-            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-        ) {
-            if (text.isEmpty()) {
-                item { Message(if (entry.size == 0UL) "The file is empty" else "This file is not text") }
-            } else {
-                items(lines.size) { i ->
-                    Text(
-                        lines[i],
-                        if (i + 1 == hit) {
-                            Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.tertiaryContainer)
-                        } else {
-                            Modifier
-                        },
-                        fontFamily = FontFamily.Monospace,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                if (entry.size.toLong() > TEXT_MAX) {
-                    item { Message("The file goes on. Open it in another app for the rest.") }
-                }
+        if (text.isEmpty()) {
+            Message(if (entry.size == 0UL) "The file is empty" else "This file is not text", Modifier.padding(pad))
+            return@Scaffold
+        }
+        val ink = MaterialTheme.colorScheme.onSurface.toArgb()
+        val marked = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f).toArgb()
+        val found = MaterialTheme.colorScheme.tertiaryContainer.toArgb()
+        Column(Modifier.padding(pad).fillMaxSize()) {
+            // Android's own text view: a long press marks a word, the two
+            // handles stretch the mark, and the system's bar copies it. A
+            // Compose list of lines would copy them with no line ends
+            // between, and forget the lines that scrolled away.
+            key(entry.path, text) {
+                AndroidView(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    factory = { c ->
+                        val shown = SpannableString(text.replace("\r\n", "\n"))
+                        // The line a search inside the files found is
+                        // coloured, and the text opens two lines above it.
+                        val from = lineStart(shown, entry.line.toInt())
+                        if (from >= 0) {
+                            val to = shown.indexOf('\n', from).let { if (it < 0) shown.length else it }
+                            shown.setSpan(BackgroundColorSpan(found), from, to, 0)
+                        }
+                        val page = android.widget.TextView(c).apply {
+                            setTextIsSelectable(true)
+                            typeface = Typeface.MONOSPACE
+                            textSize = 12f
+                            setTextColor(ink)
+                            highlightColor = marked
+                            // The plain line breaker: half a megabyte of
+                            // text is laid out in one go.
+                            breakStrategy = LineBreaker.BREAK_STRATEGY_SIMPLE
+                            hyphenationFrequency = Layout.HYPHENATION_FREQUENCY_NONE
+                            // A first touch must not move the page.
+                            revealOnFocusHint = false
+                            val d = resources.displayMetrics.density
+                            setPadding((12 * d).toInt(), (8 * d).toInt(), (12 * d).toInt(), (8 * d).toInt())
+                            setText(shown)
+                        }
+                        ScrollView(c).apply {
+                            addView(page)
+                            if (from > 0) {
+                                page.doOnLayout {
+                                    post {
+                                        page.layout?.let { l ->
+                                            scrollTo(0, l.getLineTop((l.getLineForOffset(from) - 2).coerceAtLeast(0)))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                )
+            }
+            if (entry.size.toLong() > TEXT_MAX) {
+                Message("The file goes on. Open it in another app for the rest.")
             }
         }
     }
+}
+
+/** Where line `n` starts in `text`, the first line being 1. Below zero
+ *  when the text has no such line. */
+internal fun lineStart(text: CharSequence, n: Int): Int {
+    if (n < 1) return -1
+    var at = 0
+    repeat(n - 1) {
+        at = text.indexOf('\n', at) + 1
+        if (at == 0) return -1
+    }
+    return at
 }
