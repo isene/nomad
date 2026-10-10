@@ -106,9 +106,9 @@ pub struct OutsideDay {
     /// The highest level of a warning that touches the day: 2 yellow,
     /// 3 orange, 4 red; 0 for none.
     pub warning: u32,
-    /// The moon's face at noon that day, as `moon_face` numbers it:
-    /// 0 new, 2 first quarter, 4 full, 6 last quarter.
-    pub moon: u32,
+    /// The outline of the moon's lit part at noon that day, as
+    /// `moon_outline` gives it: x and y by turns on a disc of radius 1.
+    pub moon: Vec<f32>,
 }
 
 /// An official weather warning for the spot (MET Norway, so Norway only).
@@ -959,7 +959,7 @@ pub fn outside_build(
             sunrise,
             sunset,
             warning,
-            moon: moon_face(sun_moon(y as i32, m as u32, d as u32, 12.0, lat, lon, zone_hours).ahead),
+            moon: moon_outline(sun_moon(y as i32, m as u32, d as u32, 12.0, lat, lon, zone_hours).ahead),
         });
     }
 
@@ -1117,6 +1117,27 @@ fn moon_face(ahead: f64) -> u32 {
         a if a < 276.0 => 6,
         _ => 7,
     }
+}
+
+/// The outline of the moon's lit part when the moon is `ahead` degrees
+/// ahead of the sun, as seen from the northern half of the Earth. The
+/// points are x and y by turns on a disc of radius 1 around (0, 0), with
+/// x to the right and y down.
+///
+/// One side of the lit part is half the disc's rim. The other is the line
+/// between light and dark: half an ellipse that starts on that rim at new
+/// moon, is straight at half moon and reaches the far rim at full moon.
+fn moon_outline(ahead: f64) -> Vec<f32> {
+    const STEPS: usize = 16;
+    // Lit on the right while the moon grows, on the left after full.
+    let side = if ahead < 180.0 { 1.0 } else { -1.0 };
+    let squeeze = ahead.to_radians().cos();
+    let point = |i: usize, wide: f64| {
+        let a = (i as f64 / STEPS as f64 - 0.5) * std::f64::consts::PI;
+        [(side * wide * a.cos()) as f32, a.sin() as f32]
+    };
+    // Down the rim, then back up the line between light and dark.
+    (0..=STEPS).map(|i| point(i, 1.0)).chain((1..STEPS).rev().map(|i| point(i, squeeze))).flatten().collect()
 }
 
 /// The sky for the widget. `hour` is the local clock, 23.5 for 23:30, and
@@ -1641,20 +1662,45 @@ mod tests {
         assert_eq!(outside_dial(None, None, Some(gfs(61)), OSLO, now)[..3], [DialHour::Cloud; 3]);
     }
 
+    /// How much of the disc an outline covers, 0 to 100, and whether the
+    /// lit part is on the right.
+    fn lit_part(outline: &[f32]) -> (f64, bool) {
+        let p: Vec<(f64, f64)> = outline.chunks(2).map(|c| (c[0] as f64, c[1] as f64)).collect();
+        let cross = |i: usize| p[i].0 * p[(i + 1) % p.len()].1 - p[(i + 1) % p.len()].0 * p[i].1;
+        let area = (0..p.len()).map(cross).sum::<f64>().abs() / 2.0;
+        (area / std::f64::consts::PI * 100.0, p.iter().map(|q| q.0).sum::<f64>() > 0.0)
+    }
+
     #[test]
-    fn each_day_has_the_moons_face() {
+    fn each_day_has_the_moon_as_it_is_lit() {
         // Sixteen days from Oslo midnight, 9 October 2026. New moon was
         // 10 October at 17:50 Oslo time, the first quarter 18 October at
         // 18:13.
         let start = iso_epoch("2026-10-08T22:00:00Z").unwrap();
         let gfs = gfs_hours(start, 16 * 24, |_| (10.0, 0.0, 2.0, 0));
         let out = outside_build(None, None, Some(gfs), None, 59.91, 10.75, OSLO, start);
-        let faces: Vec<u32> = out.days.iter().map(|d| d.moon).collect();
-        // Waning crescent, new, seven days of waxing crescent, the
-        // quarter, then waxing gibbous.
-        assert_eq!(faces, [7, 0, 1, 1, 1, 1, 1, 1, 1, 2, 3, 3, 3, 3, 3, 3]);
         assert_eq!(out.days[1].date, "2026-10-10");
         assert_eq!(out.days[9].date, "2026-10-18");
+        let lit: Vec<(f64, bool)> = out.days.iter().map(|d| lit_part(&d.moon)).collect();
+        // The day after new moon shows a sliver, not a fat crescent: a
+        // phone showed one emoji for all seven days up to the half moon.
+        let want = [2.0, 0.0, 1.0, 3.0, 8.0, 14.0, 21.0, 30.0, 38.0, 48.0, 57.0, 67.0, 75.0, 84.0, 91.0, 96.0];
+        for (day, ((got, _), want)) in out.days.iter().zip(lit.iter().zip(want)) {
+            assert!((got - want).abs() < 1.5, "{}: {got:.1} lit, not {want}", day.date);
+        }
+        // The last sliver before new moon is on the left, the growing
+        // moon on the right.
+        assert!(!lit[0].1 && lit[2..].iter().all(|l| l.1));
+
+        // The outline itself: nothing at new moon, half the disc at the
+        // quarters, all of it at full.
+        let part = |ahead| lit_part(&moon_outline(ahead));
+        assert!(part(0.0).0 < 0.01 && part(359.9).0 < 0.01);
+        assert!((part(90.0).0 - 49.7).abs() < 0.5 && part(90.0).1);
+        assert!((part(270.0).0 - 49.7).abs() < 0.5 && !part(270.0).1);
+        assert!(part(180.0).0 > 99.0);
+        // Every point is on the disc.
+        assert!(moon_outline(123.0).chunks(2).all(|c| c[0] * c[0] + c[1] * c[1] < 1.0001));
 
         // Full moon was 26 October at 05:12, the last quarter 1 November
         // at 21:28. Summer time ended on the 25th.
