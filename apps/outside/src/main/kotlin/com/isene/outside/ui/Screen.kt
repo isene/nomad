@@ -382,6 +382,9 @@ private fun DayRow(day: OutsideDay, best: Boolean, onClick: () -> Unit) {
                     Detail("★", Amber)
                 }
             }
+            // A line of its own: the two lines above can be full to the
+            // edge, and the cells beside them are always three lines tall.
+            Text(MOONS[day.moon.toInt() % 8], fontSize = 13.sp, lineHeight = 16.sp)
         }
         day.cells.forEach { DayCell(it, rainLine, Modifier.weight(1f)) }
     }
@@ -729,6 +732,9 @@ private fun agreementColor(a: Agreement): Color = when (a) {
     Agreement.MIXED -> Amber
     Agreement.SPLIT -> Red
 }
+
+/** The moon's faces as the core numbers them for a day: 0 new, 4 full. */
+private val MOONS = listOf("🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘")
 
 private fun symbol(sky: Sky, night: Boolean): String = when (sky) {
     Sky.CLEAR -> if (night) "🌙" else "☀️"

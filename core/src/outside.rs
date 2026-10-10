@@ -106,6 +106,9 @@ pub struct OutsideDay {
     /// The highest level of a warning that touches the day: 2 yellow,
     /// 3 orange, 4 red; 0 for none.
     pub warning: u32,
+    /// The moon's face at noon that day, as `moon_face` numbers it:
+    /// 0 new, 2 first quarter, 4 full, 6 last quarter.
+    pub moon: u32,
 }
 
 /// An official weather warning for the spot (MET Norway, so Norway only).
@@ -956,6 +959,7 @@ pub fn outside_build(
             sunrise,
             sunset,
             warning,
+            moon: moon_face(sun_moon(y as i32, m as u32, d as u32, 12.0, lat, lon, zone_hours).ahead),
         });
     }
 
@@ -1071,6 +1075,50 @@ fn along_sun_path(ra: f64, dec: f64) -> f64 {
     (ra.sin() * tilt.cos() + dec.tan() * tilt.sin()).atan2(ra.cos()).to_degrees().rem_euclid(360.0)
 }
 
+/// The moon's eight faces, in the order it goes through them.
+const PHASES: [&str; 8] = [
+    "New Moon", "Waxing Crescent", "First Quarter", "Waxing Gibbous",
+    "Full Moon", "Waning Gibbous", "Last Quarter", "Waning Crescent",
+];
+
+/// Where the sun and the moon stand at one hour.
+struct SunMoon {
+    /// Right ascension and declination, in degrees.
+    sun: (f64, f64),
+    moon: (f64, f64),
+    /// How far along its yearly path the sun is.
+    sun_at: f64,
+    /// How far the moon is ahead of the sun on that path: 0 at new moon,
+    /// 180 at full.
+    ahead: f64,
+}
+
+/// `hour` is the local clock, 23.5 for 23:30, and `tz_hours` is that
+/// clock's distance east of UTC.
+fn sun_moon(year: i32, month: u32, day: u32, hour: f64, lat: f64, lon: f64, tz_hours: f64) -> SunMoon {
+    let (_, bodies) = orbit::sky_at(year, month, day, hour, lat, lon, tz_hours);
+    let at = |name: &str| bodies.iter().find(|b| b.0 == name).map(|b| (b.1, b.2)).unwrap_or((0.0, 0.0));
+    let (sun, moon) = (at("sun"), at("moon"));
+    let sun_at = along_sun_path(sun.0, sun.1);
+    SunMoon { sun, moon, sun_at, ahead: (along_sun_path(moon.0, moon.1) - sun_at).rem_euclid(360.0) }
+}
+
+/// Which of the `PHASES` the moon shows when it is `ahead` degrees ahead
+/// of the sun. The moon gains 12 degrees a day, so 6 to each side of new,
+/// half and full is the day itself.
+fn moon_face(ahead: f64) -> u32 {
+    match ahead {
+        a if !(6.0..354.0).contains(&a) => 0,
+        a if a < 84.0 => 1,
+        a if a < 96.0 => 2,
+        a if a < 174.0 => 3,
+        a if a < 186.0 => 4,
+        a if a < 264.0 => 5,
+        a if a < 276.0 => 6,
+        _ => 7,
+    }
+}
+
 /// The sky for the widget. `hour` is the local clock, 23.5 for 23:30, and
 /// `tz_hours` is that clock's distance east of UTC.
 ///
@@ -1079,25 +1127,8 @@ fn along_sun_path(ra: f64, dec: f64) -> f64 {
 /// day off near new moon.
 #[uniffi::export]
 pub fn outside_sky(year: i32, month: u32, day: u32, hour: f64, lat: f64, lon: f64, tz_hours: f64) -> Almanac {
-    let (_, bodies) = orbit::sky_at(year, month, day, hour, lat, lon, tz_hours);
-    let at = |name: &str| bodies.iter().find(|b| b.0 == name).map(|b| (b.1, b.2)).unwrap_or((0.0, 0.0));
-    let (sun_ra, sun_dec) = at("sun");
-    let (moon_ra, moon_dec) = at("moon");
-
-    let sun_at = along_sun_path(sun_ra, sun_dec);
-    // How far the moon is ahead of the sun: 0 at new moon, 180 at full.
-    let ahead = (along_sun_path(moon_ra, moon_dec) - sun_at).rem_euclid(360.0);
-    // The moon gains 12 degrees a day, so 6 to each side is the day itself.
-    let phase = match ahead {
-        a if !(6.0..354.0).contains(&a) => "New Moon",
-        a if a < 84.0 => "Waxing Crescent",
-        a if a < 96.0 => "First Quarter",
-        a if a < 174.0 => "Waxing Gibbous",
-        a if a < 186.0 => "Full Moon",
-        a if a < 264.0 => "Waning Gibbous",
-        a if a < 276.0 => "Last Quarter",
-        _ => "Waning Crescent",
-    };
+    let SunMoon { sun: (sun_ra, sun_dec), moon: (moon_ra, moon_dec), sun_at, ahead } =
+        sun_moon(year, month, day, hour, lat, lon, tz_hours);
     let (d1, d2) = (sun_dec.to_radians(), moon_dec.to_radians());
     let apart = d1.sin() * d2.sin() + d1.cos() * d2.cos() * (sun_ra - moon_ra).to_radians().cos();
 
@@ -1112,7 +1143,7 @@ pub fn outside_sky(year: i32, month: u32, day: u32, hour: f64, lat: f64, lon: f6
         sun: line(&sun),
         moon: line(&orbit::moon_times(year, month, day, lat, lon, tz_hours)),
         lit: ((1.0 - apart) * 50.0).round() as u32,
-        phase: phase.to_string(),
+        phase: PHASES[moon_face(ahead) as usize].to_string(),
         sunrise,
         sunset,
     }
@@ -1608,6 +1639,28 @@ mod tests {
         assert_eq!(hour3(yr("cloudy", 0.0), storm("CLOUDY", 0.0), gfs(3)), DialHour::Cloud);
         // The hours before it have only GFS, overcast and dry.
         assert_eq!(outside_dial(None, None, Some(gfs(61)), OSLO, now)[..3], [DialHour::Cloud; 3]);
+    }
+
+    #[test]
+    fn each_day_has_the_moons_face() {
+        // Sixteen days from Oslo midnight, 9 October 2026. New moon was
+        // 10 October at 17:50 Oslo time, the first quarter 18 October at
+        // 18:13.
+        let start = iso_epoch("2026-10-08T22:00:00Z").unwrap();
+        let gfs = gfs_hours(start, 16 * 24, |_| (10.0, 0.0, 2.0, 0));
+        let out = outside_build(None, None, Some(gfs), None, 59.91, 10.75, OSLO, start);
+        let faces: Vec<u32> = out.days.iter().map(|d| d.moon).collect();
+        // Waning crescent, new, seven days of waxing crescent, the
+        // quarter, then waxing gibbous.
+        assert_eq!(faces, [7, 0, 1, 1, 1, 1, 1, 1, 1, 2, 3, 3, 3, 3, 3, 3]);
+        assert_eq!(out.days[1].date, "2026-10-10");
+        assert_eq!(out.days[9].date, "2026-10-18");
+
+        // Full moon was 26 October at 05:12, the last quarter 1 November
+        // at 21:28. Summer time ended on the 25th.
+        let face = |month, day| moon_face(sun_moon(2026, month, day, 12.0, 59.91, 10.75, 1.0).ahead);
+        assert_eq!((face(10, 25), face(10, 26), face(10, 27)), (3, 4, 5));
+        assert_eq!((face(10, 31), face(11, 1), face(11, 2)), (5, 6, 7));
     }
 
     #[test]
