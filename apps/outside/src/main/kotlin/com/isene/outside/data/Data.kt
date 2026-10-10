@@ -133,12 +133,20 @@ class Store(ctx: Context) {
 
     fun setTap(key: String, app: String) = prefs.edit().putString(key, app).apply()
 
-    /** The folder whose waiting messages the widget marks, as the address
-     *  the system's folder picker gave. Empty until one is chosen: the
-     *  widget then shows no mark and looks nowhere. */
-    fun inbox(): String = prefs.getString("inbox", "") ?: ""
+    /** The address the widget asks whether messages wait: the one of the
+     *  fleet connector, pasted in once. Empty until then: the widget
+     *  shows no mark and asks nobody. Whoever has it can read and send
+     *  fleet messages, so it is never shown again, and the backup rules
+     *  keep these settings on the phone. */
+    fun relay(): String = prefs.getString("relay", "") ?: ""
 
-    fun setInbox(folder: String) = prefs.edit().putString("inbox", folder).apply()
+    fun setRelay(url: String) = prefs.edit().putString("relay", url).apply()
+
+    /** Whether messages waited when the server was last asked. Kept, so
+     *  that the widget is right when Android starts the app afresh. */
+    fun waits(): Boolean = prefs.getBoolean("waits", false)
+
+    fun setWaits(yes: Boolean) = prefs.edit().putBoolean("waits", yes).apply()
 }
 
 /** Every app with an icon in the launcher, sorted by name: its

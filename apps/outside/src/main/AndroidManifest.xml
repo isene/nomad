@@ -11,8 +11,9 @@
     <!-- For the widget: the clock app asks for this of whoever opens its
          list of alarms. -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
-    <!-- For the widget's dot: to keep a watch on one folder while the dot
-         is switched on, and to start that watch again with the phone. -->
+    <!-- For the widget's dot: to ask the fleet server once a minute while
+         the dot is switched on and the screen is lit, and to start that
+         watch again with the phone. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -85,7 +86,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Watches one folder for waiting messages and marks them on the home-screen widget" />
+                android:value="Asks one server whether messages wait and marks them on the home-screen widget" />
         </service>
     </application>
 

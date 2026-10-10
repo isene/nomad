@@ -23,17 +23,16 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.media.AudioManager
-import android.net.Uri
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.IBinder
-import android.os.Looper
 import android.os.PowerManager
 import android.provider.AlarmClock
-import android.provider.DocumentsContract
 import android.provider.Settings
 import android.view.View
 import android.widget.RemoteViews
 import com.isene.outside.data.Cache
+import com.isene.outside.data.Net
 import com.isene.outside.data.SOURCES
 import com.isene.outside.data.Store
 import com.isene.outside.data.tzOf
@@ -89,11 +88,6 @@ class ClockWidget : AppWidgetProvider() {
 
     companion object {
         private const val SOUND_JOB = 1
-
-        /** Whether the widget shows the dot now. Null until it has been
-         *  drawn in this run of the app. */
-        var dot: Boolean? = null
-            private set
 
         // The dial, in dp: its square, its radius, and how far out the
         // icons on the rim sit. res/drawable/widget_dial.xml has the same.
@@ -178,8 +172,7 @@ class ClockWidget : AppWidgetProvider() {
                 if (bodies.all { b -> b == null }) null
                 else outsideDial(bodies[0], bodies[1], bodies[2], tzOf(""), now.toEpochSecond())
             } ?: emptyList()
-            val waits = waiting(ctx, store.inbox())
-            dot = waits
+            val waits = store.relay().isNotEmpty() && store.waits()
             views.setImageViewBitmap(R.id.marks, marks(ctx, dial, alarm, sky.takeIf { spot != null }, waits))
 
             for (part in Tap.entries) {
@@ -192,7 +185,7 @@ class ClockWidget : AppWidgetProvider() {
             val nextHour = now.truncatedTo(ChronoUnit.HOURS).plusHours(1)
             alarms.setExact(AlarmManager.RTC, nextHour.toInstant().toEpochMilli(), hourly(ctx))
             watchSound(ctx, again = false)
-            if (store.inbox().isNotEmpty()) InboxWatch.start(ctx)
+            if (store.relay().isNotEmpty()) InboxWatch.start(ctx)
         }
 
         /** Ask to be run when the volume or the ringer mode changes. Such
@@ -238,26 +231,6 @@ class ClockWidget : AppWidgetProvider() {
             .addCategory(Intent.CATEGORY_LAUNCHER)
             .addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
             .setClassName(pkg, activity)
-
-        /** Whether a message waits in the folder chosen in the app: a file
-         *  there named *.msg. One listing of that folder a run, and none
-         *  at all while no folder is chosen. */
-        fun waiting(ctx: Context, folder: String): Boolean {
-            if (folder.isEmpty()) return false
-            return try {
-                val tree = Uri.parse(folder)
-                val files = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-                val name = arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
-                ctx.contentResolver.query(files, name, null, null, null)?.use { rows ->
-                    var found = false
-                    while (!found && rows.moveToNext()) found = rows.getString(0)?.endsWith(".msg") == true
-                    found
-                } ?: false
-            } catch (_: Exception) {
-                // The folder is gone, or the leave to read it was taken back.
-                false
-            }
-        }
 
         /** What the dial cannot draw by itself: the ring between two hour
          *  ticks in the colour of that hour's weather (blue for rain, grey
@@ -342,29 +315,36 @@ class WidgetSound : JobService() {
 }
 
 /**
- * Keeps the widget's dot true to the folder within seconds. Android tells
- * no app when another app writes a file, so this looks: one listing of the
- * folder every five seconds while the screen is on, and none while it is
- * off. The widget is drawn again only when the answer has changed.
+ * Keeps the widget's dot true within about a minute. It asks the fleet
+ * server how many messages wait: one small request a minute while the
+ * screen is on, one at once when the screen comes on, and none while it
+ * is off. The widget is drawn again only when the answer has changed.
+ * With no answer (no network) the dot stays as it was.
  *
- * It is up only while a folder is chosen and a widget is placed. Android
+ * It is up only while an address is set and a widget is placed. Android
  * lets a service stay up when it carries a notice. The app never asks for
  * leave to show notices, so that notice stays out of sight.
  */
 class InboxWatch : Service() {
-    private val beat = Handler(Looper.getMainLooper())
+    // The network may not be used on the main thread.
+    private val thread = HandlerThread("inbox").apply { start() }
+    private val beat = Handler(thread.looper)
     private lateinit var store: Store
 
     private val look = object : Runnable {
         override fun run() {
-            val folder = store.inbox()
-            if (folder.isEmpty()) return stopSelf()
-            if (ClockWidget.waiting(this@InboxWatch, folder) != ClockWidget.dot) ClockWidget.refresh(this@InboxWatch)
+            val url = store.relay()
+            if (url.isEmpty()) return stopSelf()
+            val waits = ask(url)?.let { it > 0 }
+            if (waits != null && waits != store.waits()) {
+                store.setWaits(waits)
+                ClockWidget.refresh(this@InboxWatch)
+            }
             beat.postDelayed(this, EVERY_MS)
         }
     }
 
-    /** Look at once when the screen comes on, and rest when it goes off. */
+    /** Ask at once when the screen comes on, and rest when it goes off. */
     private val screen = object : BroadcastReceiver() {
         override fun onReceive(ctx: Context, intent: Intent) {
             beat.removeCallbacks(look)
@@ -389,25 +369,36 @@ class InboxWatch : Service() {
             return stopSelf()
         }
         alive = true
+        // The receiver runs on the watch's own thread, like the beat.
         val onAndOff = IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_SCREEN_OFF) }
-        registerReceiver(screen, onAndOff, RECEIVER_NOT_EXPORTED)
-        if (getSystemService(PowerManager::class.java).isInteractive) look.run()
+        registerReceiver(screen, onAndOff, null, beat, RECEIVER_NOT_EXPORTED)
+        if (getSystemService(PowerManager::class.java).isInteractive) beat.post(look)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
 
     override fun onDestroy() {
-        beat.removeCallbacks(look)
         if (alive) unregisterReceiver(screen)
         alive = false
+        beat.removeCallbacksAndMessages(null)
+        thread.quitSafely()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
         private const val CHANNEL = "watch"
-        private const val EVERY_MS = 5_000L
+        private const val EVERY_MS = 60_000L
         private var alive = false
+
+        /** How many messages wait, as the server at this address says.
+         *  Null when it gives no number: no network, or a wrong address.
+         *  Blocking, so never on the main thread. */
+        fun ask(url: String): Int? = try {
+            Net.get(url + (if ('?' in url) "&" else "?") + "waiting")?.trim()?.toIntOrNull()
+        } catch (_: Exception) {
+            null
+        }
 
         /** Start the watch if it is not up. Android allows that from the
          *  open app, on the full hour, after an update and after a start
