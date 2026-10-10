@@ -1,6 +1,8 @@
 package com.isene.outside.ui
 
 import android.Manifest
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -198,6 +200,7 @@ fun OutsideScreen(vm: OutsideViewModel) {
                         Text("Widget: choose what a tap opens")
                     }
                 }
+                item { InboxRow() }
             }
         }
     }
@@ -213,6 +216,41 @@ fun OutsideScreen(vm: OutsideViewModel) {
         )
     }
     if (taps) TapSheet(onClose = { taps = false })
+}
+
+/** The folder the widget looks in for waiting messages (files named
+ *  *.msg). The system's folder picker gives leave to read that one folder.
+ *  A tap while a folder is chosen forgets it and gives the leave back. */
+@Composable
+private fun InboxRow() {
+    val ctx = LocalContext.current
+    val store = remember { Store(ctx) }
+    var folder by remember { mutableStateOf(store.inbox()) }
+    val read = Intent.FLAG_GRANT_READ_URI_PERMISSION
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null) {
+            ctx.contentResolver.takePersistableUriPermission(uri, read)
+            store.setInbox(uri.toString())
+            folder = uri.toString()
+        }
+    }
+    TextButton(
+        onClick = {
+            if (folder.isEmpty()) {
+                pick.launch(null)
+            } else {
+                runCatching { ctx.contentResolver.releasePersistableUriPermission(Uri.parse(folder), read) }
+                store.setInbox("")
+                folder = ""
+            }
+        },
+        Modifier.padding(horizontal = 4.dp),
+    ) {
+        Text(
+            if (folder.isEmpty()) "Widget: show a dot when messages wait"
+            else "Widget: the messages dot is on. Tap to turn it off",
+        )
+    }
 }
 
 /** Shown while there is nothing to show: no place yet, or no forecast. */
