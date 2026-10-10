@@ -175,7 +175,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
   so had the six days after it. `moon_face` still names the widget's
   phase. At a large font the two lines above the moon can fill the 88 dp
   column, and the cells beside it are always three lines tall, so that
-  line costs no height.
+  line costs no height. Since 0.3.10 the moon is drawn 8 dp lower than
+  it is laid out (`Modifier.offset`): it stood against the dot above
+  it. The row keeps its height.
 - The widget (`Widget.kt`, since 0.3.0) copies a KWGT design to the
   pixel: `res/layout/clock_widget.xml` has the measured sizes, all in dp.
   - It is plain `RemoteViews`, not Glance. `TextClock` and `AnalogClock`
