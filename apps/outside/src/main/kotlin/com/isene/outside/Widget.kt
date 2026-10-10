@@ -38,6 +38,17 @@ import uniffi.fe2o3_mobile_core.DialHour
 import uniffi.fe2o3_mobile_core.outsideDial
 import uniffi.fe2o3_mobile_core.outsideSky
 
+/** The three parts of the widget that take a tap, and the name of what
+ *  each opens until another app is chosen for it in outside. */
+enum class Tap(val view: Int, val title: String, val usual: String) {
+    LEFT(R.id.left, "Left part", "The clock app's alarms"),
+    CLOCK(R.id.clock, "Clock", "rpnx"),
+    RIGHT(R.id.right, "Right part", "outside");
+
+    /** Where Store keeps the app chosen for this part. */
+    val key get() = "tap_${name.lowercase()}"
+}
+
 /**
  * The home-screen widget: the time, the date and the next alarm, an analog
  * clock, and the sound setting with the day's sun and moon.
@@ -120,7 +131,8 @@ class ClockWidget : AppWidgetProvider() {
 
             // Sunrise and the like need a place. The sign and the moon's
             // face are the same everywhere.
-            val spot = Store(ctx).here()
+            val store = Store(ctx)
+            val spot = store.here()
             val sky = outsideSky(
                 now.year, now.monthValue.toUInt(), now.dayOfMonth.toUInt(), now.hour + now.minute / 60.0,
                 spot?.lat ?: 0.0, spot?.lon ?: 0.0, now.offset.totalSeconds / 3600.0,
@@ -143,9 +155,9 @@ class ClockWidget : AppWidgetProvider() {
             } ?: emptyList()
             views.setImageViewBitmap(R.id.marks, marks(ctx, dial, alarm, sky.takeIf { spot != null }))
 
-            views.setOnClickPendingIntent(R.id.left, open(ctx, Intent(AlarmClock.ACTION_SHOW_ALARMS)))
-            views.setOnClickPendingIntent(R.id.clock, open(ctx, app("com.isene.rpnx", "com.isene.rpnx.MainActivity")))
-            views.setOnClickPendingIntent(R.id.right, open(ctx, app(ctx.packageName, MainActivity::class.java.name)))
+            for (part in Tap.entries) {
+                views.setOnClickPendingIntent(part.view, open(ctx, target(ctx, part, store.tap(part.key))))
+            }
             mgr.updateAppWidget(ids, views)
 
             // RTC and not RTC_WAKEUP: a sleeping phone is left asleep, and
@@ -181,6 +193,17 @@ class ClockWidget : AppWidgetProvider() {
             ctx, 0, intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+
+        /** What a tap on a part opens: the app chosen for it, else what
+         *  that part has always opened. */
+        private fun target(ctx: Context, part: Tap, chosen: String): Intent {
+            ComponentName.unflattenFromString(chosen)?.let { return app(it.packageName, it.className) }
+            return when (part) {
+                Tap.LEFT -> Intent(AlarmClock.ACTION_SHOW_ALARMS)
+                Tap.CLOCK -> app("com.isene.rpnx", "com.isene.rpnx.MainActivity")
+                Tap.RIGHT -> app(ctx.packageName, MainActivity::class.java.name)
+            }
+        }
 
         /** An app opened the way its icon opens it: back where it was left. */
         private fun app(pkg: String, activity: String) = Intent(Intent.ACTION_MAIN)

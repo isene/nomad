@@ -189,8 +189,16 @@ when building the core. Same rule as the rest of Fe₂O₃.
     That is three file reads and one parse a run; the widget never
     fetches. Geir asked for the ring on 2026-10-10 (0.3.0 had one blue
     tick for the hour now, 0.3.1 blue ticks for rain).
-  - The widget has no settings screen and gets none: Geir asks for a
-    change, and it goes into the code.
+  - The widget's look has no settings screen and gets none: Geir asks
+    for a change, and it goes into the code.
+  - The one setting is the app each of the three parts opens on a tap
+    (`Tap`; Geir asked for it on 2026-10-10, 0.3.3). `Store.tap` keeps
+    a "package/activity" under `tap_left`, `tap_clock` and `tap_right`,
+    empty for the app that part came with. `TapSheet`, opened from the
+    bottom of the screen, picks from `launchable`, which needs the
+    `<queries>` entry in the manifest. `refresh` reads the three from
+    the prefs it has open already. The widget takes a new choice in
+    `MainActivity.onStop`, so nothing refreshes it from the sheet.
   - `TextClock` has no week number, so `refresh` writes the week into
     the date pattern as quoted text.
   - `outside_sky` in the core gives the sign, the rise and set lines and

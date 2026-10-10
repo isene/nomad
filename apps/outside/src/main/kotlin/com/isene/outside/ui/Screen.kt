@@ -47,6 +47,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -56,6 +57,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -63,12 +65,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.isene.outside.OutsideViewModel
+import com.isene.outside.Tap
 import com.isene.outside.UiState
+import com.isene.outside.data.Store
+import com.isene.outside.data.launchable
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import uniffi.fe2o3_mobile_core.Agreement
 import uniffi.fe2o3_mobile_core.Outside
 import uniffi.fe2o3_mobile_core.OutsideDay
@@ -94,6 +101,7 @@ private val Red = Color(0xFFD9534F)
 fun OutsideScreen(vm: OutsideViewModel) {
     val ui by vm.ui.collectAsState()
     var places by rememberSaveable { mutableStateOf(false) }
+    var taps by rememberSaveable { mutableStateOf(false) }
     // The date of the day whose hours are open.
     var open by rememberSaveable { mutableStateOf("") }
 
@@ -185,6 +193,11 @@ fun OutsideScreen(vm: OutsideViewModel) {
                     }
                     item { Footer(ui.fetched) }
                 }
+                item {
+                    TextButton(onClick = { taps = true }, Modifier.padding(horizontal = 4.dp)) {
+                        Text("Widget: choose what a tap opens")
+                    }
+                }
             }
         }
     }
@@ -199,6 +212,7 @@ fun OutsideScreen(vm: OutsideViewModel) {
             },
         )
     }
+    if (taps) TapSheet(onClose = { taps = false })
 }
 
 /** Shown while there is nothing to show: no place yet, or no forecast. */
@@ -457,9 +471,52 @@ private fun PlaceSheet(ui: UiState, vm: OutsideViewModel, onClose: () -> Unit) {
     }
 }
 
+/** The app a tap on each of the widget's three parts opens. A part is
+ *  picked first, then an app for it. The widget takes the choice when
+ *  outside is left, as it takes everything else. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TapSheet(onClose: () -> Unit) {
+    val ctx = LocalContext.current
+    val store = remember { Store(ctx) }
+    var chosen by remember { mutableStateOf(Tap.entries.associateWith { store.tap(it.key) }) }
+    // The part an app is being picked for.
+    var picking by remember { mutableStateOf<Tap?>(null) }
+    val apps by produceState(emptyList<Pair<String, String>>()) {
+        value = withContext(Dispatchers.IO) { launchable(ctx) }
+    }
+    ModalBottomSheet(
+        onDismissRequest = onClose,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    ) {
+        LazyColumn(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+            val part = picking
+            if (part == null) {
+                item { Small("A tap on the widget opens", Modifier.padding(bottom = 4.dp)) }
+                items(Tap.entries) { p ->
+                    val app = chosen[p].orEmpty()
+                    val name = if (app.isEmpty()) p.usual else apps.firstOrNull { it.first == app }?.second ?: app
+                    PlaceRow(null, p.title, name) { picking = p }
+                }
+            } else {
+                fun pick(app: String) {
+                    store.setTap(part.key, app)
+                    chosen = chosen + (part to app)
+                    picking = null
+                }
+                item { Small("${part.title} opens", Modifier.padding(bottom = 4.dp)) }
+                item { PlaceRow(null, part.usual, "As it came") { pick("") } }
+                items(apps, key = { it.first }) { (id, name) ->
+                    PlaceRow(null, name, if (id == chosen[part]) "Chosen now" else "") { pick(id) }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun PlaceRow(
-    icon: ImageVector,
+    icon: ImageVector?,
     name: String,
     region: String,
     onRemove: (() -> Unit)? = null,
@@ -469,8 +526,10 @@ private fun PlaceRow(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.width(14.dp))
+        if (icon != null) {
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(14.dp))
+        }
         Column(Modifier.weight(1f)) {
             Text(name, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (region.isNotEmpty()) Small(region)
