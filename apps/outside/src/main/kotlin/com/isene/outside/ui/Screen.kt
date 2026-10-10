@@ -66,6 +66,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.isene.outside.ClockWidget
+import com.isene.outside.InboxWatch
 import com.isene.outside.OutsideViewModel
 import com.isene.outside.Tap
 import com.isene.outside.UiState
@@ -220,7 +222,8 @@ fun OutsideScreen(vm: OutsideViewModel) {
 
 /** The folder the widget looks in for waiting messages (files named
  *  *.msg). The system's folder picker gives leave to read that one folder.
- *  A tap while a folder is chosen forgets it and gives the leave back. */
+ *  A tap while a folder is chosen forgets it and gives the leave back.
+ *  The widget is drawn at once, which also starts the watch. */
 @Composable
 private fun InboxRow() {
     val ctx = LocalContext.current
@@ -232,6 +235,7 @@ private fun InboxRow() {
             ctx.contentResolver.takePersistableUriPermission(uri, read)
             store.setInbox(uri.toString())
             folder = uri.toString()
+            ClockWidget.refresh(ctx)
         }
     }
     TextButton(
@@ -242,6 +246,8 @@ private fun InboxRow() {
                 runCatching { ctx.contentResolver.releasePersistableUriPermission(Uri.parse(folder), read) }
                 store.setInbox("")
                 folder = ""
+                InboxWatch.stop(ctx)
+                ClockWidget.refresh(ctx)
             }
         },
         Modifier.padding(horizontal = 4.dp),

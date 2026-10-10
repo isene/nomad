@@ -1,7 +1,11 @@
 package com.isene.outside
 
 import android.app.AlarmManager
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
+import android.app.Service
 import android.app.job.JobInfo
 import android.app.job.JobParameters
 import android.app.job.JobScheduler
@@ -12,12 +16,18 @@ import android.content.BroadcastReceiver
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.media.AudioManager
 import android.net.Uri
+import android.os.Handler
+import android.os.IBinder
+import android.os.Looper
+import android.os.PowerManager
 import android.provider.AlarmClock
 import android.provider.DocumentsContract
 import android.provider.Settings
@@ -59,6 +69,8 @@ enum class Tap(val view: Int, val title: String, val usual: String) {
  * the full hour and when something the widget shows has changed: the next
  * alarm, the volume, the clock's zone, the place or its forecast. It has
  * no timer of its own, and nothing here runs while no widget is placed.
+ * The one thing that stays up is InboxWatch, and only while the dot for
+ * waiting messages is switched on in the app.
  *
  * It is plain RemoteViews and not Glance: TextClock and AnalogClock exist
  * only there, and Glance starts a worker for every update.
@@ -70,12 +82,18 @@ class ClockWidget : AppWidgetProvider() {
 
     override fun onDisabled(ctx: Context) {
         listen(ctx, false)
+        InboxWatch.stop(ctx)
         ctx.getSystemService(AlarmManager::class.java).cancel(hourly(ctx))
         ctx.getSystemService(JobScheduler::class.java).cancel(SOUND_JOB)
     }
 
     companion object {
         private const val SOUND_JOB = 1
+
+        /** Whether the widget shows the dot now. Null until it has been
+         *  drawn in this run of the app. */
+        var dot: Boolean? = null
+            private set
 
         // The dial, in dp: its square, its radius, and how far out the
         // icons on the rim sit. res/drawable/widget_dial.xml has the same.
@@ -160,10 +178,9 @@ class ClockWidget : AppWidgetProvider() {
                 if (bodies.all { b -> b == null }) null
                 else outsideDial(bodies[0], bodies[1], bodies[2], tzOf(""), now.toEpochSecond())
             } ?: emptyList()
-            views.setImageViewBitmap(
-                R.id.marks,
-                marks(ctx, dial, alarm, sky.takeIf { spot != null }, waiting(ctx, store.inbox())),
-            )
+            val waits = waiting(ctx, store.inbox())
+            dot = waits
+            views.setImageViewBitmap(R.id.marks, marks(ctx, dial, alarm, sky.takeIf { spot != null }, waits))
 
             for (part in Tap.entries) {
                 views.setOnClickPendingIntent(part.view, open(ctx, target(ctx, part, store.tap(part.key))))
@@ -175,6 +192,7 @@ class ClockWidget : AppWidgetProvider() {
             val nextHour = now.truncatedTo(ChronoUnit.HOURS).plusHours(1)
             alarms.setExact(AlarmManager.RTC, nextHour.toInstant().toEpochMilli(), hourly(ctx))
             watchSound(ctx, again = false)
+            if (store.inbox().isNotEmpty()) InboxWatch.start(ctx)
         }
 
         /** Ask to be run when the volume or the ringer mode changes. Such
@@ -224,7 +242,7 @@ class ClockWidget : AppWidgetProvider() {
         /** Whether a message waits in the folder chosen in the app: a file
          *  there named *.msg. One listing of that folder a run, and none
          *  at all while no folder is chosen. */
-        private fun waiting(ctx: Context, folder: String): Boolean {
+        fun waiting(ctx: Context, folder: String): Boolean {
             if (folder.isEmpty()) return false
             return try {
                 val tree = Uri.parse(folder)
@@ -307,7 +325,7 @@ class ClockWidget : AppWidgetProvider() {
 }
 
 /** The full hour, and the changes the widget shows: a new next alarm, a
- *  clock that was set, another zone, this app updated. */
+ *  clock that was set, another zone, this app updated, the phone started. */
 class WidgetEvents : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) = ClockWidget.refresh(ctx)
 }
@@ -321,4 +339,90 @@ class WidgetSound : JobService() {
     }
 
     override fun onStopJob(params: JobParameters) = false
+}
+
+/**
+ * Keeps the widget's dot true to the folder within seconds. Android tells
+ * no app when another app writes a file, so this looks: one listing of the
+ * folder every five seconds while the screen is on, and none while it is
+ * off. The widget is drawn again only when the answer has changed.
+ *
+ * It is up only while a folder is chosen and a widget is placed. Android
+ * lets a service stay up when it carries a notice. The app never asks for
+ * leave to show notices, so that notice stays out of sight.
+ */
+class InboxWatch : Service() {
+    private val beat = Handler(Looper.getMainLooper())
+    private lateinit var store: Store
+
+    private val look = object : Runnable {
+        override fun run() {
+            val folder = store.inbox()
+            if (folder.isEmpty()) return stopSelf()
+            if (ClockWidget.waiting(this@InboxWatch, folder) != ClockWidget.dot) ClockWidget.refresh(this@InboxWatch)
+            beat.postDelayed(this, EVERY_MS)
+        }
+    }
+
+    /** Look at once when the screen comes on, and rest when it goes off. */
+    private val screen = object : BroadcastReceiver() {
+        override fun onReceive(ctx: Context, intent: Intent) {
+            beat.removeCallbacks(look)
+            if (intent.action == Intent.ACTION_SCREEN_ON) look.run()
+        }
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        store = Store(this)
+        getSystemService(NotificationManager::class.java)
+            .createNotificationChannel(NotificationChannel(CHANNEL, "Messages dot", NotificationManager.IMPORTANCE_MIN))
+        val notice = Notification.Builder(this, CHANNEL)
+            .setSmallIcon(R.drawable.widget_alarm)
+            .setContentTitle("Watching for messages")
+            .build()
+        try {
+            startForeground(1, notice, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } catch (_: Exception) {
+            // Android brought the service back at a moment when it may not
+            // stay up. The next full hour starts it again.
+            return stopSelf()
+        }
+        alive = true
+        val onAndOff = IntentFilter(Intent.ACTION_SCREEN_ON).apply { addAction(Intent.ACTION_SCREEN_OFF) }
+        registerReceiver(screen, onAndOff, RECEIVER_NOT_EXPORTED)
+        if (getSystemService(PowerManager::class.java).isInteractive) look.run()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int) = START_STICKY
+
+    override fun onDestroy() {
+        beat.removeCallbacks(look)
+        if (alive) unregisterReceiver(screen)
+        alive = false
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    companion object {
+        private const val CHANNEL = "watch"
+        private const val EVERY_MS = 5_000L
+        private var alive = false
+
+        /** Start the watch if it is not up. Android allows that from the
+         *  open app, on the full hour, after an update and after a start
+         *  of the phone. At other moments it refuses, and the next of
+         *  those moments starts it. */
+        fun start(ctx: Context) {
+            if (alive) return
+            try {
+                ctx.startForegroundService(Intent(ctx, InboxWatch::class.java))
+            } catch (_: Exception) {
+            }
+        }
+
+        fun stop(ctx: Context) {
+            ctx.stopService(Intent(ctx, InboxWatch::class.java))
+        }
+    }
 }
