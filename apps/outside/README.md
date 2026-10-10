@@ -14,7 +14,8 @@ once.
   red when they disagree. The open day says on what ("Rain: 0 to 14 mm").
 - A score from 0 to 10 for being outside, the day's best stretch
   ("13 to 17"), and a star on the best of the next seven days.
-- Sunrise and sunset for each day.
+- Sunrise and sunset for each day, and the moon's phase as a small moon
+  under the day's name.
 - Search for a place, follow the phone's position, save the places you
   come back to.
 - The last forecast stays on the phone, so the app opens with numbers
