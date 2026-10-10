@@ -1,5 +1,7 @@
 # pointer
 
+**[Download for Android (APK)](https://github.com/isene/nomad/releases/download/apk/pointer.apk)** · [how to install](https://isene.org/nomad/#get)
+
 <img src="logo.svg" width="96" align="right" alt="pointer">
 
 A file manager for the phone, after the

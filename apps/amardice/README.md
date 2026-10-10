@@ -4,6 +4,8 @@
 
 # amardice
 
+**[Download for Android (APK)](https://github.com/isene/nomad/releases/download/apk/amardice.apk)** · [how to install](https://isene.org/nomad/#get)
+
 ![version](https://img.shields.io/badge/version-0.1.4-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 An O6 dice roller for the [Amar RPG](https://d6gaming.org) — part of the [nomad](../../) mobile suite.

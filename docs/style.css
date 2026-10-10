@@ -132,6 +132,22 @@ section .section-intro { color: var(--fg-dim); max-width: 740px; margin-bottom: 
 .card-meta img { height: 20px; }
 .card-meta .repo { color: var(--fg-mute); font-size: 0.82rem; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
 
+/* Download */
+.badges { margin-top: 2rem; margin-bottom: 0; }
+#get { padding-top: 1rem; }
+.steps { max-width: 740px; margin: 1rem 0 1rem 1.4rem; }
+.steps li { margin-bottom: 0.4rem; }
+.notes { list-style: none; color: var(--fg-dim); font-size: 0.92rem; max-width: 740px; margin-bottom: 2rem; }
+.getgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 0.75rem; }
+.get {
+  display: block; padding: 0.7rem 1rem; border-radius: 8px; text-decoration: none;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: #04140a; font-weight: 700; transition: transform 0.15s;
+}
+.get:hover { transform: translateY(-2px); }
+.get span { display: block; font-weight: 400; font-size: 0.8rem; }
+.card-meta .get { position: relative; z-index: 2; padding: 0.65rem 0.9rem; font-size: 0.85rem; }
+
 /* Install / build */
 .install pre {
   background: #05050a; border: 1px solid #26263a; border-radius: 10px;

@@ -294,3 +294,23 @@ when building the core. Same rule as the rest of Fe₂O₃.
 
 Cargo build success and Gradle assemble success do not equal behavioural
 correctness. Exercise the actual code path on the phone before tagging.
+
+## Publishing an app
+
+The download buttons on the landing page point at one GitHub release,
+tag `apk`, with one file per app: `<app>.apk`. The link never changes,
+so the file is replaced for every new version:
+
+```bash
+tools/publish <app>      # build, check, upload
+tools/publish --check <app>   # build and check only
+tools/publish --list     # what is published, and which version
+```
+
+- Publish a version after Geir has run it on his phone, never before.
+- The script refuses an APK that names a folder of this machine. The
+  build files keep such names out of the Rust library
+  (`--remap-path-prefix`); keep that when adding an app.
+- A new app needs a button in the `#get` grid of `docs/index.html` and
+  a "Download APK" link on its card.
+- outside has no button yet. Ask Geir before publishing it.
