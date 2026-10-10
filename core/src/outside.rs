@@ -1118,6 +1118,10 @@ pub fn outside_sky(year: i32, month: u32, day: u32, hour: f64, lat: f64, lon: f6
     }
 }
 
+/// The smallest amount of rain the app prints for a step: it reads
+/// "0.1 mm". `millimetres` in the app's Screen.kt has the same number.
+const PRINTED_MM: f64 = 0.05;
+
 /// What the ring of the widget's dial shows for one hour.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
 pub enum DialHour {
@@ -1135,9 +1139,10 @@ pub enum DialHour {
 /// at 1, entry 3 the one from 3 to 4. A stretch stands for the hour that
 /// starts at its first tick, and the hour `now` is in is one of the twelve.
 ///
-/// Wet is 0.1 mm or more as the mean of the sources that reach the hour,
-/// the same line `hour_score` draws. A dry hour is cloud when the sources
-/// together say more than "partly cloudy".
+/// An hour is rain when the app shows rain for it in any column: a wet
+/// symbol, or an amount it prints. So the ring is never dry for an hour
+/// that has rain in the app. A dry hour is cloud when the sources together
+/// say more than "partly cloudy".
 #[uniffi::export]
 pub fn outside_dial(
     yr: Option<String>,
@@ -1160,18 +1165,18 @@ pub fn outside_dial(
         // The hour going on is judged from now: the forecast may not
         // reach back to its start.
         let at = start.max(now);
-        let (mut n, mut rain, mut cloud) = (0.0, 0.0, 0.0);
+        let (mut n, mut rain, mut cloud) = (0.0, false, 0.0);
         for steps in &sources {
             if let Some(s) = steps.iter().find(|s| s.epoch <= at && at < s.epoch + s.hours as i64 * 3600) {
                 n += 1.0;
-                rain += s.rain / s.hours as f64;
+                rain |= is_wet(s.sky) || s.rain >= PRINTED_MM;
                 cloud += cloud_rank(s.sky);
             }
         }
         if n == 0.0 {
             continue;
         }
-        dial[(tz.local(start).rem_euclid(43200) / 3600) as usize] = if rain / n >= 0.1 {
+        dial[(tz.local(start).rem_euclid(43200) / 3600) as usize] = if rain {
             DialHour::Rain
         } else if cloud / n > 2.0 {
             DialHour::Cloud
@@ -1549,14 +1554,16 @@ mod tests {
         assert_eq!(dial[..6], [Sun, Sun, Sun, Cloud, Cloud, Rain]);
         assert_eq!(dial[6], Unknown);
 
-        // Two sources: the mean decides. Yr's hour from 11 UTC is dry
-        // and partly cloudy.
+        // Two sources: rain in one is rain. Yr's hour from 11 UTC is dry
+        // and partly cloudy. 0.05 mm is printed as "0.1 mm", 0.04 is not.
         let both = |mm: f64, code: i64| {
             let gfs = gfs_hours(at("10:00"), 2, |i| (12.0, if i == 1 { mm } else { 0.0 }, 3.0, code));
             outside_dial(Some(yr_body()), None, Some(gfs), OSLO, at("10:20"))[1]
         };
         assert_eq!(both(0.3, 3), Rain);
-        assert_eq!(both(0.15, 3), Cloud);
+        assert_eq!(both(0.05, 3), Rain);
+        assert_eq!(both(0.04, 3), Cloud);
+        assert_eq!(both(0.0, 61), Rain);
         assert_eq!(both(0.0, 1), Sun);
 
         // A clock half an hour off UTC: its hours start on the half hour.
@@ -1565,6 +1572,42 @@ mod tests {
         let india = Tz { offset: 19800, change_at: 0, offset_after: 19800 };
         let dial = outside_dial(Some(yr_body()), None, None, india, at("10:20"));
         assert_eq!(dial[3..6], [Rain, Rain, Sun]);
+    }
+
+    #[test]
+    fn the_dial_is_blue_where_the_app_shows_rain() {
+        // From a bug report. At 16:43 the app showed the hour from 03:00
+        // as: Yr showers and 0.1 mm, Storm a cloud and 0.1 mm, GFS a rain
+        // symbol and no amount. The mean is under 0.1 mm, and the ring
+        // was grey from 3 to 4.
+        let at = |day: u32, clock: &str| iso_epoch(&format!("2026-10-{day}T{clock}:00Z")).unwrap();
+        let yr = |symbol: &str, mm: f64| {
+            json!({"properties": {"timeseries": [{"time": "2026-10-11T01:00:00Z", "data": {
+                "instant": {"details": {"air_temperature": 5.0, "wind_speed": 6.0}},
+                "next_1_hours": {"summary": {"symbol_code": symbol},
+                    "details": {"precipitation_amount": mm}}}}]}})
+            .to_string()
+        };
+        let storm = |symbol: &str, mm: f64| {
+            json!({"data": {"forecastByPlaceId": {"days": [{"weatherOneHourSteps": [{
+                "startTime": "2026-10-11T01:00:00Z", "endTime": "2026-10-11T02:00:00Z",
+                "temperature": 5.0, "precipitation": mm, "symbol": symbol}]}]}}})
+            .to_string()
+        };
+        // GFS from 16:00 in Oslo, dry all the way; `code` at 03:00.
+        let gfs = |code: i64| gfs_hours(at(10, "14:00"), 12, |i| (3.0, 0.0, 5.0, if i == 11 { code } else { 3 }));
+        let now = at(10, "14:43");
+        let hour3 = |yr: String, storm: String, gfs: String| outside_dial(Some(yr), Some(storm), Some(gfs), OSLO, now)[3];
+
+        assert_eq!(hour3(yr("lightrainshowers_night", 0.1), storm("CLOUDY", 0.1), gfs(61)), DialHour::Rain);
+        // Each column alone is enough: a printed amount under a cloud,
+        // and a rain symbol with no amount.
+        assert_eq!(hour3(yr("cloudy", 0.0), storm("CLOUDY", 0.1), gfs(3)), DialHour::Rain);
+        assert_eq!(hour3(yr("cloudy", 0.0), storm("CLOUDY", 0.0), gfs(61)), DialHour::Rain);
+        // No rain in any column: the hour is grey, as before.
+        assert_eq!(hour3(yr("cloudy", 0.0), storm("CLOUDY", 0.0), gfs(3)), DialHour::Cloud);
+        // The hours before it have only GFS, overcast and dry.
+        assert_eq!(outside_dial(None, None, Some(gfs(61)), OSLO, now)[..3], [DialHour::Cloud; 3]);
     }
 
     #[test]
