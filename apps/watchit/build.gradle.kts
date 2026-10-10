@@ -31,6 +31,15 @@ fun cargoEnv(): Map<String, String> {
     val out = mutableMapOf<String, String>()
     out.putAll(current)
     out["PATH"] = cleanPath
+    // Panic messages name source files. Keep this machine's folders out
+    // of them: the library goes into an APK that others download. Where
+    // two prefixes fit a path, rustc takes the last, so the longer one
+    // comes last.
+    out["RUSTFLAGS"] = listOfNotNull(
+        current["RUSTFLAGS"],
+        "--remap-path-prefix=${System.getProperty("user.home")}/=",
+        "--remap-path-prefix=${rootProject.projectDir.parent}/=",
+    ).joinToString(" ")
     val ndk = ndkHome
     if (ndk != null) {
         out["ANDROID_NDK_HOME"] = ndk

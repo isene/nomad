@@ -23,6 +23,11 @@
         suite. One Rust core, eighteen Kotlin&nbsp;/&nbsp;Compose apps,
         synced over Syncthing, with no Google account and no cloud middleman.
       </p>
+      <div class="cta">
+        <a href="#get" class="primary">Download for Android (APK)</a>
+        <a href="#apps" class="secondary">Browse the apps</a>
+        <a href="https://github.com/isene/nomad" class="secondary">GitHub</a>
+      </div>
       <div class="badges">
         <img src="https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff" alt="Kotlin / Compose">
         <img src="https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00" alt="Rust / UniFFI">
@@ -30,12 +35,43 @@
         <img src="https://img.shields.io/badge/license-Unlicense-green" alt="Unlicense">
         <img src="https://img.shields.io/badge/Stay-Amazing-important" alt="Stay Amazing">
       </div>
-      <div class="cta">
-        <a href="#apps" class="primary">Browse the apps</a>
-        <a href="https://github.com/isene/nomad" class="secondary">GitHub</a>
-      </div>
     </div>
   </header>
+
+  <section id="get">
+    <div class="container">
+      <h2>Get an app</h2>
+      <ol class="steps">
+        <li>Tap an app below, and your phone downloads its file.</li>
+        <li>Open the file from the notice that the download is done.</li>
+        <li>Android asks once if your browser may install apps: allow it, go back and tap Install.</li>
+      </ol>
+      <ul class="notes">
+        <li>The apps need Android 13 or newer.</li>
+        <li>An update is installed the same way, and the app keeps its data.</li>
+        <li>If Android warns about an unknown developer, choose to install anyway.</li>
+      </ul>
+      <div class="getgrid">
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/amardice.apk"><b>amardice</b><span>RPG dice roller</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/astro.apk"><b>astro</b><span>Astronomy companion</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/books.apk"><b>books</b><span>Library reader</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/fresh.apk"><b>fresh</b><span>Recent apps</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/gaze.apk"><b>gaze</b><span>Web browser</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/gazette.apk"><b>gazette</b><span>News digest reader</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/hyperlist.apk"><b>hyperlist</b><span>HyperList editor</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/mail.apk"><b>kastrup</b><span>Mail reader</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/onepage.apk"><b>onepage</b><span>Home launcher</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/pointer.apk"><b>pointer</b><span>File manager</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/ref.apk"><b>ref</b><span>Reference reader</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/relay.apk"><b>relay</b><span>Notification gateway</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/rpnx.apk"><b>rpnx</b><span>RPN calculator</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/scribe.apk"><b>scribe</b><span>Notes with tags and pictures</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/tasks.apk"><b>tasks</b><span>HyperList todo</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/vox.apk"><b>vox</b><span>Voice quick-capture</span></a>
+        <a class="get" href="https://github.com/isene/nomad/releases/download/apk/watchit.apk"><b>watchit</b><span>Movie / series browser</span></a>
+      </div>
+    </div>
+  </section>
 
   <section id="how">
     <div class="container">
@@ -95,7 +131,7 @@
       </p>
       <div class="grid">
 
-        <div class="card">
+        <div class="card" id="tasks">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/tasks">tasks</a></h3>
             <div class="card-kind">HyperList todo</div>
@@ -106,10 +142,10 @@
             <code>~/.tasks/todo.hl</code> hyperlist that scribe edits and
             kastrup's <code>z</code> triage appends to.
           </p>
-          <div class="card-meta"><span class="repo">apps/tasks</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/tasks</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/tasks.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="hyperlist">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/hyperlist">hyperlist</a></h3>
             <div class="card-kind">HyperList editor</div>
@@ -120,10 +156,10 @@
             editor: full syntax highlighting, fold, drag-reorder across
             depth (collapsed items move as one), and auto-renumber.
           </p>
-          <div class="card-meta"><span class="repo">apps/hyperlist</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/hyperlist</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/hyperlist.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="relay">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/relay">relay</a></h3>
             <div class="card-kind">Notification gateway</div>
@@ -134,10 +170,10 @@
             photo previews) into kastrup and fires replies, replacing the
             laptop's Firefox/Marionette bridge with an on-device listener.
           </p>
-          <div class="card-meta"><span class="repo">apps/relay</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/relay</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/relay.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="astro">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/astro">astro</a></h3>
             <div class="card-kind">Astronomy companion</div>
@@ -148,10 +184,10 @@
             events, APOD, starchart, and a telescope/eyepiece gear catalog:
             the <code>gear.json</code> shared with desktop astro.
           </p>
-          <div class="card-meta"><span class="repo">apps/astro</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/astro</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/astro.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="watchit">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/watchit">watchit</a></h3>
             <div class="card-kind">Movie / series browser</div>
@@ -162,10 +198,10 @@
             dump lists, posters, full detail (cast, plot, streaming), and
             search-to-add.
           </p>
-          <div class="card-meta"><span class="repo">apps/watchit</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/watchit</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/watchit.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="amardice">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/amardice">amardice</a></h3>
             <div class="card-kind">RPG dice roller</div>
@@ -176,10 +212,10 @@
             crit/fumble tables, plus fear rolls with mental-fortitude vs a
             fear DR. Engine shared with the desktop and the d6gaming wiki.
           </p>
-          <div class="card-meta"><span class="repo">apps/amardice</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/amardice</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/amardice.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="rpnx">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/rpnx">rpnx</a></h3>
             <div class="card-kind">RPN calculator</div>
@@ -191,10 +227,10 @@
             keypad, persistent state, and a FOCAL program runner that loads
             <code>.xrpn</code> files from the synced folder.
           </p>
-          <div class="card-meta"><span class="repo">apps/rpnx</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/rpnx</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/rpnx.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="vox">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/vox">vox</a></h3>
             <div class="card-kind">Voice quick-capture</div>
@@ -206,10 +242,10 @@
             <code>todo.hl</code> or appended to a notes file. The pocket
             version of the laptop's <code>Win+a</code> dictation.
           </p>
-          <div class="card-meta"><span class="repo">apps/vox</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/vox</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/vox.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="scribe">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/scribe">scribe</a></h3>
             <div class="card-kind">Notes with tags and pictures</div>
@@ -223,10 +259,10 @@
             scribe opens the same files with the pictures in the text, and
             an import brings your Google Keep notes over.
           </p>
-          <div class="card-meta"><span class="repo">apps/scribe</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/scribe</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/scribe.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="ref">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/ref">ref</a></h3>
             <div class="card-kind">Reference reader</div>
@@ -238,10 +274,10 @@
             Public collections ship bundled; your own load as JSON from a
             synced folder, so private corpora never leave your devices.
           </p>
-          <div class="card-meta"><span class="repo">apps/ref</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/ref</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/ref.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="gazette">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/gazette">gazette</a></h3>
             <div class="card-kind">News digest reader</div>
@@ -253,10 +289,10 @@
             typeset PDF; gazette browses the last 7 days synced into
             <code>~/.news</code> and opens source links.
           </p>
-          <div class="card-meta"><span class="repo">apps/gazette</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/gazette</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/gazette.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="books">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/books">books</a></h3>
             <div class="card-kind">Library reader</div>
@@ -268,10 +304,10 @@
             the read-only half: only finished books appear, grouped by shelf,
             with inline figures, read full-screen and offline.
           </p>
-          <div class="card-meta"><span class="repo">apps/books</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/books</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/books.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="gaze">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/gaze">gaze</a></h3>
             <div class="card-kind">Web browser</div>
@@ -284,10 +320,10 @@
             hosts list, dark pages, and the page handed to the Claude app to ask
             about.
           </p>
-          <div class="card-meta"><span class="repo">apps/gaze</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/gaze</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/gaze.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="fresh">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/fresh">fresh</a></h3>
             <div class="card-kind">Recent apps</div>
@@ -298,10 +334,10 @@
             left out. Tap one to open it; long-press for app info or to
             uninstall. No Rust core and no background work.
           </p>
-          <div class="card-meta"><span class="repo">apps/fresh</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/fresh</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/fresh.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="outside">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/outside">outside</a></h3>
             <div class="card-kind">Weather</div>
@@ -313,10 +349,10 @@
             agree, and each day gets its best stretch for being outside.
             Search for a place, follow the phone, save your places.
           </p>
-          <div class="card-meta"><span class="repo">apps/outside</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/outside</span></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="pointer">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/pointer">pointer</a></h3>
             <div class="card-kind">File manager</div>
@@ -329,10 +365,10 @@
             open as folders, and search inside files. Other apps save
             straight into your marked folders. It cannot reach the network.
           </p>
-          <div class="card-meta"><span class="repo">apps/pointer</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/pointer</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/pointer.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="onepage">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/onepage">onepage</a></h3>
             <div class="card-kind">Home launcher</div>
@@ -344,10 +380,10 @@
             resize per axis, tap a widget's ✕ to remove it. Built to cost
             nothing when idle: no polling, no background wake-ups.
           </p>
-          <div class="card-meta"><span class="repo">apps/onepage</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/onepage</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/onepage.apk">Download APK</a></div>
         </div>
 
-        <div class="card">
+        <div class="card" id="mail">
           <div class="card-head"><div>
             <h3 class="card-title"><a class="card-link" href="https://github.com/isene/nomad/tree/master/apps/mail">kastrup</a></h3>
             <div class="card-kind">Mail reader</div>
@@ -361,7 +397,7 @@
             clear a message off the phone without touching the archive. Unread
             count on the home screen.
           </p>
-          <div class="card-meta"><span class="repo">apps/mail</span><img src="https://img.shields.io/badge/sideload-APK-7f52ff" alt="sideload APK"></div>
+          <div class="card-meta"><span class="repo">apps/mail</span><a class="get" href="https://github.com/isene/nomad/releases/download/apk/mail.apk">Download APK</a></div>
         </div>
 
       </div>

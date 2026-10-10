@@ -1,5 +1,7 @@
 # gaze
 
+**[Download for Android (APK)](https://github.com/isene/nomad/releases/download/apk/gaze.apk)** · [how to install](https://isene.org/nomad/#get)
+
 The laptop browser's best parts on the phone, around Android's own WebView.
 
 - **Tabs** that come back after a restart, each with the pages it came through. Only the tab you look at loads. Hold a tab in the list and drag it to move it.

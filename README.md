@@ -9,6 +9,9 @@ Google account, no cloud middleman.
 
 **Landing page:** [isene.org/nomad](https://isene.org/nomad/)
 
+**Download:** every app as an APK, with three steps to install it, at
+[isene.org/nomad/#get](https://isene.org/nomad/#get).
+
 One Cargo workspace and one Gradle multi-project in a single monorepo. The
 interesting code lives in **Rust** (`core/`, crate `fe2o3-mobile-core`),
 exposed to **Kotlin** through [UniFFI](https://mozilla.github.io/uniffi-rs/);
@@ -43,8 +46,10 @@ prompt the changes that fit *your* phone.
 | <img src="apps/outside/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**outside**](apps/outside/) | Three weather forecasts side by side (Yr, Storm, GFS) for up to sixteen days, with the hours per day, a mark for how well they agree, and the best stretch for being outside. A home-screen widget shows the time, an analog clock, the next alarm, and the sun and moon | — |
 | <img src="apps/pointer/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**pointer**](apps/pointer/) | File manager: tag items, walk to another folder, copy or move them there; a trash, undo for every step, tabs, archives that open as folders, search inside files, marked folders that other apps can save into, and no network permission | [pointer](https://github.com/isene/pointer) |
 
-Each ships as its own signed APK with its own launcher icon, sideloaded from a
-Syncthing-synced folder.
+Each ships as its own signed APK with its own launcher icon. The newest
+build of each is one tap away on the
+[landing page](https://isene.org/nomad/#get); `tools/publish <app>` puts
+it there.
 
 ## Architecture
 
@@ -81,7 +86,7 @@ Design hierarchy, build quirks, and per-app notes live in
 PATH="/usr/bin:$PATH" cargo test -p fe2o3-mobile-core
 
 # An app's signed release APK
-export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
 export ANDROID_NDK_HOME="$HOME/.android-sdk/ndk/27.2.12479018"
 ./gradlew :apps:<name>:assembleRelease
 ```

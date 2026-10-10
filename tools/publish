@@ -1,0 +1,80 @@
+#!/bin/bash
+# Build an app's signed APK and put it where the landing page's download
+# button points: the "apk" release on GitHub, as <app>.apk.
+#
+#   tools/publish gaze           one app
+#   tools/publish gaze outside   several, one build at a time
+#   tools/publish --all          every app
+#   tools/publish --check gaze   build and check, upload nothing
+#   tools/publish --list         what is published now
+#
+# The link on the page never changes:
+#   https://github.com/isene/nomad/releases/download/apk/<app>.apk
+# so run this for every new version of an app, or the page hands out an
+# old one. Needs gh (logged in), the Android SDK and each app's
+# key.properties.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+REPO=isene/nomad
+TAG=apk
+export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}
+export ANDROID_HOME=${ANDROID_HOME:-$HOME/.android-sdk}
+export ANDROID_NDK_HOME=${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/27.2.12479018}
+export PATH="/usr/bin:$JAVA_HOME/bin:$PATH"
+bt=("$ANDROID_HOME"/build-tools/*)
+bt=${bt[-1]}
+
+die() { echo "publish: $*" >&2; exit 1; }
+
+upload=1
+apps=()
+for arg in "$@"; do
+  case $arg in
+    --list)
+      gh release view "$TAG" -R "$REPO" --json assets \
+        --jq '.assets[] | "\(.label)\t\(.updatedAt[0:10])\t\(.size / 1048576 | floor) MB"'
+      exit ;;
+    --check) upload=0 ;;
+    --all) for d in apps/*/; do d=${d#apps/}; apps+=("${d%/}"); done ;;
+    -*) die "unknown option $arg" ;;
+    *) [ -d "apps/$arg" ] || die "no app named $arg"; apps+=("$arg") ;;
+  esac
+done
+[ ${#apps[@]} -gt 0 ] || die "which app? (or --all, --list)"
+
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"; ./gradlew --stop -q >/dev/null 2>&1 || true' EXIT
+
+for app in "${apps[@]}"; do
+  # One app a run: the apps share one Rust build folder.
+  ./gradlew ":apps:$app:assembleRelease" --max-workers 4 -q
+  apk=apps/$app/build/outputs/apk/release/$app-release.apk
+  [ -f "$apk" ] || die "$app: no signed APK. Is apps/$app/key.properties there?"
+  "$bt/apksigner" verify "$apk" >/dev/null 2>&1 || die "$app: the signature does not verify"
+
+  # Nothing of this machine may ride along: neither the home folder nor
+  # the folder this repo is in, in any file of the APK.
+  here=$(dirname "$PWD")/
+  for dir in "$HOME/" "${here#"$HOME/"}"; do
+    [ -n "$dir" ] || continue
+    n=$(unzip -p "$apk" 2>/dev/null | grep -a -c -F "$dir" || true)
+    [ "$n" = 0 ] || die "$app: $n lines in the APK name the folder $dir"
+  done
+
+  read -r line < <("$bt/aapt2" dump badging "$apk")
+  version=${line#*versionName=\'}
+  version=${version%%\'*}
+
+  if [ $upload = 0 ]; then
+    echo "$app $version: built and checked, not uploaded"
+    continue
+  fi
+  gh release view "$TAG" -R "$REPO" >/dev/null 2>&1 || gh release create "$TAG" -R "$REPO" \
+    --title "Android apps" \
+    --notes "The newest build of every nomad app. The download buttons on https://isene.org/nomad/ point here. Each file is named after its app and is replaced when a new version is out; the label beside it says which version it is."
+  cp "$apk" "$tmp/$app.apk"
+  gh release upload "$TAG" "$tmp/$app.apk#$app $version" --clobber -R "$REPO"
+  rm "$tmp/$app.apk"
+  echo "$app $version: published"
+done
