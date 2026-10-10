@@ -132,6 +132,13 @@ class Store(ctx: Context) {
     fun tap(key: String): String = prefs.getString(key, "") ?: ""
 
     fun setTap(key: String, app: String) = prefs.edit().putString(key, app).apply()
+
+    /** The folder whose waiting messages the widget marks, as the address
+     *  the system's folder picker gave. Empty until one is chosen: the
+     *  widget then shows no mark and looks nowhere. */
+    fun inbox(): String = prefs.getString("inbox", "") ?: ""
+
+    fun setInbox(folder: String) = prefs.edit().putString("inbox", folder).apply()
 }
 
 /** Every app with an icon in the launcher, sorted by name: its

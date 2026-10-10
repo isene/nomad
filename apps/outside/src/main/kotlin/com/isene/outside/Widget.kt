@@ -17,7 +17,9 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.media.AudioManager
+import android.net.Uri
 import android.provider.AlarmClock
+import android.provider.DocumentsContract
 import android.provider.Settings
 import android.view.View
 import android.widget.RemoteViews
@@ -84,6 +86,11 @@ class ClockWidget : AppWidgetProvider() {
         /** A forecast older than this says too little about the next
          *  twelve hours to colour the ring from. */
         private const val FRESH_MS = 12 * 3_600_000L
+
+        // The dot for waiting messages, in dp: its radius, and how far
+        // its middle sits from the top and the right edge of the square.
+        private const val DOT_RADIUS = 3f
+        private const val DOT_IN = 5f
 
         /** Degrees left open at each end of an hour's stretch of the
          *  ring, so that the hours can be counted. */
@@ -153,7 +160,10 @@ class ClockWidget : AppWidgetProvider() {
                 if (bodies.all { b -> b == null }) null
                 else outsideDial(bodies[0], bodies[1], bodies[2], tzOf(""), now.toEpochSecond())
             } ?: emptyList()
-            views.setImageViewBitmap(R.id.marks, marks(ctx, dial, alarm, sky.takeIf { spot != null }))
+            views.setImageViewBitmap(
+                R.id.marks,
+                marks(ctx, dial, alarm, sky.takeIf { spot != null }, waiting(ctx, store.inbox())),
+            )
 
             for (part in Tap.entries) {
                 views.setOnClickPendingIntent(part.view, open(ctx, target(ctx, part, store.tap(part.key))))
@@ -211,11 +221,34 @@ class ClockWidget : AppWidgetProvider() {
             .addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
             .setClassName(pkg, activity)
 
+        /** Whether a message waits in the folder chosen in the app: a file
+         *  there named *.msg. One listing of that folder a run, and none
+         *  at all while no folder is chosen. */
+        private fun waiting(ctx: Context, folder: String): Boolean {
+            if (folder.isEmpty()) return false
+            return try {
+                val tree = Uri.parse(folder)
+                val files = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+                val name = arrayOf(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                ctx.contentResolver.query(files, name, null, null, null)?.use { rows ->
+                    var found = false
+                    while (!found && rows.moveToNext()) found = rows.getString(0)?.endsWith(".msg") == true
+                    found
+                } ?: false
+            } catch (_: Exception) {
+                // The folder is gone, or the leave to read it was taken back.
+                false
+            }
+        }
+
         /** What the dial cannot draw by itself: the ring between two hour
          *  ticks in the colour of that hour's weather (blue for rain, grey
-         *  for cloud, yellow for sun), and on the rim an icon at the time
-         *  of the next alarm, of sunrise and of sunset. */
-        private fun marks(ctx: Context, dial: List<DialHour>, alarm: ZonedDateTime?, sky: Almanac?): Bitmap {
+         *  for cloud, yellow for sun), on the rim an icon at the time of
+         *  the next alarm, of sunrise and of sunset, and a dot in the top
+         *  right corner while a message waits. */
+        private fun marks(
+            ctx: Context, dial: List<DialHour>, alarm: ZonedDateTime?, sky: Almanac?, waiting: Boolean,
+        ): Bitmap {
             val dp = ctx.resources.displayMetrics.density
             val size = (SQUARE * dp).roundToInt()
             val mid = size / 2f
@@ -260,6 +293,13 @@ class ClockWidget : AppWidgetProvider() {
             if (sky != null && sky.sunrise >= 0) {
                 icon(R.drawable.widget_sunrise, 0xFFF5F821, 7.2f, sky.sunrise)
                 icon(R.drawable.widget_sunset, 0xFFEA8920, 7.2f, sky.sunset)
+            }
+
+            // The corner of the square is outside the dial: the ring and
+            // the icons on the rim never reach it, whatever the hour.
+            if (waiting) {
+                val dot = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFE8795A.toInt() }
+                canvas.drawCircle(size - DOT_IN * dp, DOT_IN * dp, DOT_RADIUS * dp, dot)
             }
             return bitmap
         }
