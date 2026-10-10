@@ -127,7 +127,7 @@
                 <TextView
                     android:id="@+id/sign"
                     style="@style/WidgetText"
-                    android:layout_gravity="center_horizontal"
+                    android:layout_marginStart="26dp"
                     android:layout_marginTop="6.5dp"
                     android:text="LIBRA" />
 

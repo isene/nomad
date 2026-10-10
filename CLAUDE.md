@@ -178,14 +178,19 @@ when building the core. Same rule as the rest of Fe₂O₃.
     volume, and `MainActivity.onStop`. `WidgetEvents` is disabled in the
     manifest and enabled while a widget is placed.
   - The dial and the two hands are vectors of one 92 dp square, because
-    `AnalogClock` lays them centre on centre. `refresh` draws the blue
-    rain ticks and the rim icons into a bitmap on top.
-  - A blue tick is an hour with rain among the next twelve, from
-    `outside_rain_hours` in the core: 0.1 mm or more as the mean of the
-    sources. `refresh` reads the three cached bodies for `Store.here()`
-    and skips one older than twelve hours. That is three file reads and
-    one parse a run; the widget never fetches. Geir chose rain for the
-    blue on 2026-10-10 (it was the hour now in 0.3.0).
+    `AnalogClock` lays them centre on centre. `refresh` draws the
+    weather ring and the rim icons into a bitmap on top.
+  - The ring between two hour ticks has the colour of the hour that
+    starts there, for the twelve hours from now: blue for rain, grey for
+    cloud, yellow for sun (a clear night too). `outside_dial` in the
+    core decides: rain is 0.1 mm or more as the mean of the sources, and
+    cloud is more than "partly cloudy". `refresh` reads the three cached
+    bodies for `Store.here()` and skips one older than twelve hours.
+    That is three file reads and one parse a run; the widget never
+    fetches. Geir asked for the ring on 2026-10-10 (0.3.0 had one blue
+    tick for the hour now, 0.3.1 blue ticks for rain).
+  - The widget has no settings screen and gets none: Geir asks for a
+    change, and it goes into the code.
   - `TextClock` has no week number, so `refresh` writes the week into
     the date pattern as quoted text.
   - `outside_sky` in the core gives the sign, the rise and set lines and

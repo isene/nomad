@@ -34,7 +34,8 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import uniffi.fe2o3_mobile_core.Almanac
-import uniffi.fe2o3_mobile_core.outsideRainHours
+import uniffi.fe2o3_mobile_core.DialHour
+import uniffi.fe2o3_mobile_core.outsideDial
 import uniffi.fe2o3_mobile_core.outsideSky
 
 /**
@@ -70,8 +71,12 @@ class ClockWidget : AppWidgetProvider() {
         private const val RIM = 1.14f
 
         /** A forecast older than this says too little about the next
-         *  twelve hours to paint rain from. */
+         *  twelve hours to colour the ring from. */
         private const val FRESH_MS = 12 * 3_600_000L
+
+        /** Degrees left open at each end of an hour's stretch of the
+         *  ring, so that the hours can be counted. */
+        private const val GAP = 1.2f
 
         /** Where Android keeps what the sound line shows. */
         private val SOUND = listOf(
@@ -126,17 +131,17 @@ class ClockWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.lit, "${sky.lit}%")
             views.setTextViewText(R.id.phase, sky.phase)
 
-            // Rain is from the forecasts the app last fetched for that
-            // place. The widget fetches nothing itself.
-            val rain = spot?.let {
+            // The weather is from the forecasts the app last fetched for
+            // that place. The widget fetches nothing itself.
+            val dial = spot?.let {
                 val cache = Cache(ctx)
                 val key = cache.key(it)
                 val oldest = System.currentTimeMillis() - FRESH_MS
                 val bodies = SOURCES.map { s -> if (cache.fetched(key, s) > oldest) cache.read(key, s) else null }
                 if (bodies.all { b -> b == null }) null
-                else outsideRainHours(bodies[0], bodies[1], bodies[2], tzOf(""), now.toEpochSecond())
+                else outsideDial(bodies[0], bodies[1], bodies[2], tzOf(""), now.toEpochSecond())
             } ?: emptyList()
-            views.setImageViewBitmap(R.id.marks, marks(ctx, rain, alarm, sky.takeIf { spot != null }))
+            views.setImageViewBitmap(R.id.marks, marks(ctx, dial, alarm, sky.takeIf { spot != null }))
 
             views.setOnClickPendingIntent(R.id.left, open(ctx, Intent(AlarmClock.ACTION_SHOW_ALARMS)))
             views.setOnClickPendingIntent(R.id.clock, open(ctx, app("com.isene.rpnx", "com.isene.rpnx.MainActivity")))
@@ -183,10 +188,11 @@ class ClockWidget : AppWidgetProvider() {
             .addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
             .setClassName(pkg, activity)
 
-        /** What the dial cannot draw by itself: a blue tick for each hour
-         *  with rain among the next twelve, and on the rim an icon at the
-         *  time of the next alarm, of sunrise and of sunset. */
-        private fun marks(ctx: Context, rain: List<UInt>, alarm: ZonedDateTime?, sky: Almanac?): Bitmap {
+        /** What the dial cannot draw by itself: the ring between two hour
+         *  ticks in the colour of that hour's weather (blue for rain, grey
+         *  for cloud, yellow for sun), and on the rim an icon at the time
+         *  of the next alarm, of sunrise and of sunset. */
+        private fun marks(ctx: Context, dial: List<DialHour>, alarm: ZonedDateTime?, sky: Almanac?): Bitmap {
             val dp = ctx.resources.displayMetrics.density
             val size = (SQUARE * dp).roundToInt()
             val mid = size / 2f
@@ -194,15 +200,22 @@ class ClockWidget : AppWidgetProvider() {
             val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bitmap)
 
-            val blue = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFFACCCF3.toInt()
-                strokeWidth = 1.2f * dp
+            val ring = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                strokeWidth = 2f * dp
             }
-            for (tick in rain) {
-                canvas.save()
-                canvas.rotate(tick.toInt() * 30f, mid, mid)
-                canvas.drawLine(mid, mid - 0.964f * radius, mid, mid - 0.838f * radius, blue)
-                canvas.restore()
+            dial.forEachIndexed { i, hour ->
+                ring.color = when (hour) {
+                    DialHour.RAIN -> 0xFF3D9BFF
+                    DialHour.CLOUD -> 0xFF8E8E8E
+                    DialHour.SUN -> 0xFFF5F821
+                    DialHour.UNKNOWN -> return@forEachIndexed
+                }.toInt()
+                // An arc is counted from 3 o'clock, the dial from 12.
+                canvas.drawArc(
+                    mid - radius, mid - radius, mid + radius, mid + radius,
+                    i * 30f - 90f + GAP, 30f - 2 * GAP, false, ring,
+                )
             }
 
             // `clock` is a time of day in hours; the dial shows twelve.

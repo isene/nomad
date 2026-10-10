@@ -1118,21 +1118,34 @@ pub fn outside_sky(year: i32, month: u32, day: u32, hour: f64, lat: f64, lon: f6
     }
 }
 
-/// The ticks to paint blue on the widget's dial: one for each hour with
-/// rain among the twelve from `now`. 0 is the tick at 12, 3 the one at 3.
-/// A tick stands for the hour that starts there, and the first of the
-/// twelve is the hour `now` is in.
+/// What the ring of the widget's dial shows for one hour.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum DialHour {
+    /// No forecast reaches the hour.
+    Unknown,
+    /// Clear, fair or partly cloudy, by day and by night.
+    Sun,
+    Cloud,
+    /// Rain, sleet or snow.
+    Rain,
+}
+
+/// The weather of the twelve hours from `now`, for the ring of the
+/// widget's dial. Entry 0 is the stretch from the tick at 12 to the tick
+/// at 1, entry 3 the one from 3 to 4. A stretch stands for the hour that
+/// starts at its first tick, and the hour `now` is in is one of the twelve.
 ///
 /// Wet is 0.1 mm or more as the mean of the sources that reach the hour,
-/// the same line `hour_score` draws.
+/// the same line `hour_score` draws. A dry hour is cloud when the sources
+/// together say more than "partly cloudy".
 #[uniffi::export]
-pub fn outside_rain_hours(
+pub fn outside_dial(
     yr: Option<String>,
     storm: Option<String>,
     gfs: Option<String>,
     tz: Tz,
     now: i64,
-) -> Vec<u32> {
+) -> Vec<DialHour> {
     let sources = [
         tidy(yr.as_deref().map(parse_yr).unwrap_or_default(), now),
         tidy(storm.as_deref().map(parse_storm).unwrap_or_default(), now),
@@ -1141,21 +1154,32 @@ pub fn outside_rain_hours(
     // The hour starts on the local clock, which is not on the UTC hour
     // everywhere.
     let first = now - tz.local(now).rem_euclid(3600);
-    (0..12)
-        .map(|k| first + k * 3600)
-        .filter(|&at| {
-            // The hour going on is judged from now: the forecast may not
-            // reach back to its start.
-            let at = at.max(now);
-            let rain: Vec<f64> = sources
-                .iter()
-                .filter_map(|steps| steps.iter().find(|s| s.epoch <= at && at < s.epoch + s.hours as i64 * 3600))
-                .map(|s| s.rain / s.hours as f64)
-                .collect();
-            !rain.is_empty() && rain.iter().sum::<f64>() / rain.len() as f64 >= 0.1
-        })
-        .map(|at| (tz.local(at).rem_euclid(43200) / 3600) as u32)
-        .collect()
+    let mut dial = vec![DialHour::Unknown; 12];
+    for k in 0..12 {
+        let start = first + k * 3600;
+        // The hour going on is judged from now: the forecast may not
+        // reach back to its start.
+        let at = start.max(now);
+        let (mut n, mut rain, mut cloud) = (0.0, 0.0, 0.0);
+        for steps in &sources {
+            if let Some(s) = steps.iter().find(|s| s.epoch <= at && at < s.epoch + s.hours as i64 * 3600) {
+                n += 1.0;
+                rain += s.rain / s.hours as f64;
+                cloud += cloud_rank(s.sky);
+            }
+        }
+        if n == 0.0 {
+            continue;
+        }
+        dial[(tz.local(start).rem_euclid(43200) / 3600) as usize] = if rain / n >= 0.1 {
+            DialHour::Rain
+        } else if cloud / n > 2.0 {
+            DialHour::Cloud
+        } else {
+            DialHour::Sun
+        };
+    }
+    dial
 }
 
 #[cfg(test)]
@@ -1495,34 +1519,52 @@ mod tests {
     }
 
     #[test]
-    fn the_rain_ticks_for_the_widget() {
-        // Yr alone: 0.4 mm from 10 UTC, none from 11, then 1.2 mm over
-        // the six hours from 12, and nothing after 18.
+    fn the_dial_for_the_widget() {
+        use DialHour::{Cloud, Rain, Sun, Unknown};
         let at = |clock: &str| iso_epoch(&format!("2026-10-05T{clock}:00Z")).unwrap();
-        let ticks = |now: i64| outside_rain_hours(Some(yr_body()), None, None, OSLO, now);
-        // 12:20 in Oslo: wet now, dry from 13, wet from 14 to 20.
-        assert_eq!(ticks(at("10:20")), vec![0, 2, 3, 4, 5, 6, 7]);
-        // 19:30 in Oslo: the last wet hour is the one going on.
-        assert_eq!(ticks(at("17:30")), vec![7]);
+
+        // Yr alone: 0.4 mm from 10 UTC, partly cloudy and dry from 11,
+        // then 1.2 mm over the six hours from 12.
+        let yr = |now: i64| outside_dial(Some(yr_body()), None, None, OSLO, now);
+        // 12:20 in Oslo. The forecast ends at 20:00 there.
+        let mut want = vec![Rain, Sun, Rain, Rain, Rain, Rain, Rain, Rain, Unknown, Unknown, Unknown, Unknown];
+        assert_eq!(yr(at("10:20")), want);
+        // 19:30 in Oslo: one known hour is left, the one going on.
+        want = vec![Unknown; 12];
+        want[7] = Rain;
+        assert_eq!(yr(at("17:30")), want);
         // At 20:00 the six hours from 12 are over, and Yr's other
         // six-hour step, from 13 with 1.0 mm, speaks for one more hour.
-        assert_eq!(ticks(at("18:00")), vec![8]);
-        assert!(ticks(at("19:00")).is_empty());
-        assert!(outside_rain_hours(None, None, None, OSLO, at("10:20")).is_empty());
+        want[7] = Unknown;
+        want[8] = Rain;
+        assert_eq!(yr(at("18:00")), want);
+        assert_eq!(yr(at("19:00")), vec![Unknown; 12]);
+        assert_eq!(outside_dial(None, None, None, OSLO, at("10:20")), vec![Unknown; 12]);
 
-        // Two sources: the mean decides. Yr has no rain from 11 UTC.
-        let with_gfs = |mm: f64| {
-            let gfs = gfs_hours(at("10:00"), 2, |i| (12.0, if i == 1 { mm } else { 0.0 }, 3.0, 3));
-            outside_rain_hours(Some(yr_body()), None, Some(gfs), OSLO, at("10:20"))
+        // GFS alone, an hour a step from 12:00 in Oslo: clear, fair,
+        // partly cloudy, overcast, fog, and overcast with rain.
+        let codes = [0, 1, 2, 3, 45, 3];
+        let gfs = gfs_hours(at("10:00"), 6, |i| (12.0, if i == 5 { 0.5 } else { 0.0 }, 3.0, codes[i.min(5)]));
+        let dial = outside_dial(None, None, Some(gfs), OSLO, at("10:20"));
+        assert_eq!(dial[..6], [Sun, Sun, Sun, Cloud, Cloud, Rain]);
+        assert_eq!(dial[6], Unknown);
+
+        // Two sources: the mean decides. Yr's hour from 11 UTC is dry
+        // and partly cloudy.
+        let both = |mm: f64, code: i64| {
+            let gfs = gfs_hours(at("10:00"), 2, |i| (12.0, if i == 1 { mm } else { 0.0 }, 3.0, code));
+            outside_dial(Some(yr_body()), None, Some(gfs), OSLO, at("10:20"))[1]
         };
-        assert_eq!(with_gfs(0.3), vec![0, 1, 2, 3, 4, 5, 6, 7]);
-        assert_eq!(with_gfs(0.15), vec![0, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(both(0.3, 3), Rain);
+        assert_eq!(both(0.15, 3), Cloud);
+        assert_eq!(both(0.0, 1), Sun);
 
         // A clock half an hour off UTC: its hours start on the half hour.
-        let india = Tz { offset: 19800, change_at: 0, offset_after: 19800 };
         // 15:50 there. The hour from 15:00 began before the forecast
         // does, and Yr's wet hour covers now.
-        assert_eq!(outside_rain_hours(Some(yr_body()), None, None, india, at("10:20"))[0], 3);
+        let india = Tz { offset: 19800, change_at: 0, offset_after: 19800 };
+        let dial = outside_dial(Some(yr_body()), None, None, india, at("10:20"));
+        assert_eq!(dial[3..6], [Rain, Rain, Sun]);
     }
 
     #[test]
