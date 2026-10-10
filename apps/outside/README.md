@@ -32,8 +32,10 @@ A clock for the home screen, one row tall and the full width.
 - Right: the ringer mode with the ring and alarm volume, the sign the sun
   is in, sunrise and sunset, moonrise and moonset, how much of the moon
   is lit, and its phase.
-- Tap the left part for the clock app and the right part for outside.
-  The clock opens [rpnx](../rpnx/), when that is installed.
+- A tap opens an app: the left part the clock app's alarms, the clock
+  [rpnx](../rpnx/) when that is installed, and the right part outside.
+- Choose another app for each of the three at the bottom of outside's
+  screen, under "Widget: choose what a tap opens".
 
 The sun, the moon and the weather are for the place where outside last saw
 the phone. The widget never asks for the position itself, so open outside
@@ -69,6 +71,9 @@ changes its page. The other two columns keep working when it does.
   wakes a sleeping phone, and the widget uses no network.
 - The phone's position is rounded to about a kilometre before it leaves
   the phone. The app asks for coarse location only.
+- To let you choose what a tap on the widget opens, the app can see
+  which apps have an icon on the phone. It reads that list only while
+  you choose, and sends it nowhere.
 - No account, no tracking, no ads.
 
 ## Code

@@ -1,7 +1,10 @@
 package com.isene.outside.data
 
 import android.annotation.SuppressLint
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.location.Geocoder
 import android.location.Location
 import android.location.LocationManager
@@ -123,6 +126,23 @@ class Store(ctx: Context) {
      *  The spot last shown, when the app has never followed the phone. */
     fun here(): Spot? =
         outsideSpotsParse(prefs.getString("phone", "") ?: "").firstOrNull() ?: last()?.first
+
+    /** The app a tap on a part of the widget opens, as "package/activity".
+     *  Empty until one is chosen: the part then opens what it always has. */
+    fun tap(key: String): String = prefs.getString(key, "") ?: ""
+
+    fun setTap(key: String, app: String) = prefs.edit().putString(key, app).apply()
+}
+
+/** Every app with an icon in the launcher, sorted by name: its
+ *  "package/activity" and the name under the icon. Slow, so off the main
+ *  thread, and asked for only while the list is on screen. */
+fun launchable(ctx: Context): List<Pair<String, String>> {
+    val pm = ctx.packageManager
+    val icons = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+    return pm.queryIntentActivities(icons, PackageManager.ResolveInfoFlags.of(0))
+        .map { ComponentName(it.activityInfo.packageName, it.activityInfo.name).flattenToString() to it.loadLabel(pm).toString() }
+        .sortedBy { it.second.lowercase() }
 }
 
 /** The phone's own position and the name of the place there. */

@@ -12,6 +12,16 @@
          list of alarms. -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
 
+    <!-- For the widget: to list the apps a tap on it can open. Only apps
+         with an icon in the launcher are seen, and the list is read only
+         while it is on screen. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
