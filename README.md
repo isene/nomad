@@ -19,9 +19,8 @@ each app is a thin Compose shell. Anything CPU-bound, data-heavy, or shared
 between apps belongs in the core, so the phone and the desktop tools compute
 identically.
 
-The reason these are public domain is not that you should install them as-is.
-They are released for inspiration: clone the repo, fire up Claude Code, and
-prompt the changes that fit *your* phone.
+The apps are released for inspiration: clone the repo, fire up Claude Code,
+and prompt the changes that fit *your* phone.
 
 ## The apps
 
