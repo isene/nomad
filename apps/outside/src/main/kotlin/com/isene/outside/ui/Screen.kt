@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -389,7 +390,9 @@ private fun DayRow(day: OutsideDay, best: Boolean, onClick: () -> Unit) {
             }
             // A line of its own: the two lines above can be full to the
             // edge, and the cells beside them are always three lines tall.
-            Moon(day.moon)
+            // Drawn lower than it is laid out, so it stands clear of the
+            // dot above and the row keeps its height.
+            Moon(day.moon, Modifier.offset(y = 8.dp))
         }
         day.cells.forEach { DayCell(it, rainLine, Modifier.weight(1f)) }
     }
@@ -744,9 +747,9 @@ private fun agreementColor(a: Agreement): Color = when (a) {
  * its height.
  */
 @Composable
-private fun Moon(lit: List<Float>) {
+private fun Moon(lit: List<Float>, modifier: Modifier) {
     val side = with(LocalDensity.current) { 16.sp.toDp() }
-    Canvas(Modifier.size(side)) {
+    Canvas(modifier.size(side)) {
         val r = size.minDimension * 0.4f
         drawCircle(MoonDark, r)
         val path = Path()
