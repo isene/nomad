@@ -1518,6 +1518,14 @@ mod tests {
         guard
     }
 
+    // A new search stops the one before it, so tests that search run one
+    // at a time too.
+    static SEARCHES: Mutex<()> = Mutex::new(());
+
+    fn searching() -> std::sync::MutexGuard<'static, ()> {
+        SEARCHES.lock().unwrap_or_else(|e| e.into_inner())
+    }
+
     /// A fresh folder for one test.
     fn scratch(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("pointer-test-{}-{}", std::process::id(), name));
@@ -1719,6 +1727,7 @@ mod tests {
 
     #[test]
     fn the_trash_keeps_gives_back_and_empties() {
+        let _one = searching();
         let dir = scratch("trash");
         let roots = vec![s(&dir)];
         fs::create_dir(dir.join("docs")).unwrap();
@@ -1770,6 +1779,7 @@ mod tests {
 
     #[test]
     fn search_finds_names_below_and_skips_hidden_folders() {
+        let _one = searching();
         let dir = scratch("search");
         fs::create_dir_all(dir.join("a/b")).unwrap();
         fs::create_dir_all(dir.join(".cache")).unwrap();
@@ -1839,6 +1849,7 @@ mod tests {
 
     #[test]
     fn a_zip_is_walked_like_a_folder() {
+        let _one = searching();
         let dir = scratch("zip-walk");
         let zip = dir.join("a.zip");
         zip_at(&zip);
@@ -1992,6 +2003,7 @@ mod tests {
 
     #[test]
     fn words_are_found_inside_files() {
+        let _one = searching();
         let dir = scratch("grep");
         fs::create_dir_all(dir.join("sub")).unwrap();
         fs::create_dir_all(dir.join(".hid")).unwrap();

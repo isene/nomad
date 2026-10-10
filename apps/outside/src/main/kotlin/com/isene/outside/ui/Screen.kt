@@ -678,7 +678,9 @@ private fun whole(x: Double): String = Math.round(x).toString()
 
 private fun deg(x: Double): String = "${whole(x)}°"
 
-/** "0.4", "14"; empty for a dry step. */
+/** "0.4", "14"; empty for a dry step. The widget's ring is blue for an
+ *  hour with an amount printed here: PRINTED_MM in the core's outside.rs
+ *  has the same 0.05. */
 private fun millimetres(x: Double): String = when {
     x < 0.05 -> ""
     x < 10 -> String.format(Locale.ROOT, "%.1f", x)
