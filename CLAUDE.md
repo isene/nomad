@@ -316,4 +316,7 @@ tools/publish --list     # what is published, and which version
   (`--remap-path-prefix`); keep that when adding an app.
 - A new app needs a button in the `#get` grid of `docs/index.html` and
   a "Download APK" link on its card.
-- outside has no button yet. Ask Geir before publishing it.
+- outside is private. Geir dropped it as a public app on 2026-10-10: no
+  download, no card on the page, no row in a listing here or in the
+  fe2o3 repo. `tools/publish` refuses it; `--check outside` still
+  builds it for his phone.

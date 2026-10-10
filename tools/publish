@@ -18,6 +18,8 @@ cd "$(dirname "$0")/.."
 
 REPO=isene/nomad
 TAG=apk
+# Built here, never uploaded.
+PRIVATE=" outside "
 export JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}
 export ANDROID_HOME=${ANDROID_HOME:-$HOME/.android-sdk}
 export ANDROID_NDK_HOME=${ANDROID_NDK_HOME:-$ANDROID_HOME/ndk/27.2.12479018}
@@ -66,7 +68,7 @@ for app in "${apps[@]}"; do
   version=${line#*versionName=\'}
   version=${version%%\'*}
 
-  if [ $upload = 0 ]; then
+  if [ $upload = 0 ] || [[ $PRIVATE == *" $app "* ]]; then
     echo "$app $version: built and checked, not uploaded"
     continue
   fi
