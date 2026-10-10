@@ -40,7 +40,8 @@ A clock for the home screen, one row tall and the full width.
 - A coral dot in the top right corner of the clock means a message waits:
   a file named `*.msg` in a folder you choose. Choose it at the bottom of
   outside's screen, under "Widget: show a dot when messages wait". With no
-  folder chosen there is no dot, and the widget looks nowhere.
+  folder chosen there is no dot, and the widget looks nowhere. The dot
+  follows the folder within a few seconds.
 
 The sun, the moon and the weather are for the place where outside last saw
 the phone. The widget never asks for the position itself, so open outside
@@ -79,8 +80,10 @@ changes its page. The other two columns keep working when it does.
 - To let you choose what a tap on the widget opens, the app can see
   which apps have an icon on the phone. It reads that list only while
   you choose, and sends it nowhere.
-- For the dot, the app may read the one folder you choose. It lists the
-  names in it when the widget is redrawn, and opens no file.
+- For the dot, the app may read the one folder you choose, and it opens
+  no file there. While the dot is switched on, a small watch stays up. It
+  lists the folder every five seconds while the screen is on, and rests
+  while the screen is off.
 - No account, no tracking, no ads.
 
 ## Code

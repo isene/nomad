@@ -210,9 +210,20 @@ when building the core. Same rule as the rest of Fe₂O₃.
     from the middle and the rim icons reach 46 dp, so nothing meets it.
     `InboxRow` at the bottom of the screen takes the folder with the
     system's picker and keeps the leave to read it; a tap while a folder
-    is set forgets it. The folder is the phone's copy of the messages
-    that wait for Claude on the phone, brought there by Syncthing. The
-    dot changes only when the widget is redrawn.
+    is set forgets it.
+  - `InboxWatch` (0.3.6) keeps the dot true within seconds, as Geir
+    asked. Android tells no app when Syncthing writes a file, so it is
+    a foreground service that lists the folder every five seconds while
+    the screen is on, and redraws the widget only when the answer has
+    changed. With the screen off it does nothing. `refresh` starts it
+    when a folder is chosen. Android allows that start from the open
+    app, from the hourly exact alarm, after an update and after boot;
+    at other moments it refuses, and `start` swallows that. Its notice
+    is never seen, since the app does not ask for leave to post one.
+  - The folder is fed from the laptop. A script there keeps the names
+    of the waiting fleet messages, as empty files, in a folder that
+    Syncthing shares with the phone. While the laptop sleeps, the names
+    on the phone stay as they were.
   - `TextClock` has no week number, so `refresh` writes the week into
     the date pattern as quoted text.
   - `outside_sky` in the core gives the sign, the rise and set lines and
