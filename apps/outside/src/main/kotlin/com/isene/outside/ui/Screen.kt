@@ -3,6 +3,7 @@ package com.isene.outside.ui
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -58,8 +59,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -101,6 +104,8 @@ private val RainBlue = Color(0xFF4A90D9)
 private val Green = Color(0xFF3FA75A)
 private val Amber = Color(0xFFE0A030)
 private val Red = Color(0xFFD9534F)
+private val MoonDark = Color(0xFF3B4656)
+private val MoonLit = Color(0xFFF3E7B4)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -384,7 +389,7 @@ private fun DayRow(day: OutsideDay, best: Boolean, onClick: () -> Unit) {
             }
             // A line of its own: the two lines above can be full to the
             // edge, and the cells beside them are always three lines tall.
-            Text(MOONS[day.moon.toInt() % 8], fontSize = 13.sp, lineHeight = 16.sp)
+            Moon(day.moon)
         }
         day.cells.forEach { DayCell(it, rainLine, Modifier.weight(1f)) }
     }
@@ -733,8 +738,27 @@ private fun agreementColor(a: Agreement): Color = when (a) {
     Agreement.SPLIT -> Red
 }
 
-/** The moon's faces as the core numbers them for a day: 0 new, 4 full. */
-private val MOONS = listOf("🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘")
+/**
+ * The moon as it is lit that day: a dark disc, and on it the lit part the
+ * core has outlined. As tall as a line of small text, so the row keeps
+ * its height.
+ */
+@Composable
+private fun Moon(lit: List<Float>) {
+    val side = with(LocalDensity.current) { 16.sp.toDp() }
+    Canvas(Modifier.size(side)) {
+        val r = size.minDimension * 0.4f
+        drawCircle(MoonDark, r)
+        val path = Path()
+        for (i in 0 until lit.size - 1 step 2) {
+            val x = center.x + lit[i] * r
+            val y = center.y + lit[i + 1] * r
+            if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        }
+        path.close()
+        drawPath(path, MoonLit)
+    }
+}
 
 private fun symbol(sky: Sky, night: Boolean): String = when (sky) {
     Sky.CLEAR -> if (night) "🌙" else "☀️"

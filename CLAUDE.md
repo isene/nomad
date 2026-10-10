@@ -167,13 +167,15 @@ when building the core. Same rule as the rest of Fe₂O₃.
   a box around Norway, and the shell then skips the request.
 - Fetches happen in `onResume` only, and only for bodies older than 30
   minutes (10 on pull-to-refresh). No WorkManager.
-- Each day has the moon's face (0.3.8; Geir asked for it on 2026-10-10).
-  `OutsideDay.moon` runs from 0 (new) over 4 (full) to 7, from
-  `moon_face` at the day's noon. `outside_sky` names the widget's phase
-  with the same function, so app and widget agree. `DayRow` shows it as
-  an emoji on a third line under the day's name. At a large font the two
-  lines above it can fill the 88 dp column, and the cells beside it are
-  always three lines tall, so that line costs no height.
+- Each day has a small moon (0.3.8; Geir asked for it on 2026-10-10).
+  `OutsideDay.moon` is the outline of the lit part at the day's noon,
+  from `moon_outline`: points on a disc of radius 1. `DayRow` fills it on
+  a dark disc, on a third line under the day's name. 0.3.8 showed one of
+  eight emoji instead, so the day after new moon had a fat crescent, and
+  so had the six days after it. `moon_face` still names the widget's
+  phase. At a large font the two lines above the moon can fill the 88 dp
+  column, and the cells beside it are always three lines tall, so that
+  line costs no height.
 - The widget (`Widget.kt`, since 0.3.0) copies a KWGT design to the
   pixel: `res/layout/clock_widget.xml` has the measured sizes, all in dp.
   - It is plain `RemoteViews`, not Glance. `TextClock` and `AnalogClock`
