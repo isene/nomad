@@ -37,11 +37,12 @@ A clock for the home screen, one row tall and the full width.
   [rpnx](../rpnx/) when that is installed, and the right part outside.
 - Choose another app for each of the three at the bottom of outside's
   screen, under "Widget: choose what a tap opens".
-- A coral dot in the top right corner of the clock means a message waits:
-  a file named `*.msg` in a folder you choose. Choose it at the bottom of
-  outside's screen, under "Widget: show a dot when messages wait". With no
-  folder chosen there is no dot, and the widget looks nowhere. The dot
-  follows the folder within a few seconds.
+- A coral dot in the top right corner of the clock means a
+  [fleet](https://github.com/isene/fleet) message waits for Claude on the
+  phone. Switch it on at the bottom of outside's screen, under "Widget:
+  show a dot when messages wait", by pasting the address of your fleet
+  connector. Until then there is no dot, and the widget asks nobody. The
+  dot follows the queue within about a minute.
 
 The sun, the moon and the weather are for the place where outside last saw
 the phone. The widget never asks for the position itself, so open outside
@@ -74,16 +75,17 @@ changes its page. The other two columns keep working when it does.
   hour. Without the widget, nothing runs in the background.
 - The home screen draws the widget's clocks by itself. The app is run on
   the full hour, and when the next alarm or the volume changes. It never
-  wakes a sleeping phone, and the widget uses no network.
+  wakes a sleeping phone. The widget uses no network, but for the dot
+  when that is switched on.
 - The phone's position is rounded to about a kilometre before it leaves
   the phone. The app asks for coarse location only.
 - To let you choose what a tap on the widget opens, the app can see
   which apps have an icon on the phone. It reads that list only while
   you choose, and sends it nowhere.
-- For the dot, the app may read the one folder you choose, and it opens
-  no file there. While the dot is switched on, a small watch stays up. It
-  lists the folder every five seconds while the screen is on, and rests
-  while the screen is off.
+- While the dot is switched on, a small watch stays up. It asks your
+  fleet server how many messages wait: once a minute while the screen is
+  on, and never while it is off. The address stays on the phone and is
+  left out of backups.
 - No account, no tracking, no ads.
 
 ## Code

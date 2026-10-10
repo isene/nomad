@@ -202,28 +202,30 @@ when building the core. Same rule as the rest of Fe₂O₃.
     `<queries>` entry in the manifest. `refresh` reads the three from
     the prefs it has open already. The widget takes a new choice in
     `MainActivity.onStop`, so nothing refreshes it from the sheet.
-  - A dot shows that a message waits (0.3.5; Geir asked for it on
-    2026-10-10). `waiting` lists the folder in `Store.inbox()` once a
-    `refresh` and stops at the first name that ends in `.msg`. With no
-    folder chosen it returns at once. `marks` draws the dot 5 dp in from
-    the top right corner of the clock's square. That corner is 56 dp
-    from the middle and the rim icons reach 46 dp, so nothing meets it.
-    `InboxRow` at the bottom of the screen takes the folder with the
-    system's picker and keeps the leave to read it; a tap while a folder
-    is set forgets it.
-  - `InboxWatch` (0.3.6) keeps the dot true within seconds, as Geir
-    asked. Android tells no app when Syncthing writes a file, so it is
-    a foreground service that lists the folder every five seconds while
-    the screen is on, and redraws the widget only when the answer has
-    changed. With the screen off it does nothing. `refresh` starts it
-    when a folder is chosen. Android allows that start from the open
-    app, from the hourly exact alarm, after an update and after boot;
-    at other moments it refuses, and `start` swallows that. Its notice
-    is never seen, since the app does not ask for leave to post one.
-  - The folder is fed from the laptop. A script there keeps the names
-    of the waiting fleet messages, as empty files, in a folder that
-    Syncthing shares with the phone. While the laptop sleeps, the names
-    on the phone stay as they were.
+  - A dot shows that a fleet message waits for Claude on the phone
+    (0.3.7; Geir asked for it on 2026-10-10). `marks` draws it 5 dp in
+    from the top right corner of the clock's square. That corner is
+    56 dp from the middle and the rim icons reach 46 dp, so nothing
+    meets it.
+  - `InboxWatch` asks the fleet server: a GET of the connector's
+    address with `?waiting` answers with a number, and consumes nothing
+    (`server/fleet-mcp.py` in the fleet repo). It is a foreground
+    service: one request a minute while the screen is on, one when the
+    screen comes on, none while it is off. `Store.waits` keeps the
+    answer, and the widget is drawn again only when it changes.
+    `refresh` starts the service when an address is set. Android allows
+    that start from the open app, from the hourly exact alarm, after an
+    update and after boot; at other moments it refuses, and `start`
+    swallows that. Its notice is never seen, since the app does not ask
+    for leave to post one.
+  - The address is a secret: whoever has it can read and send fleet
+    messages. It is in no code and in no APK. Geir pastes it once in
+    `InboxRow` at the bottom of the screen, and `Store.relay` keeps it
+    in the prefs, which the backup rules leave on the phone. Never
+    print it, log it or put it in a test.
+  - Two earlier tries are gone: a folder brought by Syncthing (0.3.5,
+    0.3.6) and a laptop script that fed it. Geir: "Keep it as simple as
+    possible."
   - `TextClock` has no week number, so `refresh` writes the week into
     the date pattern as quoted text.
   - `outside_sky` in the core gives the sign, the rise and set lines and

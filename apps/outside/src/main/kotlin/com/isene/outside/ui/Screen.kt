@@ -1,8 +1,6 @@
 package com.isene.outside.ui
 
 import android.Manifest
-import android.content.Intent
-import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -31,6 +29,7 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -51,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -79,6 +80,7 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.fe2o3_mobile_core.Agreement
 import uniffi.fe2o3_mobile_core.Outside
@@ -220,32 +222,27 @@ fun OutsideScreen(vm: OutsideViewModel) {
     if (taps) TapSheet(onClose = { taps = false })
 }
 
-/** The folder the widget looks in for waiting messages (files named
- *  *.msg). The system's folder picker gives leave to read that one folder.
- *  A tap while a folder is chosen forgets it and gives the leave back.
- *  The widget is drawn at once, which also starts the watch. */
+/** The dot for waiting fleet messages, switched on by pasting the address
+ *  of the fleet connector. The address is in no code: it is a secret, and
+ *  this is the one place it enters. It is asked once at once, so the row
+ *  can say whether the server answered. A tap while it is on forgets it. */
 @Composable
 private fun InboxRow() {
     val ctx = LocalContext.current
     val store = remember { Store(ctx) }
-    var folder by remember { mutableStateOf(store.inbox()) }
-    val read = Intent.FLAG_GRANT_READ_URI_PERMISSION
-    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
-        if (uri != null) {
-            ctx.contentResolver.takePersistableUriPermission(uri, read)
-            store.setInbox(uri.toString())
-            folder = uri.toString()
-            ClockWidget.refresh(ctx)
-        }
-    }
+    val scope = rememberCoroutineScope()
+    var on by remember { mutableStateOf(store.relay().isNotEmpty()) }
+    var asking by remember { mutableStateOf(false) }
+    var said by remember { mutableStateOf("") }
     TextButton(
         onClick = {
-            if (folder.isEmpty()) {
-                pick.launch(null)
+            if (!on) {
+                asking = true
             } else {
-                runCatching { ctx.contentResolver.releasePersistableUriPermission(Uri.parse(folder), read) }
-                store.setInbox("")
-                folder = ""
+                store.setRelay("")
+                store.setWaits(false)
+                on = false
+                said = ""
                 InboxWatch.stop(ctx)
                 ClockWidget.refresh(ctx)
             }
@@ -253,8 +250,46 @@ private fun InboxRow() {
         Modifier.padding(horizontal = 4.dp),
     ) {
         Text(
-            if (folder.isEmpty()) "Widget: show a dot when messages wait"
-            else "Widget: the messages dot is on. Tap to turn it off",
+            if (!on) "Widget: show a dot when messages wait"
+            else "Widget: the messages dot is on$said. Tap to turn it off",
+        )
+    }
+    if (asking) {
+        var url by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { asking = false },
+            title = { Text("Messages dot") },
+            text = {
+                Column {
+                    Text("Paste the address of the fleet connector. It stays on this phone.")
+                    OutlinedTextField(
+                        value = url,
+                        onValueChange = { url = it.trim() },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = url.startsWith("https://"),
+                    onClick = {
+                        asking = false
+                        store.setRelay(url)
+                        on = true
+                        said = ""
+                        scope.launch {
+                            val n = withContext(Dispatchers.IO) { InboxWatch.ask(url) }
+                            said = if (n == null) " (no answer from the server)" else " ($n waiting)"
+                            if (n != null) store.setWaits(n > 0)
+                            // Draws the dot, and starts the watch.
+                            ClockWidget.refresh(ctx)
+                        }
+                    },
+                ) { Text("Save") }
+            },
+            dismissButton = { TextButton(onClick = { asking = false }) { Text("Cancel") } },
         )
     }
 }
