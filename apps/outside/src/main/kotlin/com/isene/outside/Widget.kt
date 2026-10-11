@@ -95,6 +95,10 @@ class ClockWidget : AppWidgetProvider() {
         private const val RADIUS = 37.5f
         private const val RIM = 1.14f
 
+        /** How far out the alarm's icon sits, inside the ring: between
+         *  the tip of the hour hand (22.4 dp) and the hour ticks (31.4 dp). */
+        private const val INSIDE = 0.72f
+
         /** A forecast older than this says too little about the next
          *  twelve hours to colour the ring from. */
         private const val FRESH_MS = 12 * 3_600_000L
@@ -110,7 +114,7 @@ class ClockWidget : AppWidgetProvider() {
 
         /** The dial shows twelve hours. The alarm's icon is green when
          *  the alarm rings within them, and grey when it rings later. */
-        private const val ALARM_SOON = 0xFF7DBE82
+        private const val ALARM_SOON = 0xFF55C963
         private const val ALARM_LATER = 0xFFB3B5B2
 
         /** Where Android keeps what the sound line shows. */
@@ -244,9 +248,9 @@ class ClockWidget : AppWidgetProvider() {
         /** What the dial cannot draw by itself: the ring between two hour
          *  ticks in the colour of that hour's weather (blue for rain, grey
          *  for cloud, yellow for sun), on the rim an icon at the time of
-         *  the next alarm (green when it rings within twelve hours), of
-         *  sunrise and of sunset, and a dot in the top right corner while
-         *  a message waits. */
+         *  sunrise and of sunset, inside the ring one at the time of the
+         *  next alarm (green when it rings within twelve hours), and a
+         *  dot in the top right corner while a message waits. */
         private fun marks(
             ctx: Context, dial: List<DialHour>, alarm: ZonedDateTime?, soon: Boolean, sky: Almanac?,
             waiting: Boolean,
@@ -277,10 +281,11 @@ class ClockWidget : AppWidgetProvider() {
             }
 
             // `clock` is a time of day in hours; the dial shows twelve.
-            fun icon(id: Int, color: Long, width: Float, clock: Double) {
+            // `at` is the way out from the middle, the ring being 1.
+            fun icon(id: Int, color: Long, width: Float, clock: Double, at: Float) {
                 val turn = Math.toRadians(clock % 12 * 30)
-                val x = mid + RIM * radius * sin(turn).toFloat()
-                val y = mid - RIM * radius * cos(turn).toFloat()
+                val x = mid + at * radius * sin(turn).toFloat()
+                val y = mid - at * radius * cos(turn).toFloat()
                 val half = width * dp / 2
                 ctx.getDrawable(id)?.mutate()?.apply {
                     setTint(color.toInt())
@@ -293,11 +298,11 @@ class ClockWidget : AppWidgetProvider() {
             }
             if (alarm != null) {
                 val color = if (soon) ALARM_SOON else ALARM_LATER
-                icon(R.drawable.widget_alarm, color, 6.2f, alarm.hour + alarm.minute / 60.0)
+                icon(R.drawable.widget_alarm, color, 6.2f, alarm.hour + alarm.minute / 60.0, INSIDE)
             }
             if (sky != null && sky.sunrise >= 0) {
-                icon(R.drawable.widget_sunrise, 0xFFF5F821, 7.2f, sky.sunrise)
-                icon(R.drawable.widget_sunset, 0xFFEA8920, 7.2f, sky.sunset)
+                icon(R.drawable.widget_sunrise, 0xFFF5F821, 7.2f, sky.sunrise, RIM)
+                icon(R.drawable.widget_sunset, 0xFFEA8920, 7.2f, sky.sunset, RIM)
             }
 
             // The corner of the square is outside the dial: the ring and
