@@ -203,6 +203,12 @@ when building the core. Same rule as the rest of Fe₂O₃.
     That is three file reads and one parse a run; the widget never
     fetches. Geir asked for the ring on 2026-10-10 (0.3.0 had one blue
     tick for the hour now, 0.3.1 blue ticks for rain).
+  - The alarm's icon on the rim is soft green (`ALARM_SOON`) when the
+    alarm rings within twelve hours and grey when it rings later (0.3.11;
+    Geir asked for it on 2026-10-11). The dial shows twelve hours, so the
+    icon's place alone cannot tell the two apart. `refresh` asks for one
+    more run at twelve hours before the alarm when that moment is
+    before the next full hour. Not tried on a phone by Claude.
   - The widget's look has no settings screen and gets none: Geir asks
     for a change, and it goes into the code.
   - The one setting is the app each of the three parts opens on a tap

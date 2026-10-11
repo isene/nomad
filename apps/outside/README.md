@@ -30,7 +30,8 @@ A clock for the home screen, one row tall and the full width.
   hours, one stretch between two ticks for each hour: blue for rain, grey
   for cloud, yellow for sun. An hour is blue when one of the forecasts
   shows rain for it in the app. Small icons on the rim mark the next
-  alarm, sunrise and sunset.
+  alarm, sunrise and sunset. The alarm's icon is green when the alarm
+  rings within twelve hours, and grey when it rings later.
 - Right: the ringer mode with the ring and alarm volume, the sign the sun
   is in, sunrise and sunset, moonrise and moonset, how much of the moon
   is lit, and its phase.

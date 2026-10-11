@@ -108,6 +108,11 @@ class ClockWidget : AppWidgetProvider() {
          *  ring, so that the hours can be counted. */
         private const val GAP = 1.2f
 
+        /** The dial shows twelve hours. The alarm's icon is green when
+         *  the alarm rings within them, and grey when it rings later. */
+        private const val ALARM_SOON = 0xFF7DBE82
+        private const val ALARM_LATER = 0xFFB3B5B2
+
         /** Where Android keeps what the sound line shows. */
         private val SOUND = listOf(
             Settings.System.getUriFor("volume_ring_speaker"),
@@ -173,7 +178,8 @@ class ClockWidget : AppWidgetProvider() {
                 else outsideDial(bodies[0], bodies[1], bodies[2], tzOf(""), now.toEpochSecond())
             } ?: emptyList()
             val waits = store.relay().isNotEmpty() && store.waits()
-            views.setImageViewBitmap(R.id.marks, marks(ctx, dial, alarm, sky.takeIf { spot != null }, waits))
+            val soon = alarm != null && !alarm.isAfter(now.plusHours(12))
+            views.setImageViewBitmap(R.id.marks, marks(ctx, dial, alarm, soon, sky.takeIf { spot != null }, waits))
 
             for (part in Tap.entries) {
                 views.setOnClickPendingIntent(part.view, open(ctx, target(ctx, part, store.tap(part.key))))
@@ -183,7 +189,10 @@ class ClockWidget : AppWidgetProvider() {
             // RTC and not RTC_WAKEUP: a sleeping phone is left asleep, and
             // the alarm goes off when the phone next wakes.
             val nextHour = now.truncatedTo(ChronoUnit.HOURS).plusHours(1)
-            alarms.setExact(AlarmManager.RTC, nextHour.toInstant().toEpochMilli(), hourly(ctx))
+            // The alarm's icon turns green twelve hours before the alarm
+            // rings. That may be between two full hours: one more run.
+            val green = alarm?.minusHours(12)?.takeIf { it.isAfter(now) && it.isBefore(nextHour) }
+            alarms.setExact(AlarmManager.RTC, (green ?: nextHour).toInstant().toEpochMilli(), hourly(ctx))
             watchSound(ctx, again = false)
             if (store.relay().isNotEmpty()) InboxWatch.start(ctx)
         }
@@ -235,10 +244,12 @@ class ClockWidget : AppWidgetProvider() {
         /** What the dial cannot draw by itself: the ring between two hour
          *  ticks in the colour of that hour's weather (blue for rain, grey
          *  for cloud, yellow for sun), on the rim an icon at the time of
-         *  the next alarm, of sunrise and of sunset, and a dot in the top
-         *  right corner while a message waits. */
+         *  the next alarm (green when it rings within twelve hours), of
+         *  sunrise and of sunset, and a dot in the top right corner while
+         *  a message waits. */
         private fun marks(
-            ctx: Context, dial: List<DialHour>, alarm: ZonedDateTime?, sky: Almanac?, waiting: Boolean,
+            ctx: Context, dial: List<DialHour>, alarm: ZonedDateTime?, soon: Boolean, sky: Almanac?,
+            waiting: Boolean,
         ): Bitmap {
             val dp = ctx.resources.displayMetrics.density
             val size = (SQUARE * dp).roundToInt()
@@ -280,7 +291,10 @@ class ClockWidget : AppWidgetProvider() {
                     draw(canvas)
                 }
             }
-            if (alarm != null) icon(R.drawable.widget_alarm, 0xFFB3B5B2, 6.2f, alarm.hour + alarm.minute / 60.0)
+            if (alarm != null) {
+                val color = if (soon) ALARM_SOON else ALARM_LATER
+                icon(R.drawable.widget_alarm, color, 6.2f, alarm.hour + alarm.minute / 60.0)
+            }
             if (sky != null && sky.sunrise >= 0) {
                 icon(R.drawable.widget_sunrise, 0xFFF5F821, 7.2f, sky.sunrise)
                 icon(R.drawable.widget_sunset, 0xFFEA8920, 7.2f, sky.sunset)
