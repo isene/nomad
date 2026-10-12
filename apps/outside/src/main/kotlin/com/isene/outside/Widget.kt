@@ -271,7 +271,8 @@ class ClockWidget : AppWidgetProvider() {
                 ring.color = when (hour) {
                     DialHour.RAIN -> 0xFF3D9BFF
                     DialHour.CLOUD -> 0xFF8E8E8E
-                    DialHour.PARTLY -> 0xFFF8F6A6
+                    // A paler one (F8F6A6) was white on the phone.
+                    DialHour.PARTLY -> 0xFFF8FA6E
                     DialHour.SUN -> 0xFFF5F821
                     DialHour.UNKNOWN -> return@forEachIndexed
                 }.toInt()

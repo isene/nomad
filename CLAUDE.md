@@ -194,7 +194,8 @@ when building the core. Same rule as the rest of Fe₂O₃.
   - The ring between two hour ticks has the colour of the hour that
     starts there, for the twelve hours from now: blue for rain, grey for
     cloud, light yellow for partly cloudy (0.3.13; Geir asked for it on
-    2026-10-12), yellow for sun (a clear night too). `outside_dial` in the
+    2026-10-12; its first colour, `F8F6A6`, was white on his phone, so
+    0.3.14 has `F8FA6E`), yellow for sun (a clear night too). `outside_dial` in the
     core decides. An hour is rain when one source shows rain for it in
     the app: a wet symbol, or an amount the app prints (0.05 mm or
     more). A dry hour is cloud when the sources together say more than
