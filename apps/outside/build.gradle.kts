@@ -124,8 +124,8 @@ android {
         applicationId = "com.isene.outside"
         minSdk = 33
         targetSdk = 35
-        versionCode = 17
-        versionName = "0.3.12"
+        versionCode = 18
+        versionName = "0.3.13"
         ndk { abiFilters += androidAbis.keys }
     }
 

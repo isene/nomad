@@ -247,10 +247,11 @@ class ClockWidget : AppWidgetProvider() {
 
         /** What the dial cannot draw by itself: the ring between two hour
          *  ticks in the colour of that hour's weather (blue for rain, grey
-         *  for cloud, yellow for sun), on the rim an icon at the time of
-         *  sunrise and of sunset, inside the ring one at the time of the
-         *  next alarm (green when it rings within twelve hours), and a
-         *  dot in the top right corner while a message waits. */
+         *  for cloud, light yellow for partly cloudy, yellow for sun), on
+         *  the rim an icon at the time of sunrise and of sunset, inside
+         *  the ring one at the time of the next alarm (green when it
+         *  rings within twelve hours), and a dot in the top right corner
+         *  while a message waits. */
         private fun marks(
             ctx: Context, dial: List<DialHour>, alarm: ZonedDateTime?, soon: Boolean, sky: Almanac?,
             waiting: Boolean,
@@ -270,6 +271,7 @@ class ClockWidget : AppWidgetProvider() {
                 ring.color = when (hour) {
                     DialHour.RAIN -> 0xFF3D9BFF
                     DialHour.CLOUD -> 0xFF8E8E8E
+                    DialHour.PARTLY -> 0xFFF8F6A6
                     DialHour.SUN -> 0xFFF5F821
                     DialHour.UNKNOWN -> return@forEachIndexed
                 }.toInt()
