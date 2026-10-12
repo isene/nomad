@@ -193,11 +193,13 @@ when building the core. Same rule as the rest of Fe₂O₃.
     weather ring and the rim icons into a bitmap on top.
   - The ring between two hour ticks has the colour of the hour that
     starts there, for the twelve hours from now: blue for rain, grey for
-    cloud, yellow for sun (a clear night too). `outside_dial` in the
+    cloud, light yellow for partly cloudy (0.3.13; Geir asked for it on
+    2026-10-12), yellow for sun (a clear night too). `outside_dial` in the
     core decides. An hour is rain when one source shows rain for it in
     the app: a wet symbol, or an amount the app prints (0.05 mm or
     more). A dry hour is cloud when the sources together say more than
-    "partly cloudy". Until 0.3.3 rain was 0.1 mm as the mean of the
+    "partly cloudy", and partly cloudy when they say more than "fair".
+    Until 0.3.3 rain was 0.1 mm as the mean of the
     sources, and the ring was grey for an hour the app showed rain in. `refresh` reads the three cached
     bodies for `Store.here()` and skips one older than twelve hours.
     That is three file reads and one parse a run; the widget never
