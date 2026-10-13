@@ -1047,7 +1047,8 @@ pub fn outside_spots_parse(text: String) -> Vec<Spot> {
 pub struct Almanac {
     /// The sign the sun is in, "LIBRA".
     pub sign: String,
-    /// "07:41 - 18:28"; empty on a day with no sunrise or sunset.
+    /// "07:41 - 18:28". On a day with no sunrise, far north or south:
+    /// "up all day" or "down all day".
     pub sun: String,
     /// The same for the moon.
     pub moon: String,
@@ -1153,7 +1154,14 @@ pub fn outside_sky(year: i32, month: u32, day: u32, hour: f64, lat: f64, lon: f6
     let (d1, d2) = (sun_dec.to_radians(), moon_dec.to_radians());
     let apart = d1.sin() * d2.sin() + d1.cos() * d2.cos() * (sun_ra - moon_ra).to_radians().cos();
 
-    let line = |t: &Option<(String, String)>| t.as_ref().map(|(r, s)| format!("{r} - {s}")).unwrap_or_default();
+    // No rise that day: the body is up all day when it stands on the
+    // same side of the sky's equator as the place, and down all day on
+    // the other side.
+    let line = |t: &Option<(String, String)>, dec: f64| match t {
+        Some((r, s)) => format!("{r} - {s}"),
+        None if dec * lat > 0.0 => "up all day".to_string(),
+        None => "down all day".to_string(),
+    };
     let sun = orbit::sun_times(year, month, day, lat, lon, tz_hours);
     let (sunrise, sunset) = sun
         .as_ref()
@@ -1161,8 +1169,8 @@ pub fn outside_sky(year: i32, month: u32, day: u32, hour: f64, lat: f64, lon: f6
         .unwrap_or((-1.0, -1.0));
     Almanac {
         sign: SIGNS[(sun_at / 30.0) as usize % 12].to_string(),
-        sun: line(&sun),
-        moon: line(&orbit::moon_times(year, month, day, lat, lon, tz_hours)),
+        sun: line(&sun, sun_dec),
+        moon: line(&orbit::moon_times(year, month, day, lat, lon, tz_hours), moon_dec),
         lit: ((1.0 - apart) * 50.0).round() as u32,
         phase: PHASES[moon_face(ahead) as usize].to_string(),
         sunrise,
@@ -1744,9 +1752,18 @@ mod tests {
         assert_eq!(outside_sky(2026, 3, 20, 12.0, 59.91, 10.75, 1.0).sign, "PISCES");
         assert_eq!(outside_sky(2026, 3, 20, 18.0, 59.91, 10.75, 1.0).sign, "ARIES");
 
-        // Tromsø at midsummer: the sun does not set, so there is no line.
+        // Tromsø at midsummer: the sun does not set, so the line says so
+        // and the dial gets no icons.
         let north = outside_sky(2026, 6, 21, 12.0, 69.65, 18.96, 2.0);
-        assert_eq!((north.sun.as_str(), north.sunrise, north.sunset), ("", -1.0, -1.0));
+        assert_eq!((north.sun.as_str(), north.sunrise, north.sunset), ("up all day", -1.0, -1.0));
+        // At midwinter it does not rise.
+        assert_eq!(outside_sky(2026, 12, 21, 12.0, 69.65, 18.96, 1.0).sun, "down all day");
+        // The moon keeps under Tromsø's horizon when it is far south
+        // (13 to 19 October 2026), and above it when it is far north.
+        assert_eq!(outside_sky(2026, 10, 15, 12.0, 69.65, 18.96, 2.0).moon, "down all day");
+        assert_eq!(outside_sky(2026, 10, 30, 12.0, 69.65, 18.96, 1.0).moon, "up all day");
+        // Oslo has both a rise and a set on those days.
+        assert!(outside_sky(2026, 10, 15, 12.0, 59.91, 10.75, 2.0).moon.contains(" - "));
         // The sun had crossed into Cancer that morning, at 10:24.
         assert_eq!(north.sign, "CANCER");
         assert_eq!(outside_sky(2026, 6, 21, 9.0, 69.65, 18.96, 2.0).sign, "GEMINI");

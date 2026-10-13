@@ -35,7 +35,9 @@ A clock for the home screen, one row tall and the full width.
   when it rings later.
 - Right: the ringer mode with the ring and alarm volume, the sign the sun
   is in, sunrise and sunset, moonrise and moonset, how much of the moon
-  is lit, its phase, and the name of the place the weather is for.
+  is lit, its phase, and the name of the place the weather is for. Far
+  north, a day with no sunrise or moonrise reads "up all day" or "down
+  all day".
 - A tap opens an app: the left part the clock app's alarms, the clock
   [rpnx](../rpnx/) when that is installed, and the right part outside.
 - Choose another app for each of the three at the bottom of outside's

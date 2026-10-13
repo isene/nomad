@@ -267,6 +267,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
     possible."
   - `TextClock` has no week number, so `refresh` writes the week into
     the date pattern as quoted text.
+  - A day with no rise reads "up all day" or "down all day" (0.3.18).
+    Until then the line was blank, and Geir took the blank for a fault
+    when the moon stayed down in a town far north. `orbit::moon_times`
+    gives `None` for both cases; the core tells them apart by the side
+    of the sky's equator the body is on.
   - `outside_sky` in the core gives the sign, the rise and set lines and
     the lit part of the moon. The lit part is from the angle between sun
     and moon at that hour; `orbit::moon_phase` is a day off near new moon.
