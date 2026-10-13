@@ -2,6 +2,7 @@ package com.isene.onepage
 
 import java.text.BreakIterator
 import kotlin.math.abs
+import kotlin.math.hypot
 
 /** True when a finger has moved up by `min`, and more up than sideways.
  *  `dx` and `dy` are counted from where it came down; up is negative. */
@@ -42,6 +43,44 @@ fun slotAt(x: Float, y: Float, cellW: Int, cellH: Int, cols: Int, rows: Int): In
     val col = (x / cellW).toInt()
     val row = (y / cellH).toInt()
     return if (col < cols && row < rows) row * cols + col else null
+}
+
+/**
+ * A finger on an icon while the panel is edited: a tap until it has moved
+ * more than `slop`, a drag from then on.
+ *
+ * `end` is asked both when the finger lifts and when Android takes the
+ * touch away, and it ends the drag. The drop draws the panel again, that
+ * removes the icon, and Android then cancels the icon's touch. That cancel
+ * must find no drag, or it would draw the panel inside its own drawing.
+ */
+class Drag(private val slop: Float) {
+    private var x0 = 0f
+    private var y0 = 0f
+
+    /** True from the first move past `slop` until the touch ends. */
+    var on = false
+        private set
+
+    fun down(x: Float, y: Float) {
+        x0 = x
+        y0 = y
+        on = false
+    }
+
+    /** The finger moved. True when this move starts the drag. */
+    fun move(x: Float, y: Float): Boolean {
+        if (on || hypot(x - x0, y - y0) <= slop) return false
+        on = true
+        return true
+    }
+
+    /** How far the finger is from where it came down. */
+    fun dx(x: Float): Float = x - x0
+    fun dy(y: Float): Float = y - y0
+
+    /** The touch is over. True when it was a drag, once. */
+    fun end(): Boolean = on.also { on = false }
 }
 
 /** The file a contact's picture is kept in, named by the digits of the number. */

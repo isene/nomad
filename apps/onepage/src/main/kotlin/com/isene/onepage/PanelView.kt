@@ -36,7 +36,6 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import java.io.File
-import kotlin.math.hypot
 import kotlin.math.min
 import kotlin.math.roundToInt
 import uniffi.fe2o3_mobile_core.Panel
@@ -398,24 +397,17 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
      *  is let go over. A finger that stays put is a tap, as before. */
     @SuppressLint("ClickableViewAccessibility")
     private fun drag(v: View, from: Int) {
-        var x0 = 0f
-        var y0 = 0f
-        var dragging = false
+        val drag = Drag(slop.toFloat())
         v.setOnTouchListener { _, ev ->
             when (ev.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    x0 = ev.rawX
-                    y0 = ev.rawY
-                    dragging = false
+                    drag.down(ev.rawX, ev.rawY)
                     // The card must not scroll away under a drag.
                     v.parent?.requestDisallowInterceptTouchEvent(true)
                     false
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    val dx = ev.rawX - x0
-                    val dy = ev.rawY - y0
-                    if (!dragging && moving == null && folder == null && hypot(dx, dy) > slop) {
-                        dragging = true
+                    if (moving == null && folder == null && drag.move(ev.rawX, ev.rawY)) {
                         v.cancelLongPress()
                         v.isPressed = false
                         // Above its neighbours, and a little larger.
@@ -423,21 +415,26 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
                         v.scaleX = 1.15f
                         v.scaleY = 1.15f
                     }
-                    if (dragging) {
-                        v.translationX = dx
-                        v.translationY = dy
+                    if (drag.on) {
+                        v.translationX = drag.dx(ev.rawX)
+                        v.translationY = drag.dy(ev.rawY)
                         mark(slotUnder(ev))
                     }
-                    dragging
+                    drag.on
                 }
-                MotionEvent.ACTION_UP -> if (dragging) {
+                // The drag ends before the drop, which draws the panel
+                // again. Android cancels the touch of the icon that drawing
+                // removes, and the cancel below must find no drag by then.
+                MotionEvent.ACTION_UP -> if (drag.end()) {
                     drop(from, slotUnder(ev))
                     true
                 } else {
                     false
                 }
+                // Taken away mid-drag: the icon goes back, but only after
+                // Android is done with it. Never draw the panel from here.
                 MotionEvent.ACTION_CANCEL -> {
-                    if (dragging) render()
+                    if (drag.end()) post { if (!closed) render() }
                     false
                 }
                 else -> false

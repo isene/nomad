@@ -92,4 +92,33 @@ class RulesTest {
         // A broken line of the table is left out, the rest is read.
         assertEquals(listOf("a"), signTable(sequenceOf("# note", "a\tM 1 2 L 3 4", "b\tL 1 2", "c")).keys.toList())
     }
+
+    @Test fun a_finger_drags_only_after_it_has_moved_past_the_slop() {
+        val drag = Drag(24f)
+        drag.down(100f, 100f)
+        assertFalse(drag.move(110f, 110f))
+        assertFalse(drag.on)
+        assertTrue(drag.move(130f, 100f))
+        assertTrue(drag.on)
+        // Only the first such move starts it.
+        assertFalse(drag.move(200f, 100f))
+        assertTrue(drag.on)
+        assertEquals(100f, drag.dx(200f), 0f)
+        assertEquals(-40f, drag.dy(60f), 0f)
+    }
+
+    @Test fun a_drop_ends_the_drag_so_the_cancel_after_it_finds_none() {
+        // The drop draws the panel again, and Android cancels the touch of
+        // the icon that drawing removed. In 0.6.0 that cancel still saw a
+        // drag and drew the panel a second time, inside the first.
+        val drag = Drag(24f)
+        drag.down(0f, 0f)
+        drag.move(50f, 0f)
+        assertTrue(drag.end())
+        assertFalse(drag.end())
+        assertFalse(drag.on)
+        // A tap was never a drag, and a new touch starts as a tap.
+        drag.down(0f, 0f)
+        assertFalse(drag.end())
+    }
 }
