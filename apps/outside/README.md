@@ -52,7 +52,8 @@ the phone. The widget never asks for the position itself, so open outside
 after a journey.
 
 The weather is from the forecast outside last fetched, since the widget
-fetches nothing. A forecast older than twelve hours colours nothing.
+fetches nothing. A forecast older than twelve hours colours nothing. The
+ring is drawn again the moment outside has fetched a new one.
 
 ## Sources
 
