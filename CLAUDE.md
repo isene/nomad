@@ -383,6 +383,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
   into the code, a default file or a test.
 - Dialogs over the panel need `window.setType(TYPE_APPLICATION_OVERLAY)`
   or they come up behind it.
+- Never draw the panel again from a touch that Android cancels. Removing
+  a view makes Android cancel its touch at once, so a redraw from that
+  cancel runs inside the first one and leaves holes in the grid. 0.6.0
+  lost the panel at the end of every drag that way. `Drag` in `Rules.kt`
+  ends the drag before the drop, and a cancel posts its redraw.
 - `Rules.kt` has what can be tested with no phone: the swipe rule, the
   number of columns, the slot under a finger, the reader of the signs file.
   The tests run on the laptop: `:apps:onepage:testReleaseUnitTest`.
