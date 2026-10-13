@@ -15,7 +15,6 @@ import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
@@ -137,7 +136,7 @@ private fun WidgetContent(rows: List<WidgetRow>, back: Int) {
     val openApp = actionStartActivity<MainActivity>()
     val base = GlanceModifier
         .fillMaxSize()
-        .let { if (back ushr 24 == 0) it else it.background(Color(back)).cornerRadius(16.dp) }
+        .let { if (back ushr 24 == 0) it else it.background(Color(back)) }
         .padding(8.dp)
         .clickable(openApp)
     Box(

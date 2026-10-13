@@ -67,8 +67,10 @@ These come from the original mobile-architecture artifact. Do not drift.
   has one setting for the colour behind it: "Widget background", six hex
   digits and how solid (Geir asked for it on 2026-10-13). The app keeps
   it as one ARGB number, 0 for none. A new widget gets the same.
+  The corners are square: he asked for that the same day, so no widget
+  draws a radius. onepage rounds nothing either.
   - In a `RemoteViews` widget the root has the id
-    `@android:id/background` and a white rounded shape, and `refresh`
+    `@android:id/background` and a white shape, and `refresh`
     lays the colour over it with `setBackgroundTintList`. It sets the
     tint every time, the clear one too: a home screen keeps a widget's
     views, so a colour that is left out stays. tock's
