@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- No event types and no window content: Android sends this service
+     nothing, and it cannot read what is on screen. It is an accessibility
+     service only to be let to put its swipe strip over the button bar. -->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRetrieveWindowContent="false"
+    android:description="@string/edge_description"
+    android:notificationTimeout="0" />

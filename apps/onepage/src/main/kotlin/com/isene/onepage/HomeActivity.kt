@@ -57,6 +57,7 @@ class HomeActivity : Activity() {
                 }
             }
             onPersist = { LayoutStore.save(this@HomeActivity, snapshot()) }
+            onSwipeUp = { PanelWindow.show(this@HomeActivity) }
         }
         setContentView(surface)
 
@@ -85,6 +86,12 @@ class HomeActivity : Activity() {
             )
         },
     )
+
+    /** Home was pressed, here or in another app: the app panel goes. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        PanelWindow.hide()
+    }
 
     override fun onStart() {
         super.onStart()

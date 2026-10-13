@@ -24,7 +24,8 @@ import kotlin.math.roundToInt
  * no snap, overlap allowed.
  *
  * VIEW mode (default): widgets receive their own touches; the surface only
- * sees empty-space events, where a long-press enters EDIT. Zero drawing, zero
+ * sees empty-space events, where a long-press enters EDIT and a swipe up
+ * opens the app panel. Zero drawing, zero
  * layout work when idle — widgets invalidate themselves on RemoteViews pushes
  * and Android composites the wallpaper without involving us.
  *
@@ -46,12 +47,22 @@ class HomeSurface(context: Context) : FrameLayout(context) {
      *  poke KeepAliveService to add/remove the overlay live. */
     var onToggleHomeButton: (() -> Unit)? = null
 
+    /** Fired when a finger moves up over the empty page. */
+    var onSwipeUp: (() -> Unit)? = null
+
     val entries = mutableListOf<Entry>()
     private var editMode = false
 
     private val density = resources.displayMetrics.density
     private val minSizePx = (48 * density).roundToInt()
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+
+    // ---- VIEW-mode swipe: up over the empty page opens the app panel ----
+
+    private val swipeMin = 56 * density
+    private var swipeX = 0f
+    private var swipeY = 0f
+    private var swiped = false
 
     // ---- edit chrome (built once, attached only in EDIT mode) ----
 
@@ -249,6 +260,18 @@ class HomeSurface(context: Context) : FrameLayout(context) {
     override fun onTouchEvent(ev: MotionEvent): Boolean {
         if (!editMode) {
             // Only empty-space events reach here (widgets consume their own).
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    swipeX = ev.x
+                    swipeY = ev.y
+                    swiped = false
+                }
+                // Once per touch: the finger is still down when the panel is up.
+                MotionEvent.ACTION_MOVE -> if (!swiped && swipedUp(ev.x - swipeX, ev.y - swipeY, swipeMin)) {
+                    swiped = true
+                    onSwipeUp?.invoke()
+                }
+            }
             viewModeDetector.onTouchEvent(ev)
             return true
         }

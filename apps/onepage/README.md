@@ -8,7 +8,7 @@
 
 **One screen. Your widgets, placed freely. Nothing else.**
 
-![version](https://img.shields.io/badge/version-0.4.3-3ddc84) ![platform](https://img.shields.io/badge/platform-Android%2011%2B-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Views-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![idle](https://img.shields.io/badge/idle-zero%20cost-22c55e) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.5.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android%2011%2B-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Views-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![idle](https://img.shields.io/badge/idle-zero%20cost-22c55e) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A minimal home launcher — part of the [nomad](../../) mobile suite.
 
@@ -30,8 +30,20 @@ your home screen.
 
 ## What it does
 
-- **One home page.** No drawer, no paging, no dock, no search bar, no app icons
-  (launch apps with your gesture tool of choice).
+- **One home page.** No drawer, no paging, no dock, no search bar, and no app
+  icons on the page: they are in the app panel.
+- **App panel.** Swipe up and a card of icons comes up at the right edge, three
+  to a row, over the home page or over the app you are in.
+  - A tap starts an app or opens a folder. A tap beside the card, Back or Home
+    closes it.
+  - Hold the panel to edit: tap **+** in a free slot for an app or a folder, tap
+    an icon to move or remove it. Leave a row free and you have two groups.
+  - A folder shows the first letter of its name, or the emoji it starts with.
+  - A contact or a chat gets in through **Add to Home screen** in the app that
+    should open it. OnePage asks for no access to your contacts.
+  - On the home page the swipe works anywhere on the empty page. In other apps
+    it starts at the very bottom edge, and that needs OnePage switched on under
+    Accessibility (see First run).
 - **Free widget placement** — absolute `(x, y, w, h)`, no grid, overlap allowed.
 - **Edit mode** — long-press empty space:
   - drag a widget to move it,
@@ -68,6 +80,12 @@ The launcher is always alive, so the idle path is empty by design:
   drag-tick.
 - The floating pill is one inert composited layer; it spends cycles only when
   tapped.
+- **The app panel does not exist while it is closed.** Its view is built when
+  you swipe and dropped when it closes. An icon is drawn once, off the main
+  thread, and kept in memory. The file is written when you change the panel.
+- **The swipe strip is one empty window**, 14 dp tall along the bottom edge. It
+  runs code only when a finger lands on it. The accessibility service behind it
+  asks Android for no events and cannot read the screen.
 
 ## Architecture
 
@@ -101,6 +119,12 @@ APK → `apps/onepage/build/outputs/apk/release/`. Sync and sideload.
 3. Long-press the wallpaper → **+ Widget** → pick one → it appears centered.
    Drag to move, pinch to resize, **Done** to save.
 4. The floating pill takes you home from any app.
+5. Swipe up on the empty page: the app panel opens, in edit mode while it is
+   empty. Tap **+** to fill it.
+6. To open the panel from any app: Settings → Accessibility → OnePage → on.
+   Android refuses this the first time for an app installed from a file. After
+   that refusal, open App info for OnePage, tap ⋮, choose **Allow restricted
+   settings**, and switch it on again.
 
 > On ColorOS/OxygenOS the hardware/3-button Home action into third-party
 > launchers is an OEM bug with no real fix. The floating pill is the reliable
