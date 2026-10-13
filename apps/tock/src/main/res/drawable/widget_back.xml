@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The widget's dark panel, see-through enough to let the wallpaper show. -->
+<!-- The widget's panel: black, so the calendar colours stand out. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#B80A0A14" />
+    <solid android:color="#FF000000" />
     <corners android:radius="@android:dimen/system_app_widget_background_radius" />
 </shape>
