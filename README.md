@@ -43,6 +43,7 @@ and prompt the changes that fit *your* phone.
 | <img src="apps/gaze/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**gaze**](apps/gaze/) | Web browser around Android's WebView: tabs sent to and from the laptop, the laptop's encrypted passwords and bookmarks, ad blocking, dark pages, and Claude to ask about the page | [gaze](https://github.com/isene/gaze) |
 | <img src="apps/fresh/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**fresh**](apps/fresh/) | The ten most recently installed apps, newest first: tap opens one, long-press for app info or uninstall | — |
 | <img src="apps/pointer/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**pointer**](apps/pointer/) | File manager: tag items, walk to another folder, copy or move them there; a trash, undo for every step, tabs, archives that open as folders, search inside files, marked folders that other apps can save into, and no network permission | [pointer](https://github.com/isene/pointer) |
+| <img src="apps/tock/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**tock**](apps/tock/) | Calendar: the calendars the phone already syncs as a month and an agenda, with reminders, a home-screen agenda widget, and each calendar in the colour tock has for it on the laptop | [tock](https://github.com/isene/tock) |
 
 Each ships as its own signed APK with its own launcher icon. The newest
 build of each is one tap away on the

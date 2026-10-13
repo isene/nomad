@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One event in the widget's list: a bar in the calendar's colour, the
+     start over the end, the title over the place. A tap opens the event. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/row"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:baselineAligned="false"
+    android:orientation="horizontal"
+    android:paddingStart="14dp"
+    android:paddingTop="3dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="3dp"
+    tools:ignore="ContentDescription,SpUsage">
+
+    <ImageView
+        android:id="@+id/bar"
+        android:layout_width="4dp"
+        android:layout_height="match_parent" />
+
+    <LinearLayout
+        android:layout_width="48dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/from"
+            style="@style/WidgetText" />
+
+        <TextView
+            android:id="@+id/to"
+            style="@style/WidgetText.Dim" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/what"
+            style="@style/WidgetText"
+            android:maxLines="2" />
+
+        <TextView
+            android:id="@+id/where"
+            style="@style/WidgetText.Dim" />
+    </LinearLayout>
+</LinearLayout>

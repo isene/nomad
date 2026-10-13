@@ -1,0 +1,23 @@
+<resources>
+    <!-- Only the window behind the first frame; Compose paints the rest. -->
+    <style name="Theme.Tock" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!-- A line of text in the home-screen widget. Every size is in dp, text
+         too, so the look stays the same whatever font size the phone has. -->
+    <style name="WidgetText">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:textColor">#FFFFFF</item>
+        <item name="android:textSize">13dp</item>
+    </style>
+
+    <!-- The second line of a pair: the end time, the place. -->
+    <style name="WidgetText.Dim">
+        <item name="android:textColor">#B4B4C0</item>
+        <item name="android:textSize">11dp</item>
+    </style>
+</resources>

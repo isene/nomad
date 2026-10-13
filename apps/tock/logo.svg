@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="tock">
+  <!-- The tock logo of the Fe2O3 suite in few shapes, so it reads at the size of an icon. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a1a2e"/>
+      <stop offset="1" stop-color="#0a0a14"/>
+    </linearGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- The clock -->
+  <circle cx="128" cy="104" r="54" fill="none" stroke="url(#rust)" stroke-width="7"/>
+  <line x1="128" y1="104" x2="128" y2="66" stroke="#aaaabb" stroke-width="6" stroke-linecap="round"/>
+  <line x1="128" y1="104" x2="154" y2="80" stroke="#dddddd" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="128" cy="104" r="7" fill="#f74c00"/>
+  <!-- The lines of a calendar -->
+  <rect x="74" y="176" width="108" height="9" rx="4" fill="#f74c00"/>
+  <rect x="88" y="194" width="80" height="9" rx="4" fill="#b7410e"/>
+</svg>

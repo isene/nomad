@@ -46,7 +46,7 @@ These come from the original mobile-architecture artifact. Do not drift.
   of an icon. An app with no twin (fresh, hyperlist, onepage, outside, ref,
   relay, tasks, vox) gets a drawing of what it does. Draw
   `apps/<app>/logo.svg` by the rules at the top of `tools/logo`, then run
-  `tools/logo <app>`. All eighteen apps have one.
+  `tools/logo <app>`. All nineteen apps have one.
 
 ## Per-app responsibilities
 
@@ -344,6 +344,36 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - Record names are plain (`Entry`, `Mark`, `Kind`, `Undo`, `Done`). All
   core modules share one Kotlin package, so a new module must not reuse
   them.
+
+### tock (com.isene.tock)
+
+- A calendar after the laptop's tock. Signed with the tasks key. Kotlin
+  only, like fresh: every event comes from Android's own calendar store
+  (`CalendarContract`), which the phone's accounts keep in sync with the
+  laptop on or off. No INTERNET permission, no tokens; keep it that way.
+- The day and colour rules are in `Days.kt`, which touches no Android
+  class. Their tests run on the laptop:
+  `./gradlew :apps:tock:testReleaseUnitTest`. An all-day event is
+  midnight to midnight UTC in the store, so its day is read in UTC and
+  never in the phone's zone.
+- `LocalDate` is not `Comparable<LocalDate>` in Kotlin's eyes: `maxOf`,
+  `a..b` and `sortedMapOf` do not take it. Use `isBefore` and a `TreeMap`.
+- Colours: `Settings` keeps a terminal colour number (0 to 255) per
+  calendar, the number laptop tock has in `calendars.color`. No account
+  name may be written into the code or an APK: the numbers come in by
+  hand or from a text file the user picks (`laptopColors`).
+- The widget is plain `RemoteViews` with a list handed over in one piece
+  (`RemoteCollectionItems`, no service). `AgendaWidget.refresh` is run
+  by events only: a job Android runs when the calendar store changed
+  (`CalendarWatch`, it asks again each time), a plain `RTC` alarm at the
+  end of the next event or at midnight, and `WidgetEvents`, which is
+  switched off until a widget is placed.
+- Reminders: the calendar store keeps the alarms and sends
+  `EVENT_REMINDER`. `Reminder` shows the notice and marks the alert as
+  fired, or the store sends it again.
+- A repeating event is shown and can be deleted (one time through
+  `CONTENT_EXCEPTION_URI`, or all). Changing one is not built.
+- 0.1.0 was never seen on a phone by me.
 
 ## Anti-patterns (don't drift into these)
 
