@@ -124,6 +124,16 @@ export ANDROID_NDK_HOME="$HOME/.android-sdk/ndk/27.2.12479018"
 
 APK → `apps/onepage/build/outputs/apk/release/`. Sync and sideload.
 
+The tests run on the laptop. Those of the app panel run on Android's own view
+code, through [Robolectric](https://robolectric.org), so a fault in a drag or a
+list shows before the app is on a phone.
+
+```bash
+./gradlew :apps:onepage:testReleaseUnitTest
+```
+
+The first run fetches about 390 MB.
+
 ## Permissions for calls
 
 OnePage asks for two things, and only when you add your first call icon. You
