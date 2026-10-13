@@ -309,7 +309,9 @@ private fun MonthGrid(month: YearMonth, ui: Ui, pick: (LocalDate) -> Unit) {
                         today = day == ui.today,
                         selected = day == ui.selected,
                         // One dot per calendar that has something that day.
-                        dots = ui.days[day].orEmpty().filter { !it.declined }.map { it.color }.distinct().take(4),
+                        // A dot per event, so a full day looks full. Five fit
+                        // in a cell on a narrow phone.
+                        dots = ui.days[day].orEmpty().filter { !it.declined }.map { it.color }.take(5),
                         modifier = Modifier.weight(1f),
                         pick = pick,
                     )
