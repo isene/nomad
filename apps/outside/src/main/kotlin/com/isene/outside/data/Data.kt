@@ -147,6 +147,12 @@ class Store(ctx: Context) {
     fun waits(): Boolean = prefs.getBoolean("waits", false)
 
     fun setWaits(yes: Boolean) = prefs.edit().putBoolean("waits", yes).apply()
+
+    /** When the widget last asked for a forecast of its own, epoch
+     *  milliseconds; 0 when it never has. */
+    fun asked(): Long = prefs.getLong("asked", 0)
+
+    fun setAsked(at: Long) = prefs.edit().putLong("asked", at).apply()
 }
 
 /** Every app with an icon in the launcher, sorted by name: its
