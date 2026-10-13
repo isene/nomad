@@ -5,7 +5,9 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DaysTest {
@@ -119,5 +121,15 @@ class DaysTest {
         assertNull(laptopColor(colors, "Birthdays", "", "work@example.org", false))
         // One that is alone in its account does.
         assertEquals(69, laptopColor(colors, "Kalender", "", "work@example.org", true))
+    }
+
+    @Test fun opening_twice_in_a_row_asks_the_accounts_once() {
+        val quarter = 15 * 60 * 1000L
+        // Never asked before.
+        assertTrue(fetchDue(1_000_000_000L, 0, quarter))
+        assertFalse(fetchDue(1_000_000_000L + 60_000, 1_000_000_000L, quarter))
+        assertTrue(fetchDue(1_000_000_000L + quarter, 1_000_000_000L, quarter))
+        // The clock was set back to before the last time.
+        assertTrue(fetchDue(1_000_000_000L - 5, 1_000_000_000L, quarter))
     }
 }

@@ -84,6 +84,11 @@ class Settings(ctx: Context) {
 
     fun color(cal: Cal): Int = (number(cal.id)?.let { terminalColor(it) } ?: cal.phoneColor) or OPAQUE
 
+    /** When tock last asked the accounts to fetch, in ms. */
+    var synced: Long
+        get() = prefs.getLong("synced", 0)
+        set(at) = prefs.edit { putLong("synced", at) }
+
     /** The calendar the last new event went into, or -1. */
     var last: Long
         get() = prefs.getLong("last", -1)
@@ -256,7 +261,7 @@ object Phone {
     ) != null
 
     /** Ask each account to fetch its calendars now. The phone does this by
-     *  itself too; this is for the impatient. */
+     *  itself too, but it can take hours. */
     fun sync(ctx: Context) {
         val now = Bundle().apply {
             putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true)

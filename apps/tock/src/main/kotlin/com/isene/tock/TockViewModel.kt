@@ -25,6 +25,9 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** The shortest time between two fetches that opening tock asks for. */
+private const val FETCH_EVERY = 15 * 60 * 1000L
+
 /** What fills the screen. */
 sealed interface Page {
     data object Main : Page
@@ -96,7 +99,18 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
                 .registerContentObserver(CalendarContract.CONTENT_URI, true, watch)
             watching = true
         }
+        // The phone fetches from its accounts when it sees fit, and an
+        // invitation has waited hours for that. Opening tock asks for a
+        // fetch, at most once in a quarter of an hour.
+        if (fetchDue(System.currentTimeMillis(), settings.synced, FETCH_EVERY)) fetch()
         load()
+    }
+
+    /** Ask the accounts to fetch. What arrives changes the calendar
+     *  store, and that redraws the screen and the widget. */
+    private fun fetch() {
+        settings.synced = System.currentTimeMillis()
+        viewModelScope.launch(Dispatchers.IO) { Phone.sync(getApplication()) }
     }
 
     /** The app left the screen. True when the widget must be drawn again. */
@@ -303,7 +317,7 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun sync() {
-        viewModelScope.launch(Dispatchers.IO) { Phone.sync(getApplication()) }
+        fetch()
         say("Asked the accounts to sync")
     }
 
