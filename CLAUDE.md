@@ -345,6 +345,35 @@ when building the core. Same rule as the rest of Fe₂O₃.
   core modules share one Kotlin package, so a new module must not reuse
   them.
 
+### onepage (com.isene.onepage)
+
+- The home screen: one page of widgets, and since 0.5.0 an app panel.
+  Plain Views and no Compose, except the setup wizard.
+- The panel is a window of its own (`PanelWindow`,
+  `TYPE_APPLICATION_OVERLAY`), so it comes up over any app, and the app
+  below keeps running. It is built on open and dropped on close. Keep it
+  that way: no view, receiver or thread may outlive a closed panel.
+- Two things open it. A swipe up on the empty home page
+  (`HomeSurface.onSwipeUp`), and a swipe up on a 14 dp strip along the
+  bottom edge (`EdgeService`). Only a window from an accessibility
+  service may lie over the button bar, and that is the one reason
+  `EdgeService` is one. It must go on asking for no events and no window
+  content (`res/xml/edge_service.xml`).
+- The panel's file is `filesDir/panel.json`. Its format and every edit
+  (put, swap, add, folders, the shortcut list for Android) are in
+  `core/src/onepage.rs`, with tests. Kotlin draws and starts things.
+- A shortcut (a contact, a chat) arrives through `PinActivity`, which
+  takes Android's pin request. Only the default home app may show or
+  start a shortcut, so the panel cannot move to an app of its own.
+- The user fills the panel on the phone. His apps and contacts never go
+  into the code, a default file or a test.
+- Dialogs over the panel need `window.setType(TYPE_APPLICATION_OVERLAY)`
+  or they come up behind it.
+- `Rules.kt` has the swipe rule and a folder's sign, with a test that
+  runs on the laptop: `:apps:onepage:testReleaseUnitTest`.
+- Not seen on a phone by Claude: there is no emulator here. Say so after
+  every change to the panel.
+
 ### tock (com.isene.tock)
 
 - A calendar after the laptop's tock. Signed with the tasks key. Kotlin

@@ -70,6 +70,33 @@
             android:exported="false"
             android:theme="@style/Theme.OnePage.Wizard" />
 
+        <!-- An app's "Add to Home screen" lands here: a contact, a chat, a
+             web page. It goes into the app panel. Shows nothing. -->
+        <activity
+            android:name=".PinActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
+            </intent-filter>
+        </activity>
+
+        <!-- The swipe up from the bottom edge that opens the app panel in
+             any app. Off until the user switches it on under Accessibility.
+             Only Android can bind it. -->
+        <service
+            android:name=".EdgeService"
+            android:exported="true"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/edge_service" />
+        </service>
+
         <!-- Inert keep-alive (see the permission comment above). -->
         <service
             android:name=".KeepAliveService"

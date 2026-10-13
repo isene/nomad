@@ -130,8 +130,8 @@ android {
         applicationId = "com.isene.onepage"
         minSdk = 30
         targetSdk = 35
-        versionCode = 14
-        versionName = "0.4.3"
+        versionCode = 15
+        versionName = "0.5.0"
         ndk { abiFilters += androidAbis.keys }
     }
 
@@ -193,4 +193,7 @@ dependencies {
 
     // JNA — generated UniFFI bindings depend on com.sun.jna.*.
     implementation("net.java.dev.jna:jna:5.15.0@aar")
+
+    // The swipe rule and a folder's sign are plain Kotlin, tested on the laptop.
+    testImplementation("junit:junit:4.13.2")
 }
