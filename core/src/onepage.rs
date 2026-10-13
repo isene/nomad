@@ -270,6 +270,20 @@ pub fn panel_folder_drop(mut panel: Panel, at: u32, item: u32) -> Panel {
     panel
 }
 
+/// Move item number `from` of the folder at `at` to place `to`. The items
+/// between close up, so the others keep their order. A `to` past the last
+/// item means last.
+#[uniffi::export]
+pub fn panel_folder_move(mut panel: Panel, at: u32, from: u32, to: u32) -> Panel {
+    if let Some(Slot::Folder { items, .. }) = panel.slots.get_mut(at as usize) {
+        if (from as usize) < items.len() {
+            let item = items.remove(from as usize);
+            items.insert((to as usize).min(items.len()), item);
+        }
+    }
+    panel
+}
+
 /// The shortcuts of one app that are in the panel. Android keeps a shortcut
 /// only while the home app says it is in use, so this list is handed back
 /// to Android whenever one is removed.
@@ -488,6 +502,25 @@ mod panel_tests {
         assert_eq!(panel_folder_drop(p.clone(), 2, 9), p);
         assert_eq!(panel_folder_add(p.clone(), 0, app("x")), p);
         assert_eq!(panel_folder_drop(p.clone(), 40, 0), p);
+    }
+
+    #[test]
+    fn an_item_moved_in_a_folder_takes_that_place_and_the_others_close_up() {
+        let items = |names: &[&str]| names.iter().map(|n| app(n)).collect::<Vec<_>>();
+        let p = panel_put(panel_put(panel_empty(), 0, one("mail")), 1, folder("F", items(&["a", "b", "c", "d"])));
+        let order = |p: Panel| match &p.slots[1] {
+            Slot::Folder { items, .. } => items.clone(),
+            _ => vec![],
+        };
+        // Towards the end, towards the start, and past the last one.
+        assert_eq!(order(panel_folder_move(p.clone(), 1, 0, 2)), items(&["b", "c", "a", "d"]));
+        assert_eq!(order(panel_folder_move(p.clone(), 1, 3, 1)), items(&["a", "d", "b", "c"]));
+        assert_eq!(order(panel_folder_move(p.clone(), 1, 1, 9)), items(&["a", "c", "d", "b"]));
+        // Nothing to move: the same place, no such item, no folder there.
+        assert_eq!(panel_folder_move(p.clone(), 1, 2, 2), p);
+        assert_eq!(panel_folder_move(p.clone(), 1, 7, 0), p);
+        assert_eq!(panel_folder_move(p.clone(), 0, 0, 1), p);
+        assert_eq!(panel_folder_move(p.clone(), 40, 0, 1), p);
     }
 
     #[test]

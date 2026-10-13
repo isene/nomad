@@ -45,6 +45,7 @@ import uniffi.fe2o3_mobile_core.panelAdd
 import uniffi.fe2o3_mobile_core.panelFill
 import uniffi.fe2o3_mobile_core.panelFolderAdd
 import uniffi.fe2o3_mobile_core.panelFolderDrop
+import uniffi.fe2o3_mobile_core.panelFolderMove
 import uniffi.fe2o3_mobile_core.panelHas
 import uniffi.fe2o3_mobile_core.panelIntoFolder
 import uniffi.fe2o3_mobile_core.panelPins
@@ -146,6 +147,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         maxLines = 1
     }
     private val folderGrid = GridLayout(context).apply { columnCount = FOLDER_COLS }
+    private val folderHint = line(FAINT).apply { text = "Drag an icon to move it. Tap one for more." }
 
     private val folderBox = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -178,6 +180,8 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
             addView(plus, LinearLayout.LayoutParams(dp(32), dp(32)))
         }
         addView(head, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap))
+        // As wide as the icons, so the line folds and the card stays narrow.
+        addView(folderHint, LinearLayout.LayoutParams(pitch * FOLDER_COLS, wrap))
         addView(folderGrid)
         setOnClickListener { }
         visibility = View.GONE
@@ -302,18 +306,26 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
             folderBox.visibility = View.GONE
         } else {
             folderTitle.text = open.name
+            folderHint.visibility = if (edit) View.VISIBLE else View.GONE
             open.items.forEachIndexed { n, target ->
                 val v = icon(target, pitch, wanted)
                 v.background = ripple()
-                v.setOnClickListener { start(target) }
-                v.setOnLongClickListener { anchor ->
-                    menu(
+                // As in the panel: a tap starts it and holding switches
+                // editing on. While editing, a drag moves it and a tap
+                // asks what else to do with it.
+                v.setOnClickListener { anchor ->
+                    if (!edit) start(target)
+                    else menu(
                         anchor,
                         Choice("Out to the panel") { outOfFolder(at, n) },
                         Choice("Remove") { dropFromFolder(at, n) },
                     )
+                }
+                v.setOnLongClickListener {
+                    if (!edit) toggleEdit()
                     true
                 }
+                if (edit) drag(v, n, folderGrid)
                 folderGrid.addView(v, pitch, pitch)
             }
             folderBox.visibility = View.VISIBLE
@@ -342,7 +354,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
                 true
             }
         }
-        if (edit && slot !is Slot.Empty) drag(v, i)
+        if (edit && slot !is Slot.Empty) drag(v, i, grid)
         if (i == moving) v.alpha = 0.35f
         return v
     }
@@ -399,9 +411,12 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
     // ---- dragging ----
 
     /** While editing, an icon follows the finger and lands in the slot it
-     *  is let go over. A finger that stays put is a tap, as before. */
+     *  is let go over. A finger that stays put is a tap, as before.
+     *
+     *  `on` is where the icon lives: the panel's `grid`, or `folderGrid`
+     *  for an icon of the open folder. */
     @SuppressLint("ClickableViewAccessibility")
-    private fun drag(v: View, from: Int) {
+    private fun drag(v: View, from: Int, on: GridLayout) {
         val drag = Drag(slop.toFloat())
         v.setOnTouchListener { _, ev ->
             when (ev.actionMasked) {
@@ -412,7 +427,10 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
                     false
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    if (moving == null && folder == null && drag.move(ev.rawX, ev.rawY)) {
+                    // The panel's own icons lie still under an open folder,
+                    // and while one of them is being moved by taps.
+                    val free = on === folderGrid || (moving == null && folder == null)
+                    if (free && drag.move(ev.rawX, ev.rawY)) {
                         v.cancelLongPress()
                         v.isPressed = false
                         // Above its neighbours, and a little larger.
@@ -423,7 +441,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
                     if (drag.on) {
                         v.translationX = drag.dx(ev.rawX)
                         v.translationY = drag.dy(ev.rawY)
-                        mark(slotUnder(ev))
+                        mark(slotUnder(ev, on)?.let { on.getChildAt(it) })
                     }
                     drag.on
                 }
@@ -431,7 +449,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
                 // again. Android cancels the touch of the icon that drawing
                 // removes, and the cancel below must find no drag by then.
                 MotionEvent.ACTION_UP -> if (drag.end()) {
-                    drop(from, slotUnder(ev))
+                    drop(from, slotUnder(ev, on), on)
                     true
                 } else {
                     false
@@ -447,14 +465,17 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         }
     }
 
-    private fun slotUnder(ev: MotionEvent): Int? {
-        grid.getLocationOnScreen(spot)
-        return slotAt(ev.rawX - spot[0], ev.rawY - spot[1], cellW, pitch, cols, grid.childCount / cols)
+    /** The slot of `on` under the finger. In a folder that may be a free
+     *  place after its last icon. */
+    private fun slotUnder(ev: MotionEvent, on: GridLayout): Int? {
+        on.getLocationOnScreen(spot)
+        val n = on.columnCount
+        val width = if (on === grid) cellW else pitch
+        return slotAt(ev.rawX - spot[0], ev.rawY - spot[1], width, pitch, n, (on.childCount + n - 1) / n)
     }
 
     /** Frame the slot the dragged icon would land in. */
-    private fun mark(slot: Int?) {
-        val next = slot?.let { grid.getChildAt(it) }
+    private fun mark(next: View?) {
         if (next === over) return
         over?.foreground = null
         next?.foreground = GradientDrawable().apply {
@@ -464,19 +485,25 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         over = next
     }
 
-    /** On a folder an icon goes into it. Anywhere else the two slots
-     *  change places, and one of them may be free. */
-    private fun drop(from: Int, to: Int?) {
+    /** In the panel an icon dropped on a folder goes into it, and anywhere
+     *  else the two slots change places, of which one may be free. In a
+     *  folder the icon takes the place it lands on and the others close up. */
+    private fun drop(from: Int, to: Int?, on: GridLayout) {
         over = null
         if (to == null || to == from) {
             render()
             return
         }
         val panel = now()
+        val at = folder
         val into = panel.slots.getOrNull(from) is Slot.One && panel.slots.getOrNull(to) is Slot.Folder
         save(
-            if (into) panelIntoFolder(panel, from.toUInt(), to.toUInt())
-            else panelSwap(panel, from.toUInt(), to.toUInt()),
+            when {
+                on === folderGrid ->
+                    if (at == null) panel else panelFolderMove(panel, at.toUInt(), from.toUInt(), to.toUInt())
+                into -> panelIntoFolder(panel, from.toUInt(), to.toUInt())
+                else -> panelSwap(panel, from.toUInt(), to.toUInt())
+            },
         )
     }
 

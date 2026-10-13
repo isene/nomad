@@ -28,7 +28,7 @@ import org.robolectric.annotation.Config
 import uniffi.fe2o3_mobile_core.Slot
 import uniffi.fe2o3_mobile_core.Target
 import uniffi.fe2o3_mobile_core.panelEmpty
-import uniffi.fe2o3_mobile_core.panelFill
+import uniffi.fe2o3_mobile_core.panelPut
 
 /**
  * The panel on Android's own view code, run on the laptop by Robolectric.
@@ -65,11 +65,37 @@ class PanelOnAndroidTest {
         }
     }
 
-    /** The first view of a kind in `v`, in the order the views were added. */
-    private fun <T : View> find(v: View, kind: Class<T>): T? {
-        if (kind.isInstance(v)) return kind.cast(v)
-        if (v is ViewGroup) for (i in 0 until v.childCount) find(v.getChildAt(i), kind)?.let { return it }
-        return null
+    /** The views of a kind in `v`, in the order they were added. */
+    private fun <T : View> all(v: View, kind: Class<T>): List<T> = when {
+        kind.isInstance(v) -> listOf(kind.cast(v)!!)
+        v is ViewGroup -> (0 until v.childCount).flatMap { all(v.getChildAt(it), kind) }
+        else -> emptyList()
+    }
+
+    private var closed = 0
+
+    /** The panel with these slots, on a screen. */
+    private fun panelOn(editing: Boolean, vararg slots: Slot): Pair<Activity, PanelView> {
+        PanelStore.set(app, slots.foldIndexed(panelEmpty()) { i, panel, slot -> panelPut(panel, i.toUInt(), slot) })
+        val screen = Robolectric.buildActivity(Activity::class.java).create()
+        val activity = screen.get()
+        val panel = PanelView(ContextThemeWrapper(activity, android.R.style.Theme_DeviceDefault), editing) { closed++ }
+        activity.setContentView(panel)
+        screen.start().resume().visible()
+        return activity to panel
+    }
+
+    /** A finger down on one view, across to another, and up there. */
+    private fun dragOver(activity: Activity, from: View, to: View) {
+        assertTrue("the panel has no size", from.width > 0)
+        val start = middle(from)
+        val end = middle(to)
+        val down = SystemClock.uptimeMillis()
+        touch(activity, MotionEvent.ACTION_DOWN, start, down)
+        touch(activity, MotionEvent.ACTION_MOVE, end, down)
+        touch(activity, MotionEvent.ACTION_UP, end, down)
+        // The frame after the drop, when Android lays the panel out again.
+        looper.idle()
     }
 
     private fun middle(v: View): IntArray {
@@ -91,7 +117,7 @@ class PanelOnAndroidTest {
         val context = ContextThemeWrapper(app, android.R.style.Theme_DeviceDefault)
         val dialog = appDialog(context, "Other apps", apps(40), 108) {}
         dialog.show()
-        val list = find(dialog.window!!.decorView, ListView::class.java)!!
+        val list = all(dialog.window!!.decorView, ListView::class.java)[0]
         // What a dialog does with its list: it asks how tall the list wants
         // to be, and then it lays the rows out.
         list.measure(
@@ -115,32 +141,35 @@ class PanelOnAndroidTest {
     // the cancel drew the panel once more inside the first drawing.
     @Test fun a_dropped_icon_leaves_the_panel_whole_and_open() {
         val (a, b) = apps(2).map { it.second }
-        PanelStore.set(app, panelFill(panelEmpty(), 0u, listOf(a, b)))
-        var closed = 0
-        val screen = Robolectric.buildActivity(Activity::class.java).create()
-        val activity = screen.get()
-        val panel = PanelView(ContextThemeWrapper(activity, android.R.style.Theme_DeviceDefault), true) { closed++ }
-        activity.setContentView(panel)
-        screen.start().resume().visible()
+        val (activity, panel) = panelOn(true, Slot.One(a), Slot.One(b))
         settle { Icons.cached(a) != null && Icons.cached(b) != null }
         looper.idle()
 
-        val grid = find(panel, GridLayout::class.java)!!
+        val grid = all(panel, GridLayout::class.java)[0]
         val cells = grid.childCount
-        assertTrue("the panel has no size", grid.getChildAt(0).width > 0)
-        val from = middle(grid.getChildAt(0))
-        val to = middle(grid.getChildAt(1))
-
-        val down = SystemClock.uptimeMillis()
-        touch(activity, MotionEvent.ACTION_DOWN, from, down)
-        touch(activity, MotionEvent.ACTION_MOVE, to, down)
-        touch(activity, MotionEvent.ACTION_UP, to, down)
-        // The frame after the drop, when Android lays the panel out again.
-        looper.idle()
+        dragOver(activity, grid.getChildAt(0), grid.getChildAt(1))
 
         assertEquals(listOf<Slot>(Slot.One(b), Slot.One(a)), PanelStore.get(app).slots)
         assertEquals(cells, grid.childCount)
         assertTrue("a slot of the panel is gone", (0 until cells).all { grid.getChildAt(it)?.parent === grid })
+        assertEquals("the panel closed", 0, closed)
+    }
+
+    @Test fun an_icon_dragged_inside_a_folder_takes_its_new_place() {
+        val (a, b, c) = apps(3).map { it.second }
+        val (activity, panel) = panelOn(false, Slot.Folder("Tools", "", listOf(a, b, c), false))
+        val (grid, inside) = all(panel, GridLayout::class.java)
+        // A tap opens the folder, and holding an icon in it switches editing on.
+        grid.getChildAt(0).performClick()
+        inside.getChildAt(0).performLongClick()
+        settle { listOf(a, b, c).all { Icons.cached(it) != null } }
+        looper.idle()
+
+        dragOver(activity, inside.getChildAt(0), inside.getChildAt(2))
+
+        assertEquals(listOf<Target>(b, c, a), (PanelStore.get(app).slots[0] as Slot.Folder).items)
+        assertEquals(3, inside.childCount)
+        assertEquals("the folder closed", View.VISIBLE, (inside.parent as View).visibility)
         assertEquals("the panel closed", 0, closed)
     }
 }

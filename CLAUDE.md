@@ -398,6 +398,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
   cancel runs inside the first one and leaves holes in the grid. 0.6.0
   lost the panel at the end of every drag that way. `Drag` in `Rules.kt`
   ends the drag before the drop, and a cancel posts its redraw.
+- One drag serves both grids: `drag(v, from, on)` takes the panel's `grid`
+  or the open folder's `folderGrid`. In the panel a drop makes two slots
+  change places. In a folder `panel_folder_move` puts the icon where it
+  lands and the others close up. The folder card follows the panel: holding
+  an icon switches editing on, and while editing a tap gives its menu.
 - `Rules.kt` has what can be tested with no phone: the swipe rule, the
   number of columns, the slot under a finger, the reader of the signs file.
   The tests run on the laptop: `:apps:onepage:testReleaseUnitTest`.
