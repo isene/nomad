@@ -8,7 +8,7 @@
 
 **One screen. Your widgets, placed freely. Nothing else.**
 
-![version](https://img.shields.io/badge/version-0.6.1-3ddc84) ![platform](https://img.shields.io/badge/platform-Android%2011%2B-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Views-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![idle](https://img.shields.io/badge/idle-zero%20cost-22c55e) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.7.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android%2011%2B-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Views-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![idle](https://img.shields.io/badge/idle-zero%20cost-22c55e) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A minimal home launcher — part of the [nomad](../../) mobile suite.
 
@@ -43,6 +43,9 @@ your home screen.
     every app with its icon and name, and you can tick several at once.
   - A folder gets a sign you choose among 96 line drawings (a wrench, a plane,
     a shopping cart), or the first letter of its name.
+  - **Other apps** is a folder that fills itself: a tap lists every app that
+    is nowhere else in the panel, with icon and name. Drag an app onto it and
+    the app leaves the panel for that list. Add it or leave it out.
   - **Call** opens the phone's own contact list. The number you pick becomes
     an icon with that contact's picture, and a tap on it calls.
   - The last line in edit mode moves the panel: bottom, right edge, left edge.

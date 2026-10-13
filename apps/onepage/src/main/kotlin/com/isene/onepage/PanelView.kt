@@ -49,6 +49,7 @@ import uniffi.fe2o3_mobile_core.panelHas
 import uniffi.fe2o3_mobile_core.panelIntoFolder
 import uniffi.fe2o3_mobile_core.panelPins
 import uniffi.fe2o3_mobile_core.panelPut
+import uniffi.fe2o3_mobile_core.panelRest
 import uniffi.fe2o3_mobile_core.panelRows
 import uniffi.fe2o3_mobile_core.panelSwap
 
@@ -56,6 +57,10 @@ import uniffi.fe2o3_mobile_core.panelSwap
  * The app panel: a card of icons along the bottom of the screen, or at one
  * of its sides. A tap starts an app, a shortcut or a call, or opens a
  * folder as a second card. An empty row parts two groups.
+ *
+ * One folder may be the folder of all other apps. It has no items of its
+ * own: a tap lists every app on the phone that is nowhere else in the
+ * panel, with names, since those are the apps the user knows least.
  *
  * Holding the panel switches editing on: a plus shows in every free slot,
  * an icon can be dragged to another slot or onto a folder, and a tap on an
@@ -492,9 +497,14 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         when {
             edit && slot is Slot.Empty -> menu(
                 v,
-                Choice("Apps") { pickApps { save(panelFill(now(), i.toUInt(), it)) } },
-                Choice("Folder") { newFolder(i) },
-                Choice("Call") { pickContact(i) },
+                *listOfNotNull(
+                    Choice("Apps") { pickApps { save(panelFill(now(), i.toUInt(), it)) } },
+                    Choice("Folder") { newFolder(i, rest = false) },
+                    Choice("Call") { pickContact(i) },
+                    // One folder of all other apps is enough.
+                    if (now().slots.any { it is Slot.Folder && it.rest }) null
+                    else Choice("Other apps") { newFolder(i, rest = true) },
+                ).toTypedArray(),
             )
             edit && slot is Slot.Folder -> menu(
                 v,
@@ -514,8 +524,24 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
     }
 
     private fun open(i: Int) {
+        val slot = now().slots.getOrNull(i) as? Slot.Folder ?: return
+        if (slot.rest) {
+            showRest(slot.name)
+            return
+        }
         folder = i
         render()
+    }
+
+    /** The folder of all other apps: every app on the phone that is nowhere
+     *  else in the panel, to start one from. The list is made when it is
+     *  asked for, so an app installed a minute ago is in it. */
+    private fun showRest(name: String) {
+        val all = allApps(launcher)
+        val left = panelRest(now(), all.map { it.second.component }).toSet()
+        val apps = all.filter { it.second.component in left }
+        if (apps.isEmpty()) say("Every app is in the panel already.")
+        else show(appDialog(context, name, apps, iconPx) { start(it) })
     }
 
     private fun move(i: Int) {
@@ -523,19 +549,20 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         render()
     }
 
-    /** A new folder gets its name first, then its sign. */
-    private fun newFolder(i: Int) = askName("") { name ->
-        pickSign(name) { icon -> save(panelPut(now(), i.toUInt(), Slot.Folder(name, icon, emptyList()))) }
+    /** A new folder gets its name first, then its sign. `rest` makes it
+     *  the folder of all other apps. */
+    private fun newFolder(i: Int, rest: Boolean) = askName(if (rest) "Other apps" else "") { name ->
+        pickSign(name) { icon -> save(panelPut(now(), i.toUInt(), Slot.Folder(name, icon, emptyList(), rest))) }
     }
 
     private fun rename(i: Int, name: String) {
         val old = now().slots.getOrNull(i) as? Slot.Folder ?: return
-        save(panelPut(now(), i.toUInt(), Slot.Folder(name, old.icon, old.items)))
+        save(panelPut(now(), i.toUInt(), Slot.Folder(name, old.icon, old.items, old.rest)))
     }
 
     private fun setSign(i: Int, icon: String) {
         val old = now().slots.getOrNull(i) as? Slot.Folder ?: return
-        save(panelPut(now(), i.toUInt(), Slot.Folder(old.name, icon, old.items)))
+        save(panelPut(now(), i.toUInt(), Slot.Folder(old.name, icon, old.items, old.rest)))
     }
 
     private fun remove(i: Int) {
@@ -652,7 +679,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         popup.show()
     }
 
-    private fun pickApps(then: (List<Target>) -> Unit) = show(appsDialog(context, launcher, iconPx, then))
+    private fun pickApps(then: (List<Target>) -> Unit) = show(appsDialog(context, allApps(launcher), iconPx, then))
 
     private fun pickSign(name: String, then: (String) -> Unit) = show(signsDialog(context, name, then))
 

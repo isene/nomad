@@ -26,8 +26,9 @@ import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 import uniffi.fe2o3_mobile_core.Target
 
-// The two lists the app panel asks the user to choose from. Each is built
-// when it is asked for and leaves nothing behind when it closes.
+// The lists of the app panel: apps to add, apps to start, and the signs of
+// folders. Each is built when it is asked for and leaves nothing behind
+// when it closes.
 
 /** The colour of plain text in a dialog, dark or light as the phone has it. */
 private fun textColor(ctx: Context): Int {
@@ -35,74 +36,94 @@ private fun textColor(ctx: Context): Int {
     return a.getColor(0, Color.WHITE).also { a.recycle() }
 }
 
+/** Every app on the phone that has an icon, by name. */
+fun allApps(launcher: LauncherApps): List<Pair<String, Target.App>> = try {
+    launcher.getActivityList(null, Process.myUserHandle())
+        .map { it.label.toString() to Target.App(it.componentName.flattenToString()) }
+        .sortedBy { it.first.lowercase() }
+} catch (_: Exception) {
+    emptyList()
+}
+
 /**
- * Every app with an icon, by name, each with its icon and a box to tick.
- * "Add" hands back the ticked ones, in the order they were ticked.
+ * The rows of a list of apps: each with its icon and its name, and with a
+ * box to tick when `ticks` is set.
  *
- * An icon is drawn when the list scrolls to it, on one thread, and all of
- * them are dropped when the list closes.
+ * An icon is drawn when the list scrolls to it, on one thread, and `close`
+ * drops them all.
  */
-fun appsDialog(context: Context, launcher: LauncherApps, iconPx: Int, then: (List<Target>) -> Unit): AlertDialog {
+private class AppRows(
+    private val ctx: Context,
+    private val apps: List<Pair<String, Target.App>>,
+    private val iconPx: Int,
+    ticks: Boolean,
+) : BaseAdapter() {
+    private val density = ctx.resources.displayMetrics.density
+    private val color = textColor(ctx)
+    private val tick = if (!ticks) 0 else
+        ctx.obtainStyledAttributes(intArrayOf(android.R.attr.listChoiceIndicatorMultiple))
+            .let { a -> a.getResourceId(0, 0).also { a.recycle() } }
+    private val icons = HashMap<Int, Drawable>()
+    private val asked = HashSet<Int>()
+    private val pool = Executors.newSingleThreadExecutor()
+    private val main = Handler(Looper.getMainLooper())
+
+    private fun dp(n: Int) = (n * density).roundToInt()
+
+    override fun getCount() = apps.size
+    override fun getItem(n: Int) = apps[n]
+    override fun getItemId(n: Int) = n.toLong()
+
+    override fun getView(n: Int, old: View?, parent: ViewGroup): View {
+        val row = old as? CheckedTextView ?: CheckedTextView(ctx).apply {
+            setTextColor(color)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            gravity = Gravity.CENTER_VERTICAL
+            minHeight = dp(52)
+            setPadding(dp(20), 0, dp(16), 0)
+            compoundDrawablePadding = dp(16)
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            if (tick != 0) setCheckMarkDrawable(tick)
+        }
+        row.text = apps[n].first
+        row.tag = n
+        // Room for the icon from the start, so the name does not jump.
+        val shown = icons[n] ?: ColorDrawable(Color.TRANSPARENT).apply { setBounds(0, 0, iconPx, iconPx) }
+        row.setCompoundDrawablesRelative(shown, null, null, null)
+        if (n !in icons && asked.add(n)) {
+            try {
+                pool.execute {
+                    val bitmap = Icons.drawNow(ctx, apps[n].second, iconPx) ?: return@execute
+                    main.post {
+                        val icon = BitmapDrawable(ctx.resources, bitmap).apply { setBounds(0, 0, iconPx, iconPx) }
+                        icons[n] = icon
+                        if (row.tag == n) row.setCompoundDrawablesRelative(icon, null, null, null)
+                    }
+                }
+            } catch (_: Exception) {
+                // The list has closed.
+            }
+        }
+        return row
+    }
+
+    fun close() {
+        pool.shutdownNow()
+        icons.clear()
+    }
+}
+
+/**
+ * A list of apps to choose several from, each with its icon and a box to
+ * tick. "Add" hands back the ticked ones, in the order they were ticked.
+ */
+fun appsDialog(
+    context: Context, apps: List<Pair<String, Target.App>>, iconPx: Int, then: (List<Target>) -> Unit,
+): AlertDialog {
     val builder = AlertDialog.Builder(context)
     val ctx = builder.context
-    val density = ctx.resources.displayMetrics.density
-    fun dp(n: Int) = (n * density).roundToInt()
-    val color = textColor(ctx)
-    val tick = ctx.obtainStyledAttributes(intArrayOf(android.R.attr.listChoiceIndicatorMultiple))
-        .let { a -> a.getResourceId(0, 0).also { a.recycle() } }
-    val apps: List<Pair<String, Target>> = try {
-        launcher.getActivityList(null, Process.myUserHandle())
-            .map { it.label.toString() to Target.App(it.componentName.flattenToString()) }
-            .sortedBy { it.first.lowercase() }
-    } catch (_: Exception) {
-        emptyList()
-    }
-
-    val icons = HashMap<Int, Drawable>()
-    val asked = HashSet<Int>()
-    val pool = Executors.newSingleThreadExecutor()
-    val main = Handler(Looper.getMainLooper())
-
-    val rows = object : BaseAdapter() {
-        override fun getCount() = apps.size
-        override fun getItem(n: Int) = apps[n]
-        override fun getItemId(n: Int) = n.toLong()
-
-        override fun getView(n: Int, old: View?, parent: ViewGroup): View {
-            val row = old as? CheckedTextView ?: CheckedTextView(ctx).apply {
-                setTextColor(color)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-                gravity = Gravity.CENTER_VERTICAL
-                minHeight = dp(52)
-                setPadding(dp(20), 0, dp(16), 0)
-                compoundDrawablePadding = dp(16)
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-                if (tick != 0) setCheckMarkDrawable(tick)
-            }
-            row.text = apps[n].first
-            row.tag = n
-            // Room for the icon from the start, so the name does not jump.
-            val shown = icons[n] ?: ColorDrawable(Color.TRANSPARENT).apply { setBounds(0, 0, iconPx, iconPx) }
-            row.setCompoundDrawablesRelative(shown, null, null, null)
-            if (n !in icons && asked.add(n)) {
-                try {
-                    pool.execute {
-                        val bitmap = Icons.drawNow(ctx, apps[n].second, iconPx) ?: return@execute
-                        main.post {
-                            val icon = BitmapDrawable(ctx.resources, bitmap).apply { setBounds(0, 0, iconPx, iconPx) }
-                            icons[n] = icon
-                            if (row.tag == n) row.setCompoundDrawablesRelative(icon, null, null, null)
-                        }
-                    }
-                } catch (_: Exception) {
-                    // The list has closed.
-                }
-            }
-            return row
-        }
-    }
-
+    val rows = AppRows(ctx, apps, iconPx, ticks = true)
     val order = ArrayList<Int>()
     val list = ListView(ctx).apply {
         choiceMode = ListView.CHOICE_MODE_MULTIPLE
@@ -118,10 +139,24 @@ fun appsDialog(context: Context, launcher: LauncherApps, iconPx: Int, then: (Lis
         .setPositiveButton("Add") { _, _ -> if (order.isNotEmpty()) then(order.map { apps[it].second }) }
         .setNegativeButton("Cancel", null)
         .create()
-    dialog.setOnDismissListener {
-        pool.shutdownNow()
-        icons.clear()
+    dialog.setOnDismissListener { rows.close() }
+    return dialog
+}
+
+/** A list of apps to start one from: a tap on a row hands its app to `then`. */
+fun appDialog(
+    context: Context, title: String, apps: List<Pair<String, Target.App>>, iconPx: Int, then: (Target) -> Unit,
+): AlertDialog {
+    val builder = AlertDialog.Builder(context)
+    val ctx = builder.context
+    val rows = AppRows(ctx, apps, iconPx, ticks = false)
+    val list = ListView(ctx).apply {
+        isFastScrollEnabled = true
+        adapter = rows
     }
+    list.setOnItemClickListener { _, _, n, _ -> then(apps[n].second) }
+    val dialog = builder.setTitle(title).setView(list).create()
+    dialog.setOnDismissListener { rows.close() }
     return dialog
 }
 
