@@ -98,7 +98,12 @@ private class AppRows(
                     main.post {
                         val icon = BitmapDrawable(ctx.resources, bitmap).apply { setBounds(0, 0, iconPx, iconPx) }
                         icons[n] = icon
-                        if (row.tag == n) row.setCompoundDrawablesRelative(icon, null, null, null)
+                        // Not the row that asked. A list finds its height
+                        // with one row that it then shows as the first, so
+                        // the rows on screen are others than those asked
+                        // with. The icon goes to the row that shows this
+                        // app now; a row made later finds it in `icons`.
+                        showing(parent, n)?.setCompoundDrawablesRelative(icon, null, null, null)
                     }
                 }
             } catch (_: Exception) {
@@ -106,6 +111,15 @@ private class AppRows(
             }
         }
         return row
+    }
+
+    /** The row on screen that shows app `n`, if any. */
+    private fun showing(list: ViewGroup, n: Int): CheckedTextView? {
+        for (i in 0 until list.childCount) {
+            val row = list.getChildAt(i) as? CheckedTextView
+            if (row?.tag == n) return row
+        }
+        return null
     }
 
     fun close() {
