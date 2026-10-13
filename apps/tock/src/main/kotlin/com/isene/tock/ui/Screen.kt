@@ -26,12 +26,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -44,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -58,11 +62,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.isene.tock.BuildConfig
 import com.isene.tock.Page
 import com.isene.tock.Phone
 import com.isene.tock.Showing
@@ -149,6 +155,7 @@ private fun Main(vm: TockViewModel, ui: Ui) {
 
     val pager = rememberPagerState(initialPage = pageOf(ui.month)) { 2 * START }
     var menu by remember { mutableStateOf(false) }
+    var about by remember { mutableStateOf(false) }
 
     // A swipe turns the month. A tap on a day of another month, or on
     // "today", turns the grid.
@@ -184,6 +191,13 @@ private fun Main(vm: TockViewModel, ui: Ui) {
                                 vm.sync()
                             },
                         )
+                        DropdownMenuItem(
+                            text = { Text("About") },
+                            onClick = {
+                                menu = false
+                                about = true
+                            },
+                        )
                     }
                 },
             )
@@ -201,6 +215,58 @@ private fun Main(vm: TockViewModel, ui: Ui) {
             Agenda(ui, vm::open, Modifier.weight(1f))
         }
     }
+    if (about) AboutDialog { about = false }
+}
+
+/** What tock is and how to use it. */
+@Composable
+private fun AboutDialog(onDismiss: () -> Unit) {
+    val uri = LocalUriHandler.current
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+        title = { Text("tock  ${BuildConfig.VERSION_NAME}") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                Text(
+                    "The calendars on your phone as a month, an agenda and a home-screen widget.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Spacer(Modifier.size(12.dp))
+                Text("How to use", style = MaterialTheme.typography.titleSmall)
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    "• Swipe the month sideways. Tap a day to list the days from it on.\n" +
+                        "• Tap an event to see it, change it or delete it. A repeating event can be " +
+                        "deleted, not changed. + makes a new event.\n" +
+                        "• ⋮, then Calendars: tick the calendars to show. Tap a calendar's dot to give " +
+                        "it a colour by its number.\n" +
+                        "• \"Colours from the laptop\" on that page reads a text file with the colour " +
+                        "numbers tock has on the laptop.\n" +
+                        "• Add the Agenda widget to the home screen for the coming 30 days.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.size(12.dp))
+                Text(
+                    "tock shows what the accounts on your phone have fetched. It asks them to fetch " +
+                        "when you open it, and \"Sync now\" asks again. It has no network access of its own.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.size(4.dp))
+                Text(
+                    "Part of the nomad mobile suite. Built on the Fe2O3 tools by Geir Isene.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.size(16.dp))
+                Text(
+                    "tock for the terminal",
+                    Modifier.clickable { uri.openUri("https://github.com/isene/tock") },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
+    )
 }
 
 @Composable

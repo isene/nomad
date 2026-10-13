@@ -115,6 +115,10 @@ fun terminalColor(n: Int): Int = when (n) {
     else -> 0x808080
 }
 
+/** True when the accounts may be asked to fetch again: `every` ms after
+ *  the last time, or when the clock has been set back to before it. */
+fun fetchDue(now: Long, last: Long, every: Long): Boolean = now - last !in 0 until every
+
 /** A file from the laptop: on each line the colour number tock uses there,
  *  then a calendar's name or address. Lines of another shape are skipped.
  *  The names come back in lower case. */

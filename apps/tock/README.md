@@ -5,6 +5,8 @@ phone twin of [tock](https://github.com/isene/tock).
 
 - Shows the calendars the phone already keeps in sync (Google, Exchange
   and others), so it is up to date with the laptop off.
+- Asks the accounts to fetch when it is opened, at most once in 15
+  minutes. "Sync now" in the menu asks again.
 - A month with week numbers and a dot per calendar on each day. The days
   from the picked one on are listed below it.
 - An event's own screen: time, place (a tap opens the map), notes with
@@ -18,6 +20,7 @@ phone twin of [tock](https://github.com/isene/tock).
   event, and the plus starts a new one.
 - Each calendar can be hidden, and can take the colour tock has for it on
   the laptop.
+- About, in the menu, says how to use it.
 - No network code, no sign-in, no Rust core. Nothing runs on a timer.
 
 ## Colours from the laptop

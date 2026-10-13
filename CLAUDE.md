@@ -373,7 +373,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
   fired, or the store sends it again.
 - A repeating event is shown and can be deleted (one time through
   `CONTENT_EXCEPTION_URI`, or all). Changing one is not built.
-- 0.1.0 was never seen on a phone by me.
+- The phone can leave an account unfetched for hours: an Outlook
+  invitation was missing for over three hours. So `resume()` asks the
+  accounts to fetch (`Phone.sync`, the call "Sync now" makes), at most
+  once in 15 minutes (`fetchDue`). The widget asks for nothing; a timer
+  for that was not built.
 
 ## Anti-patterns (don't drift into these)
 
