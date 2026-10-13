@@ -505,6 +505,11 @@ tools/publish --list     # what is published, and which version
   (`--remap-path-prefix`); keep that when adding an app.
 - A new app needs a button in the `#get` grid of `docs/index.html` and
   a "Download APK" link on its card.
+- It also needs two entries in the fe2o3 repo: a card under "Companion
+  apps" in `docs/index.html`, and a row in the companion table of
+  `README.md`. tock went out on 2026-10-13 without them.
+- A feature that changes what an app is goes into all four texts: the
+  card and the row here, the card and the row in fe2o3.
 - outside is private. Geir dropped it as a public app on 2026-10-10: no
   download, no card on the page, no row in a listing here or in the
   fe2o3 repo. `tools/publish` refuses it; `--check outside` still
