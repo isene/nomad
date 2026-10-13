@@ -164,7 +164,7 @@ class ClockWidget : AppWidgetProvider() {
             // Sunrise and the like need a place. The sign and the moon's
             // face are the same everywhere.
             val store = Store(ctx)
-            val spot = store.here()
+            val spot = store.last()?.first
             val sky = outsideSky(
                 now.year, now.monthValue.toUInt(), now.dayOfMonth.toUInt(), now.hour + now.minute / 60.0,
                 spot?.lat ?: 0.0, spot?.lon ?: 0.0, now.offset.totalSeconds / 3600.0,
@@ -174,6 +174,7 @@ class ClockWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.moon, if (spot != null) sky.moon else "")
             views.setTextViewText(R.id.lit, "${sky.lit}%")
             views.setTextViewText(R.id.phase, sky.phase)
+            views.setTextViewText(R.id.place, spot?.name ?: "")
 
             // The weather is from the forecasts last fetched for that
             // place, by the app or by RingFetch. This run draws what is
@@ -343,18 +344,19 @@ class WidgetSound : JobService() {
 }
 
 /**
- * Fetches the forecast for the widget's place, so that the ring has its
- * weather when the app has not been opened for hours, or shows another
- * place. The widget asks for it on the full hour, and Android runs it
- * once the phone has a network. That is three requests an hour, and
- * none while the phone sleeps: the widget never wakes the phone.
+ * Fetches the forecast for the widget's place, the one on the app's
+ * screen, so that the ring has its weather when the app has not been
+ * opened for hours. The widget asks for it on the full hour, and
+ * Android runs it once the phone has a network. That is three requests
+ * an hour, and none while the phone sleeps: the widget never wakes the
+ * phone.
  */
 class RingFetch : JobService() {
     override fun onStartJob(params: JobParameters): Boolean {
         // The network may not be used on the main thread.
         Thread {
             var got = false
-            Store(this).here()?.let { spot ->
+            Store(this).last()?.first?.let { spot ->
                 val cache = Cache(this)
                 val key = cache.key(spot)
                 val req = outsideRequests(spot.lat, spot.lon, System.currentTimeMillis() / 1000)
