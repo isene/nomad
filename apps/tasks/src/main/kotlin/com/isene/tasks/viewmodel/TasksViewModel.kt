@@ -29,7 +29,7 @@ import uniffi.fe2o3_mobile_core.renameItem as rustRenameItem
 private const val PREFS = "tasks_prefs"
 private const val KEY_URI = "doc_uri"
 private const val KEY_COLLAPSED = "collapsed_categories"
-private const val KEY_WIDGET_TRANSPARENT = "widget_transparent"
+private const val KEY_WIDGET_BACK = "widget_back"
 
 data class UiState(
     val pickedUri: Uri? = null,
@@ -38,7 +38,8 @@ data class UiState(
     val collapsed: Set<String> = emptySet(),
     val toast: String? = null,
     val loading: Boolean = false,
-    val widgetTransparent: Boolean = false,
+    /** The colour behind the widget, as ARGB; 0 for none. */
+    val widgetBack: Int = 0,
 )
 
 class TasksViewModel(app: Application) : AndroidViewModel(app) {
@@ -47,7 +48,7 @@ class TasksViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow(
-        UiState(widgetTransparent = prefs.getBoolean(KEY_WIDGET_TRANSPARENT, false)),
+        UiState(widgetBack = prefs.getInt(KEY_WIDGET_BACK, 0)),
     )
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -249,11 +250,11 @@ class TasksViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = _state.value.copy(toast = null)
     }
 
-    /** Toggle the home-screen widget's transparent background, then refresh
-     *  any installed widget so it re-renders with the new background. */
-    fun setWidgetTransparent(on: Boolean) {
-        prefs.edit().putBoolean(KEY_WIDGET_TRANSPARENT, on).apply()
-        _state.value = _state.value.copy(widgetTransparent = on)
+    /** Set the colour behind the home-screen widget, then draw any placed
+     *  widget again with it. */
+    fun setWidgetBack(argb: Int) {
+        prefs.edit().putInt(KEY_WIDGET_BACK, argb).apply()
+        _state.value = _state.value.copy(widgetBack = argb)
         pokeWidget()
     }
 

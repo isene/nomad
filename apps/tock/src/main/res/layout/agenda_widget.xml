@@ -7,6 +7,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@drawable/widget_back"
+    android:backgroundTint="#00000000"
     android:orientation="vertical"
     android:paddingTop="6dp"
     android:paddingBottom="6dp"

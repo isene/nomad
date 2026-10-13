@@ -6,7 +6,7 @@
 
 **[Download for Android (APK)](https://github.com/isene/nomad/releases/download/apk/mail.apk)** · [how to install](https://isene.org/nomad/#get)
 
-![version](https://img.shields.io/badge/version-0.15.2-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.16.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -130,6 +130,9 @@ file the app writes when the count moves, and declares no update period
 at all — a widget nobody looks at wakes nothing. The background fetch
 keeps it current; without one it is as fresh as the last time the app
 ran.
+
+The wallpaper shows through the widget. "Widget background" in the menu
+puts a colour behind it, as solid as you like.
 
 Its header names the scope it is showing (`kastrup · Discord  2`),
 because it draws the list through the app's scope and two counts under

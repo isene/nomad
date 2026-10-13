@@ -23,7 +23,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.Delete
@@ -80,6 +79,11 @@ import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import uniffi.fe2o3_mobile_core.Category as RustCategory
 import uniffi.fe2o3_mobile_core.Item as RustItem
+import androidx.compose.foundation.background
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
+import androidx.compose.ui.graphics.Color
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -118,6 +122,7 @@ fun TasksScreen(vm: TasksViewModel) {
     var categoryMenuIdx by remember { mutableStateOf<Int?>(null) }
     var overflowOpen by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    var showBack by remember { mutableStateOf(false) }
 
     val cats = state.hyperlist.categories
     val rows = state.hyperlist.flatRows(state.collapsed)
@@ -152,15 +157,9 @@ fun TasksScreen(vm: TasksViewModel) {
                         onDismissRequest = { overflowOpen = false },
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Transparent widget") },
+                            text = { Text("Widget background") },
                             leadingIcon = { Icon(Icons.Filled.Opacity, null) },
-                            trailingIcon = {
-                                if (state.widgetTransparent) Icon(Icons.Filled.Check, null)
-                            },
-                            onClick = {
-                                overflowOpen = false
-                                vm.setWidgetTransparent(!state.widgetTransparent)
-                            },
+                            onClick = { overflowOpen = false; showBack = true },
                         )
                         DropdownMenuItem(
                             text = { Text("About") },
@@ -362,9 +361,50 @@ fun TasksScreen(vm: TasksViewModel) {
             confirmButton = { TextButton(onClick = { moveItemTo = null }) { Text("Cancel") } },
         )
     }
+    if (showBack) WidgetBackDialog(state.widgetBack, vm::setWidgetBack) { showBack = false }
     if (showAbout) {
         AboutDialog(onDismiss = { showAbout = false })
     }
+}
+
+/** The colour behind the home-screen widget: six hex digits, and how
+ *  solid it is. At 0 % the wallpaper shows through, as it does at first. */
+@Composable
+private fun WidgetBackDialog(argb: Int, set: (Int) -> Unit, close: () -> Unit) {
+    var hex by remember { mutableStateOf("%06X".format(argb and 0xFFFFFF)) }
+    var solid by remember { mutableStateOf((argb ushr 24) / 255f) }
+    val rgb = hex.toIntOrNull(16)?.takeIf { hex.length == 6 }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Widget background") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = hex,
+                        onValueChange = { typed -> hex = typed.uppercase().filter { it in "0123456789ABCDEF" }.take(6) },
+                        label = { Text("Colour, six hex digits") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Box(Modifier.size(40.dp).background(Color(0xFF000000.toInt() or (rgb ?: 0))))
+                }
+                Text("Solid: ${(solid * 100).roundToInt()} %. At 0 the wallpaper shows through.")
+                Slider(value = solid, onValueChange = { solid = it })
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = rgb != null,
+                onClick = {
+                    set(((solid * 255).roundToInt() shl 24) or (rgb ?: 0))
+                    close()
+                },
+            ) { Text("OK") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
 }
 
 @Composable

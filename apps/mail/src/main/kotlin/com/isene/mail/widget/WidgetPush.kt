@@ -14,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.isene.mail.data.Settings
 
 /**
  * Redraw the widget. Every redraw in the app goes through here.
@@ -58,8 +59,12 @@ object WidgetPush {
             // recomposes what the state says; handing it nothing new is
             // handing it the old summary again.
             val text = WidgetStore.text(app)
+            val back = Settings(app).widgetBack
             for (id in GlanceAppWidgetManager(app).getGlanceIds(MailWidget::class.java)) {
-                updateAppWidgetState(app, id) { it[SUMMARY] = text }
+                updateAppWidgetState(app, id) {
+                    it[SUMMARY] = text
+                    it[BACK] = back
+                }
             }
             MailWidget().updateAll(app)
         }

@@ -18,6 +18,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -164,6 +165,11 @@ class ClockWidget : AppWidgetProvider() {
             // Sunrise and the like need a place. The sign and the moon's
             // face are the same everywhere.
             val store = Store(ctx)
+            // Set every time, the clear one too: the home screen keeps the
+            // views it has, so a colour that was left out would stay.
+            views.setColorStateList(
+                android.R.id.background, "setBackgroundTintList", ColorStateList.valueOf(store.back()),
+            )
             val spot = store.last()?.first
             val sky = outsideSky(
                 now.year, now.monthValue.toUInt(), now.dayOfMonth.toUInt(), now.hour + now.minute / 60.0,

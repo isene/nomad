@@ -125,6 +125,12 @@ class Store(ctx: Context) {
 
     fun setTap(key: String, app: String) = prefs.edit().putString(key, app).apply()
 
+    /** The colour behind the widget, as ARGB. 0 is none: the wallpaper
+     *  shows through. */
+    fun back(): Int = prefs.getInt("back", 0)
+
+    fun setBack(argb: Int) = prefs.edit().putInt("back", argb).apply()
+
     /** The address the widget asks whether messages wait: the one of the
      *  fleet connector, pasted in once. Empty until then: the widget
      *  shows no mark and asks nobody. Whoever has it can read and send

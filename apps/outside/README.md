@@ -42,6 +42,9 @@ A clock for the home screen, one row tall and the full width.
   [rpnx](../rpnx/) when that is installed, and the right part outside.
 - Choose another app for each of the three at the bottom of outside's
   screen, under "Widget: choose what a tap opens".
+- The wallpaper shows through the widget. "Widget: choose the
+  background", at the bottom of outside's screen, puts a colour behind
+  it, as solid as you like.
 - A coral dot in the top right corner of the clock means a
   [fleet](https://github.com/isene/fleet) message waits for Claude on the
   phone. Switch it on at the bottom of outside's screen, under "Widget:

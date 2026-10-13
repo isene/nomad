@@ -34,6 +34,10 @@ import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
 import com.isene.mail.MainActivity
 import com.isene.mail.data.WidgetStore
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.glance.appwidget.cornerRadius
+import androidx.glance.background
+import com.isene.mail.data.Settings
 
 // Fixed colours rather than GlanceTheme's. With no panel behind it the
 // text sits directly on the wallpaper, where a colour that follows the
@@ -44,6 +48,10 @@ private val BODY = ColorProvider(Color.White)
 
 /** The summary this widget is drawing, in the widget's own state. */
 internal val SUMMARY = stringPreferencesKey("summary")
+
+/** The colour behind the widget, as ARGB. 0 is none: the wallpaper shows
+ *  through. */
+internal val BACK = intPreferencesKey("back")
 
 /**
  * Unread mail on the home screen: a count and who it is from.
@@ -68,10 +76,11 @@ class MailWidget : GlanceAppWidget() {
         provideContent {
             // Falling back to the file covers a widget just placed on the
             // home screen, whose state nobody has written yet.
-            val text = currentState<Preferences>()[SUMMARY]
-                ?: WidgetStore.text(LocalContext.current)
-            val state = WidgetStore.parse(text)
-            GlanceTheme { WidgetContent(state.unread, state.rows, state.scope) }
+            val prefs = currentState<Preferences>()
+            val ctx = LocalContext.current
+            val state = WidgetStore.parse(prefs[SUMMARY] ?: WidgetStore.text(ctx))
+            val back = prefs[BACK] ?: Settings(ctx).widgetBack
+            GlanceTheme { WidgetContent(state.unread, state.rows, state.scope, back) }
         }
     }
 }
@@ -81,6 +90,7 @@ private fun WidgetContent(
     unread: Int,
     rows: List<com.isene.mail.data.WidgetRow>,
     scope: String,
+    back: Int,
 ) {
     // The widget shows the list through the app's scope, so it has to say
     // which one: a count of two under Discord and a count of two under All
@@ -90,8 +100,9 @@ private fun WidgetContent(
     Box(
         modifier = GlanceModifier
             .fillMaxSize()
-            // No background: the wallpaper shows through. A launcher
-            // widget that paints its own panel looks pasted on.
+            // No background until the user chooses one: the wallpaper
+            // shows through.
+            .let { if (back ushr 24 == 0) it else it.background(Color(back)).cornerRadius(16.dp) }
             .padding(8.dp)
             .clickable(openApp),
         contentAlignment = Alignment.TopStart,

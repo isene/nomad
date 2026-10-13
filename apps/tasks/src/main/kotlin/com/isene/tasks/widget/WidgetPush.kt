@@ -31,12 +31,12 @@ object WidgetPush {
         val app = context.applicationContext
         val widget = TasksWidget()
         val text = widget.loadText(app)
-        val transparent = app.getSharedPreferences("tasks_prefs", Context.MODE_PRIVATE)
-            .getBoolean("widget_transparent", false)
+        val back = app.getSharedPreferences("tasks_prefs", Context.MODE_PRIVATE)
+            .getInt("widget_back", 0)
         for (id in GlanceAppWidgetManager(app).getGlanceIds(TasksWidget::class.java)) {
             updateAppWidgetState(app, id) { prefs ->
                 if (text != null) prefs[LIST] = text
-                prefs[TRANSPARENT] = transparent
+                prefs[BACK] = back
             }
         }
         TasksWidgetReceiver.update(app)

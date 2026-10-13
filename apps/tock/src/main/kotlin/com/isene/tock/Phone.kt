@@ -84,6 +84,12 @@ class Settings(ctx: Context) {
 
     fun color(cal: Cal): Int = (number(cal.id)?.let { terminalColor(it) } ?: cal.phoneColor) or OPAQUE
 
+    /** The colour behind the widget, as ARGB. 0 is none: the wallpaper
+     *  shows through. */
+    var widgetBack: Int
+        get() = prefs.getInt("widget_back", 0)
+        set(argb) = prefs.edit { putInt("widget_back", argb) }
+
     /** When tock last asked the accounts to fetch, in ms. */
     var synced: Long
         get() = prefs.getLong("synced", 0)

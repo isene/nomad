@@ -59,6 +59,12 @@ import com.isene.mail.viewmodel.ComposeRequest
 import com.isene.mail.viewmodel.MailViewModel
 import com.isene.mail.work.MailSyncWorker
 import uniffi.fe2o3_mobile_core.Message
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Slider
+import androidx.compose.ui.graphics.Color
+import com.isene.mail.widget.WidgetPush
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,6 +76,7 @@ fun MailApp(vm: MailViewModel) {
     var showSettings by remember { mutableStateOf(false) }
     var showSearch by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    var showBack by remember { mutableStateOf(false) }
     // Bulk actions confirm first: they touch everything on screen, and
     // marking read reaches the laptop.
     var confirmBulk by remember { mutableStateOf<String?>(null) }
@@ -136,6 +143,7 @@ fun MailApp(vm: MailViewModel) {
                                 )
                             }
                             DropdownMenuItem(text = { Text("Settings") }, onClick = { menuOpen = false; showSettings = true })
+                            DropdownMenuItem(text = { Text("Widget background") }, onClick = { menuOpen = false; showBack = true })
                             DropdownMenuItem(text = { Text("About") }, onClick = { menuOpen = false; showAbout = true })
                         }
                     },
@@ -199,6 +207,17 @@ fun MailApp(vm: MailViewModel) {
 
     if (showSettings) SettingsDialog(vm) { showSettings = false }
     if (showAbout) AboutDialog { showAbout = false }
+    if (showBack) {
+        val ctx = LocalContext.current
+        WidgetBackDialog(
+            argb = vm.settingsObj().widgetBack,
+            set = {
+                vm.settingsObj().widgetBack = it
+                WidgetPush.now(ctx)
+            },
+            close = { showBack = false },
+        )
+    }
     confirmBulk?.let { kind ->
         val read = kind == "read"
         val n = if (read) ui.mails.count { m -> m.messageId !in ui.readIds } else ui.mails.size
@@ -541,6 +560,46 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 )
             }
         },
+    )
+}
+
+/** The colour behind the home-screen widget: six hex digits, and how
+ *  solid it is. At 0 % the wallpaper shows through, as it does at first. */
+@Composable
+private fun WidgetBackDialog(argb: Int, set: (Int) -> Unit, close: () -> Unit) {
+    var hex by remember { mutableStateOf("%06X".format(argb and 0xFFFFFF)) }
+    var solid by remember { mutableStateOf((argb ushr 24) / 255f) }
+    val rgb = hex.toIntOrNull(16)?.takeIf { hex.length == 6 }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Widget background") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = hex,
+                        onValueChange = { typed -> hex = typed.uppercase().filter { it in "0123456789ABCDEF" }.take(6) },
+                        label = { Text("Colour, six hex digits") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Box(Modifier.size(40.dp).background(Color(0xFF000000.toInt() or (rgb ?: 0))))
+                }
+                Text("Solid: ${(solid * 100).roundToInt()} %. At 0 the wallpaper shows through.")
+                Slider(value = solid, onValueChange = { solid = it })
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = rgb != null,
+                onClick = {
+                    set(((solid * 255).roundToInt() shl 24) or (rgb ?: 0))
+                    close()
+                },
+            ) { Text("OK") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
     )
 }
 
