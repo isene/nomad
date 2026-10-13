@@ -108,7 +108,7 @@ class Store(ctx: Context) {
     }
 
     /** The spot on screen when the app was last used, and whether it was
-     *  following the phone. */
+     *  following the phone. The widget shows this spot too. */
     fun last(): Pair<Spot, Boolean>? {
         val spot = outsideSpotsParse(prefs.getString("last", "") ?: "").firstOrNull() ?: return null
         return spot to prefs.getBoolean("here", false)
@@ -116,16 +116,8 @@ class Store(ctx: Context) {
 
     fun remember(spot: Spot, here: Boolean) {
         val text = outsideSpotsText(listOf(spot))
-        val edit = prefs.edit().putString("last", text).putBoolean("here", here)
-        if (here) edit.putString("phone", text)
-        edit.apply()
+        prefs.edit().putString("last", text).putBoolean("here", here).apply()
     }
-
-    /** Where the app last saw the phone itself, for the widget's sun and
-     *  moon. Looking up the weather somewhere else must not move them.
-     *  The spot last shown, when the app has never followed the phone. */
-    fun here(): Spot? =
-        outsideSpotsParse(prefs.getString("phone", "") ?: "").firstOrNull() ?: last()?.first
 
     /** The app a tap on a part of the widget opens, as "package/activity".
      *  Empty until one is chosen: the part then opens what it always has. */

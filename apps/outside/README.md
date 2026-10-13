@@ -35,7 +35,7 @@ A clock for the home screen, one row tall and the full width.
   when it rings later.
 - Right: the ringer mode with the ring and alarm volume, the sign the sun
   is in, sunrise and sunset, moonrise and moonset, how much of the moon
-  is lit, and its phase.
+  is lit, its phase, and the name of the place the weather is for.
 - A tap opens an app: the left part the clock app's alarms, the clock
   [rpnx](../rpnx/) when that is installed, and the right part outside.
 - Choose another app for each of the three at the bottom of outside's
@@ -47,10 +47,10 @@ A clock for the home screen, one row tall and the full width.
   connector. Until then there is no dot, and the widget asks nobody. The
   dot follows the queue within about a minute.
 
-The sun, the moon and the weather are for the place where outside last saw
-the phone, whatever place is on outside's screen. The widget never asks
-for the position itself, so choose "Current location" in outside after a
-journey.
+The sun, the moon and the weather are for the place on outside's screen.
+Choose another place there, and the widget shows that place. With "Current
+location" it is where outside last saw the phone: the widget never asks
+for the position itself, so open outside after a journey.
 
 The widget fetches the forecast for that place itself, once an hour. A
 forecast older than twelve hours colours nothing: a ring with no colours

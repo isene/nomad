@@ -104,7 +104,7 @@
         </FrameLayout>
 
         <!-- Right: the sound setting, the sun's sign, the sun and the
-             moon. A tap opens outside. -->
+             moon, and the place they are for. A tap opens outside. -->
         <FrameLayout
             android:id="@+id/right"
             android:layout_width="0dp"
@@ -189,6 +189,18 @@
                         style="@style/WidgetText"
                         android:text="Waning Crescent" />
                 </LinearLayout>
+
+                <!-- The place, under the times and in line with them. It
+                     is as wide as the lines above and no wider, so a long
+                     name is cut short and moves nothing. -->
+                <TextView
+                    android:id="@+id/place"
+                    style="@style/WidgetText"
+                    android:layout_width="match_parent"
+                    android:layout_marginStart="26dp"
+                    android:layout_marginTop="2.8dp"
+                    android:ellipsize="end"
+                    android:text="Oslo" />
             </LinearLayout>
         </FrameLayout>
     </LinearLayout>

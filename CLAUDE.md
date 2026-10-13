@@ -209,20 +209,17 @@ when building the core. Same rule as the rest of Fe₂O₃.
     "partly cloudy", and partly cloudy when they say more than "fair".
     Until 0.3.3 rain was 0.1 mm as the mean of the
     sources, and the ring was grey for an hour the app showed rain in. `refresh` reads the three cached
-    bodies for `Store.here()` and skips one older than twelve hours.
+    bodies for the widget's place and skips one older than twelve hours.
     That is three file reads and one parse a run. Since 0.3.16 the
     widget fetches for itself, once an hour: when the newest body is
     older than 50 minutes (`STALE_MS`; under an hour so that every
     full-hour run asks), `refresh` asks `RingFetch` (a `JobService`
     with a network condition, hence `ACCESS_NETWORK_STATE`), at most
     once in that time (`Store.asked`). It fetches the three bodies for
-    `Store.here()` and calls `refresh` when one came. Until then only
-    the app fetched, and only the place on its screen: with a searched
-    place there, or the app unopened for twelve hours, the ring had no
-    colours. Geir had such a ring on 2026-10-12 and said yes to the
-    widget's own fetch on 2026-10-13, and asked for one every hour
-    ("Fetch it on every hour"; I had proposed every three). Which of
-    the two it was on his phone is not known. Geir asked for the ring on 2026-10-10 (0.3.0 had one blue
+    the widget's place and calls `refresh` when one came. Until then
+    only the app fetched, and only the place on its screen. Geir said
+    yes to the widget's own fetch on 2026-10-13, and asked for one
+    every hour ("Fetch it on every hour"; I had proposed every three). Geir asked for the ring on 2026-10-10 (0.3.0 had one blue
     tick for the hour now, 0.3.1 blue ticks for rain).
   - The alarm's icon is green (`ALARM_SOON`) when the alarm rings
     within twelve hours and grey when it rings later (0.3.11; Geir
@@ -273,8 +270,21 @@ when building the core. Same rule as the rest of Fe₂O₃.
   - `outside_sky` in the core gives the sign, the rise and set lines and
     the lit part of the moon. The lit part is from the angle between sun
     and moon at that hour; `orbit::moon_phase` is a day off near new moon.
-  - The place is `Store.here()`: where the app last saw the phone. The
-    widget asks for no position and uses no network.
+  - The place is the one on the app's screen, `Store.last()` (0.3.17;
+    Geir chose that on 2026-10-13). With "Current location" that is
+    where the app last saw the phone; the widget asks for no position.
+    Until 0.3.16 the place was where the app last followed the phone,
+    whatever was on screen. That was Claude's choice in 0.3.0 and the
+    cause of the ring without colours on 2026-10-12: a searched place
+    was on screen, so nothing fetched the forecast for the widget's
+    place, and Geir expected the widget to show the place he had
+    chosen. Three wrong causes were named first (a pale colour, an
+    unopened app, a look too short); ask which place is on screen.
+  - The place's name is the last line on the right, in line with the
+    times (0.3.17). Geir asked for it "somewhere"; the spot is Claude's
+    pick. It is `match_parent` in a `wrap_content` column, so a long
+    name gets an ellipsis and never widens the column. Its box ends
+    1.3 dp above the row's lower edge: no room for a taller text.
   - Not tried on a phone by Claude. The drawings were laid over the
     user's screenshot on the laptop and match within two pixels.
 - The phone's position is rounded to two decimals before any request.
