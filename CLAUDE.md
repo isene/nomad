@@ -401,6 +401,16 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - `Rules.kt` has what can be tested with no phone: the swipe rule, the
   number of columns, the slot under a finger, the reader of the signs file.
   The tests run on the laptop: `:apps:onepage:testReleaseUnitTest`.
+- `PanelOnAndroidTest` runs the panel and its lists on Android's own view
+  code, on the laptop, through Robolectric. It is for faults that come
+  from what Android does with a view: a touch it cancels, a list row it
+  shows again for another item. A new fault of that kind gets a test
+  there, and the test must fail on the old code before it counts.
+  - The same Gradle task runs it, in about eight seconds. The task also
+    builds the Rust core for the laptop (`cargoBuildHost`), since the
+    panel calls into it.
+  - The first run on a machine fetches about 390 MB. Do it on Wi-Fi.
+  - Run it before every APK that goes to the phone.
 - Not seen on a phone by Claude: there is no emulator here. Say so after
   every change to the panel.
 

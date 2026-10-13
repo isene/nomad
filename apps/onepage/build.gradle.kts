@@ -114,6 +114,33 @@ val generateUniffiBindings by tasks.registering(Exec::class) {
     )
 }
 
+// ---------- The core on the laptop, for the tests ----------
+// PanelOnAndroidTest runs the panel's own code, and that calls into the
+// Rust core. So the tests need the core built for this machine too, and
+// JNA's laptop half to load it with.
+
+val cargoBuildHost by tasks.registering(Exec::class) {
+    group = "rust"
+    description = "Build fe2o3-mobile-core for this machine, for the unit tests."
+    workingDir = coreDir
+    environment(cargoEnv())
+    // The features of the bindings step above, so nothing is compiled twice.
+    commandLine("cargo", "build", "--lib", "--features", "cli")
+    inputs.dir(coreDir.resolve("src"))
+    inputs.file(coreDir.resolve("Cargo.toml"))
+    inputs.file(rootProject.file("Cargo.toml"))
+    outputs.file(rustTargetDir.resolve("debug/" + System.mapLibraryName("fe2o3_mobile_core")))
+}
+
+tasks.withType<Test>().configureEach {
+    dependsOn(cargoBuildHost)
+    systemProperty("jna.library.path", rustTargetDir.resolve("debug").absolutePath)
+}
+
+// The JNA the app ships is Android's (@aar). Asked for by the same name,
+// Gradle would hand the tests that one again, so the jar has its own list.
+val jnaForTest: Configuration by configurations.creating
+
 // ---------- Android module ----------
 
 val keyProps = Properties().apply {
@@ -169,6 +196,10 @@ android {
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     }
+    testOptions {
+        // Robolectric builds real views, and those read the app's theme.
+        unitTests.isIncludeAndroidResources = true
+    }
 
     sourceSets {
         getByName("main") {
@@ -196,4 +227,9 @@ dependencies {
 
     // The swipe rule and a folder's sign are plain Kotlin, tested on the laptop.
     testImplementation("junit:junit:4.13.2")
+    // The panel on Android's own view code, also on the laptop
+    // (PanelOnAndroidTest). Robolectric fetches that code the first time.
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    jnaForTest("net.java.dev.jna:jna:5.15.0@jar")
+    testRuntimeOnly(files(jnaForTest))
 }
