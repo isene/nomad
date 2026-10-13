@@ -13,6 +13,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.provider.CalendarContract
 import android.view.View
 import android.widget.RemoteViews
@@ -74,6 +75,11 @@ class AgendaWidget : AppWidgetProvider() {
             val now = System.currentTimeMillis()
             val today = LocalDate.now(zone)
             val views = RemoteViews(pkg, R.layout.agenda_widget)
+            // Set every time, the clear one too: the home screen keeps the
+            // views it has, so a colour that was left out would stay.
+            views.setColorStateList(
+                android.R.id.background, "setBackgroundTintList", ColorStateList.valueOf(Settings(ctx).widgetBack),
+            )
             views.setTextViewText(
                 R.id.title,
                 today.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault())),

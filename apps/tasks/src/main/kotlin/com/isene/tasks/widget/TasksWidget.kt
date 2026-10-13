@@ -3,9 +3,10 @@ package com.isene.tasks.widget
 import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -14,6 +15,7 @@ import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
@@ -48,12 +50,14 @@ import uniffi.fe2o3_mobile_core.widgetRows
 // widget shows an empty-state hint.
 private const val PREFS = "tasks_prefs"
 private const val KEY_URI = "doc_uri"
-private const val KEY_TRANSPARENT = "widget_transparent"
+private const val KEY_BACK = "widget_back"
 private const val MAX_ROWS: UInt = 12u
 
 /** The list this widget is drawing, in the widget's own state. */
 internal val LIST = stringPreferencesKey("list")
-internal val TRANSPARENT = booleanPreferencesKey("transparent")
+/** The colour behind the widget, as ARGB. 0 is none: the wallpaper
+ *  shows through. */
+internal val BACK = intPreferencesKey("back")
 
 class TasksWidget : GlanceAppWidget() {
 
@@ -78,11 +82,11 @@ class TasksWidget : GlanceAppWidget() {
             val rows = prefs[LIST]?.let {
                 runCatching { widgetRows(parse(it), MAX_ROWS) }.getOrDefault(emptyList())
             } ?: loadRows(ctx)
-            val transparent = prefs[TRANSPARENT]
+            val back = prefs[BACK]
                 ?: ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .getBoolean(KEY_TRANSPARENT, false)
+                    .getInt(KEY_BACK, 0)
             GlanceTheme {
-                WidgetContent(rows, transparent)
+                WidgetContent(rows, back)
             }
         }
     }
@@ -129,11 +133,11 @@ class TasksWidget : GlanceAppWidget() {
 }
 
 @Composable
-private fun WidgetContent(rows: List<WidgetRow>, transparent: Boolean) {
+private fun WidgetContent(rows: List<WidgetRow>, back: Int) {
     val openApp = actionStartActivity<MainActivity>()
     val base = GlanceModifier
         .fillMaxSize()
-        .let { if (transparent) it else it.background(GlanceTheme.colors.background) }
+        .let { if (back ushr 24 == 0) it else it.background(Color(back)).cornerRadius(16.dp) }
         .padding(8.dp)
         .clickable(openApp)
     Box(

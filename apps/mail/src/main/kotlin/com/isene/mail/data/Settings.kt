@@ -48,6 +48,12 @@ class Settings(ctx: Context) {
         get() = p.getString("accounts_json", "") ?: ""
         set(v) = p.edit().putString("accounts_json", v).apply()
 
+    /** The colour behind the widget, as ARGB. 0 is none: the wallpaper
+     *  shows through. */
+    var widgetBack: Int
+        get() = p.getInt("widget_back", 0)
+        set(v) = p.edit().putInt("widget_back", v).apply()
+
     /** How far back to fetch. Beyond this the laptop is the archive. */
     var days: Int
         get() = p.getInt("days", 30)

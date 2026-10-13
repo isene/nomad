@@ -63,6 +63,18 @@ These come from the original mobile-architecture artifact. Do not drift.
 - Compose UI for screens.
 - Glance widgets that read from the Rust core through a thin read-only
   surface.
+- Every widget is clear at first, so the wallpaper shows through, and
+  has one setting for the colour behind it: "Widget background", six hex
+  digits and how solid (Geir asked for it on 2026-10-13). The app keeps
+  it as one ARGB number, 0 for none. A new widget gets the same.
+  - In a `RemoteViews` widget the root has the id
+    `@android:id/background` and a white rounded shape, and `refresh`
+    lays the colour over it with `setBackgroundTintList`. It sets the
+    tint every time, the clear one too: a home screen keeps a widget's
+    views, so a colour that is left out stays. tock's
+    `WidgetOnAndroidTest` fails when that call is skipped.
+  - In a Glance widget the colour goes through the widget's own state,
+    as the list does, and `background` is left off when it is 0.
 - WorkManager for background sync, respecting Doze and App Standby.
 - Storage Access Framework, notifications, intents, share targets.
 - Lifecycle plumbing.
@@ -232,7 +244,8 @@ when building the core. Same rule as the rest of Fe₂O₃.
     more run at twelve hours before the alarm when that moment is
     before the next full hour. Not tried on a phone by Claude.
   - The widget's look has no settings screen and gets none: Geir asks
-    for a change, and it goes into the code.
+    for a change, and it goes into the code. The colour behind it is
+    the one choice (`BackRow`, 0.3.19), as in every nomad widget.
   - The one setting is the app each of the three parts opens on a tap
     (`Tap`; Geir asked for it on 2026-10-10, 0.3.3). `Store.tap` keeps
     a "package/activity" under `tap_left`, `tap_clock` and `tap_right`,

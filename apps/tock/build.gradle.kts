@@ -24,8 +24,8 @@ android {
         applicationId = "com.isene.tock"
         minSdk = 33
         targetSdk = 35
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.1.4"
     }
 
     signingConfigs {
@@ -62,6 +62,8 @@ android {
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     }
+    // The widget test needs the app's own layouts.
+    testOptions { unitTests.isIncludeAndroidResources = true }
 }
 
 dependencies {
@@ -76,4 +78,6 @@ dependencies {
 
     // The day and colour rules are plain Kotlin and are tested on the laptop.
     testImplementation("junit:junit:4.13.2")
+    // The widget on Android's own view code, run on the laptop.
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }

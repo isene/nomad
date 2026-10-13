@@ -282,6 +282,15 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
         load()
     }
 
+    /** The colour behind the widget, as ARGB; 0 for none. */
+    fun widgetBack(): Int = settings.widgetBack
+
+    /** The widget is drawn again when the app is left. */
+    fun setWidgetBack(argb: Int) {
+        settings.widgetBack = argb
+        changed = true
+    }
+
     /** Read a file of colour numbers from the laptop and give each calendar
      *  it names its colour. */
     fun colorsFrom(file: Uri) {

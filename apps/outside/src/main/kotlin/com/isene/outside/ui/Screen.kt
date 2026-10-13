@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -39,6 +40,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -94,6 +96,7 @@ import uniffi.fe2o3_mobile_core.SourceDay
 import uniffi.fe2o3_mobile_core.Spot
 import uniffi.fe2o3_mobile_core.Step
 import uniffi.fe2o3_mobile_core.Warning
+import kotlin.math.roundToInt
 
 // The left column holds the day or the hour; the three forecasts share
 // the rest of the width.
@@ -210,6 +213,7 @@ fun OutsideScreen(vm: OutsideViewModel) {
                         Text("Widget: choose what a tap opens")
                     }
                 }
+                item { BackRow() }
                 item { InboxRow() }
             }
         }
@@ -226,6 +230,59 @@ fun OutsideScreen(vm: OutsideViewModel) {
         )
     }
     if (taps) TapSheet(onClose = { taps = false })
+}
+
+/** The one choice about the widget's look: the colour behind it. The
+ *  widget takes it when the app is left. */
+@Composable
+private fun BackRow() {
+    val ctx = LocalContext.current
+    val store = remember { Store(ctx) }
+    var asking by remember { mutableStateOf(false) }
+    TextButton(onClick = { asking = true }, Modifier.padding(horizontal = 4.dp)) {
+        Text("Widget: choose the background")
+    }
+    if (asking) WidgetBackDialog(store.back(), store::setBack) { asking = false }
+}
+
+/** The colour behind the home-screen widget: six hex digits, and how
+ *  solid it is. At 0 % the wallpaper shows through, as it does at first. */
+@Composable
+private fun WidgetBackDialog(argb: Int, set: (Int) -> Unit, close: () -> Unit) {
+    var hex by remember { mutableStateOf("%06X".format(argb and 0xFFFFFF)) }
+    var solid by remember { mutableStateOf((argb ushr 24) / 255f) }
+    val rgb = hex.toIntOrNull(16)?.takeIf { hex.length == 6 }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Widget background") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(
+                        value = hex,
+                        onValueChange = { typed -> hex = typed.uppercase().filter { it in "0123456789ABCDEF" }.take(6) },
+                        label = { Text("Colour, six hex digits") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Box(Modifier.size(40.dp).background(Color(0xFF000000.toInt() or (rgb ?: 0))))
+                }
+                Text("Solid: ${(solid * 100).roundToInt()} %. At 0 the wallpaper shows through.")
+                Slider(value = solid, onValueChange = { solid = it })
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = rgb != null,
+                onClick = {
+                    set(((solid * 255).roundToInt() shl 24) or (rgb ?: 0))
+                    close()
+                },
+            ) { Text("OK") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
 }
 
 /** The dot for waiting fleet messages, switched on by pasting the address
