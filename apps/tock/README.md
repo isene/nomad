@@ -7,8 +7,8 @@ phone twin of [tock](https://github.com/isene/tock).
   and others), so it is up to date with the laptop off.
 - Asks the accounts to fetch when it is opened, at most once in 15
   minutes. "Sync now" in the menu asks again.
-- A month with week numbers and a dot per calendar on each day. The days
-  from the picked one on are listed below it.
+- A month with week numbers and a dot per event on each day, in its
+  calendar's colour. The days from the picked one on are listed below it.
 - An event's own screen: time, place (a tap opens the map), notes with
   links that can be tapped, and who is invited.
 - New events, changes and deletes go to the phone's calendar store, and
