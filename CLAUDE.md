@@ -377,8 +377,13 @@ when building the core. Same rule as the rest of Fe₂O₃.
   outlines. `tools/onepage-signs <lucide icons dir>` writes that file; add a
   sign by adding its name to the list in the script. `Signs.kt` reads the
   file on first use.
-- The two lists (`Pickers.kt`: all apps with icons, the signs) are dialogs
-  that keep nothing after they close.
+- The lists (`Pickers.kt`: apps to add, apps to start, the signs) are
+  dialogs that keep nothing after they close.
+- One folder may be the folder of all other apps (`rest` on
+  `Slot::Folder`, "Other apps" under **+**). It stores no items:
+  `panel_rest` gives the apps that are nowhere else in the panel, and the
+  list is made each time the folder is tapped. Nothing watches for new
+  apps. It opens as a list with names, never as a card of bare icons.
 - The user fills the panel on the phone. His apps and contacts never go
   into the code, a default file or a test.
 - Dialogs over the panel need `window.setType(TYPE_APPLICATION_OVERLAY)`

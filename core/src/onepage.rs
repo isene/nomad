@@ -7,6 +7,7 @@
 // desktop tools can read/edit a layout file later if useful.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, uniffi::Record)]
 pub struct WidgetPos {
@@ -82,6 +83,11 @@ pub enum Slot {
         #[serde(default)]
         icon: String,
         items: Vec<Target>,
+        /// True for the folder of all other apps. It has no items of its
+        /// own: it shows every app on the phone that is nowhere else in
+        /// the panel (see `panel_rest`).
+        #[serde(default)]
+        rest: bool,
     },
 }
 
@@ -175,20 +181,49 @@ pub fn panel_fill(mut panel: Panel, at: u32, targets: Vec<Target>) -> Panel {
 
 /// Drop the icon at `from` into the folder at `to`. When `from` has no
 /// single icon, or `to` is no folder, nothing changes.
+///
+/// The folder of all other apps keeps no items: an app dropped on it only
+/// leaves its slot, and is then one of the other apps. A call or a shortcut
+/// is no app, so it stays where it is.
 #[uniffi::export]
 pub fn panel_into_folder(mut panel: Panel, from: u32, to: u32) -> Panel {
     let (from, to) = (from as usize, to as usize);
     let Some(Slot::One { target }) = panel.slots.get(from).cloned() else {
         return panel;
     };
-    let Some(Slot::Folder { items, .. }) = panel.slots.get_mut(to) else {
+    let Some(Slot::Folder { items, rest, .. }) = panel.slots.get_mut(to) else {
         return panel;
     };
-    if !items.contains(&target) {
+    if *rest {
+        if !matches!(target, Target::App { .. }) {
+            return panel;
+        }
+    } else if !items.contains(&target) {
         items.push(target);
     }
     panel.slots[from] = Slot::Empty;
     trimmed(panel)
+}
+
+/// The apps for the folder of all other apps: those of `all` (every app on
+/// the phone, each as "pkg/cls") that are nowhere in the panel, in the
+/// order they came in. A shortcut or a call in the panel hides no app.
+#[uniffi::export]
+pub fn panel_rest(panel: Panel, all: Vec<String>) -> Vec<String> {
+    let used: HashSet<&str> = panel
+        .slots
+        .iter()
+        .flat_map(|slot| match slot {
+            Slot::Empty => &[][..],
+            Slot::One { target } => std::slice::from_ref(target),
+            Slot::Folder { items, .. } => &items[..],
+        })
+        .filter_map(|target| match target {
+            Target::App { component } => Some(component.as_str()),
+            _ => None,
+        })
+        .collect();
+    all.into_iter().filter(|app| !used.contains(app.as_str())).collect()
 }
 
 /// True when `target` is in the panel, in a folder too.
@@ -342,7 +377,12 @@ mod panel_tests {
     }
 
     fn folder(name: &str, items: Vec<Target>) -> Slot {
-        Slot::Folder { name: name.into(), icon: String::new(), items }
+        Slot::Folder { name: name.into(), icon: String::new(), items, rest: false }
+    }
+
+    /// The folder of all other apps.
+    fn rest() -> Slot {
+        Slot::Folder { name: "Other apps".into(), icon: String::new(), items: vec![], rest: true }
     }
 
     #[test]
@@ -350,7 +390,7 @@ mod panel_tests {
         let mut p = panel_empty();
         p = panel_put(p, 0, one("mail"));
         p = panel_put(p, 4, Slot::One { target: chat("anna") });
-        p = panel_put(p, 5, Slot::Folder { name: "Travel".into(), icon: "plane".into(), items: vec![app("maps"), chat("bo")] });
+        p = panel_put(p, 5, Slot::Folder { name: "Travel".into(), icon: "plane".into(), items: vec![app("maps"), chat("bo")], rest: false });
         p = panel_put(p, 6, Slot::One { target: Target::Call { name: "Anna".into(), number: "+1 555 0100".into() } });
         let back = panel_parse(panel_serialize(p.clone())).unwrap();
         assert_eq!(back, p);
@@ -492,6 +532,43 @@ mod panel_tests {
         assert_eq!(panel_into_folder(p.clone(), 1, 1), p);
         assert_eq!(panel_into_folder(p.clone(), 0, 2), p);
         assert_eq!(panel_into_folder(p.clone(), 9, 1), p);
+    }
+
+    #[test]
+    fn the_other_apps_are_those_nowhere_in_the_panel() {
+        let name = |n: &str| format!("com.example.{n}/.Main");
+        let mut p = panel_put(panel_empty(), 0, one("mail"));
+        p = panel_put(p, 1, folder("Tools", vec![app("maps"), chat("bo")]));
+        p = panel_put(p, 2, Slot::One { target: Target::Call { name: "Anna".into(), number: "+1 555 0100".into() } });
+        p = panel_put(p, 3, rest());
+        let all = vec![name("chat"), name("mail"), name("maps"), name("notes")];
+        // In a slot or in a folder: left out. The order is kept. The chat
+        // app has a shortcut in the panel, and is still one of the others.
+        assert_eq!(panel_rest(p, all.clone()), vec![name("chat"), name("notes")]);
+        assert_eq!(panel_rest(panel_empty(), all.clone()), all);
+        assert!(panel_rest(panel_empty(), vec![]).is_empty());
+    }
+
+    #[test]
+    fn an_app_dropped_on_the_other_apps_only_leaves_its_slot() {
+        let call = Slot::One { target: Target::Call { name: "Anna".into(), number: "+1 555 0100".into() } };
+        let mut p = panel_put(panel_empty(), 0, one("mail"));
+        p = panel_put(p, 1, rest());
+        p = panel_put(p, 2, call);
+        let q = panel_into_folder(p.clone(), 0, 1);
+        assert_eq!(q.slots[0], Slot::Empty);
+        assert_eq!(q.slots[1], rest());
+        assert_eq!(panel_rest(q, vec!["com.example.mail/.Main".into()]).len(), 1);
+        // A call is no app: it would be lost there, so it stays.
+        assert_eq!(panel_into_folder(p.clone(), 2, 1), p);
+    }
+
+    #[test]
+    fn a_folder_from_an_older_file_is_a_plain_folder() {
+        let json = r#"{"version":1,"slots":[{"kind":"folder","name":"Tools","items":[]}]}"#;
+        assert_eq!(panel_parse(json.into()).unwrap().slots, vec![folder("Tools", vec![])]);
+        let p = panel_put(panel_empty(), 0, rest());
+        assert_eq!(panel_parse(panel_serialize(p.clone())).unwrap(), p);
     }
 
     #[test]
