@@ -1,23 +1,29 @@
 package com.isene.onepage
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.app.Dialog
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.LauncherApps
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
+import android.net.Uri
 import android.os.Process
 import android.provider.Settings
 import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.EditText
@@ -29,30 +35,37 @@ import android.widget.PopupMenu
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import java.io.File
+import kotlin.math.hypot
+import kotlin.math.min
 import kotlin.math.roundToInt
 import uniffi.fe2o3_mobile_core.Panel
 import uniffi.fe2o3_mobile_core.Slot
 import uniffi.fe2o3_mobile_core.Target
+import uniffi.fe2o3_mobile_core.panelAdd
+import uniffi.fe2o3_mobile_core.panelFill
 import uniffi.fe2o3_mobile_core.panelFolderAdd
 import uniffi.fe2o3_mobile_core.panelFolderDrop
+import uniffi.fe2o3_mobile_core.panelHas
+import uniffi.fe2o3_mobile_core.panelIntoFolder
 import uniffi.fe2o3_mobile_core.panelPins
 import uniffi.fe2o3_mobile_core.panelPut
 import uniffi.fe2o3_mobile_core.panelRows
 import uniffi.fe2o3_mobile_core.panelSwap
 
 /**
- * The app panel: a card of icons at the right edge of the screen, three to
- * a row. A tap starts an app or a shortcut, or opens a folder as a second
- * card. An empty row parts two groups.
+ * The app panel: a card of icons along the bottom of the screen, or at one
+ * of its sides. A tap starts an app, a shortcut or a call, or opens a
+ * folder as a second card. An empty row parts two groups.
  *
  * Holding the panel switches editing on: a plus shows in every free slot,
- * and a tap on an icon offers to move or remove it. What is changed is
- * saved at once.
+ * an icon can be dragged to another slot or onto a folder, and a tap on an
+ * icon offers the rest. What is changed is saved at once.
  *
  * The view fills its window, so a tap beside the cards is a tap on it, and
  * that steps back: out of a folder, out of editing, then out of the panel.
  */
-class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(context) {
+class PanelView(context: Context, startEditing: Boolean, private val close: () -> Unit) : FrameLayout(context) {
 
     /** One line of a menu. */
     private class Choice(val label: String, val run: () -> Unit)
@@ -61,12 +74,18 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
     private val pitch = dp(PITCH)
     private val iconPx = dp(ICON)
     private val wrap = ViewGroup.LayoutParams.WRAP_CONTENT
+    private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private val launcher: LauncherApps = context.getSystemService(LauncherApps::class.java)
     private val me = Process.myUserHandle()
 
+    /** How many icons wide the panel is, and how wide one slot is. Both
+     *  follow from where the panel is (see [settle]). */
+    private var cols = 3
+    private var cellW = pitch
+
     private var edit = false
 
-    /** The slot that is being moved, until its new place is tapped. */
+    /** The slot that is being moved by taps, until its new place is tapped. */
     private var moving: Int? = null
 
     /** The slot of the folder that is open. */
@@ -78,26 +97,32 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
     /** True once the panel has left the screen. */
     private var closed = false
 
+    /** The slot a dragged icon is over. */
+    private var over: View? = null
+    private val spot = IntArray(2)
+
     private val hint = line(FAINT)
+    private val placeLine = line(LINK).apply {
+        setOnClickListener {
+            Prefs.setPanelPlace(context, nextPlace(Prefs.panelPlace(context)))
+            settle()
+            render()
+        }
+    }
     private val anyApp = line(LINK).apply {
         text = "To open the panel from any app: tap here, then switch OnePage on under Accessibility."
         setOnClickListener { openAccessibility() }
     }
-    private val grid = GridLayout(context).apply { columnCount = COLS }
+    private val grid = GridLayout(context)
 
     private val box = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
-        val r = dp(RADIUS).toFloat()
-        // Round towards the screen, square against its edge.
-        background = GradientDrawable().apply {
-            setColor(CARD)
-            cornerRadii = floatArrayOf(r, r, 0f, 0f, 0f, 0f, r, r)
-        }
         val p = dp(PAD)
         setPadding(p, p, p, p)
-        addView(hint, LinearLayout.LayoutParams(pitch * COLS, wrap))
+        addView(hint)
         addView(grid)
-        addView(anyApp, LinearLayout.LayoutParams(pitch * COLS, wrap))
+        addView(placeLine)
+        addView(anyApp)
         // A tap on the card itself goes nowhere, so it does not close it.
         setOnClickListener { if (folder != null) back() }
         setOnLongClickListener {
@@ -137,7 +162,7 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
                 shape = GradientDrawable.OVAL
                 setColor(0x33FFFFFF)
             }
-            contentDescription = "Add an app to the folder"
+            contentDescription = "Add apps to the folder"
             setOnClickListener { addToFolder() }
         }
         val head = LinearLayout(context).apply {
@@ -156,15 +181,54 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
 
     init {
         setOnClickListener { back() }
-        addView(scroll, LayoutParams(wrap, wrap, Gravity.END or Gravity.CENTER_VERTICAL))
+        addView(scroll, LayoutParams(wrap, wrap))
         addView(folderBox, LayoutParams(wrap, wrap, Gravity.CENTER))
         Icons.retry()
         // An empty panel starts in editing, so there is a plus to tap.
-        edit = now().slots.isEmpty()
+        edit = startEditing || now().slots.isEmpty()
+        settle()
         render()
         box.alpha = 0f
         box.translationY = dp(24).toFloat()
         box.animate().alpha(1f).translationY(0f).setDuration(120).start()
+    }
+
+    /** Put the card where the user wants it: along the bottom of the
+     *  screen and as wide as it, or three icons wide at a side. */
+    private fun settle() {
+        val place = Prefs.panelPlace(context)
+        val r = dp(RADIUS).toFloat()
+        // The short side of the screen, so the card also fits a phone on its side.
+        val metrics = resources.displayMetrics
+        val room = min(metrics.widthPixels, metrics.heightPixels) - 2 * dp(PAD)
+        cols = columns(place, room, pitch)
+        cellW = if (place == BOTTOM) room / cols else pitch
+        grid.removeAllViews()
+        grid.columnCount = cols
+        // Round towards the screen, square against its edge.
+        box.background = GradientDrawable().apply {
+            setColor(CARD)
+            cornerRadii = when (place) {
+                BOTTOM -> floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
+                LEFT -> floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f)
+                else -> floatArrayOf(r, r, 0f, 0f, 0f, 0f, r, r)
+            }
+        }
+        scroll.layoutParams = LayoutParams(
+            wrap, wrap,
+            when (place) {
+                BOTTOM -> Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                LEFT -> Gravity.START or Gravity.CENTER_VERTICAL
+                else -> Gravity.END or Gravity.CENTER_VERTICAL
+            },
+        )
+        for (v in listOf(hint, placeLine, anyApp)) v.layoutParams = LinearLayout.LayoutParams(cellW * cols, wrap)
+        val at = when (place) {
+            BOTTOM -> "at the bottom"
+            LEFT -> "at the left"
+            else -> "at the right"
+        }
+        placeLine.text = "The panel is $at. Tap here to move it."
     }
 
     // ---- stepping back ----
@@ -209,19 +273,21 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
 
     private fun render() {
         val panel = now()
-        val used = panelRows(panel, COLS.toUInt()).toInt()
+        val used = panelRows(panel, cols.toUInt()).toInt()
         // While editing there is room below for a new group after a gap.
         val rows = if (edit) used + SPARE else used
         val wanted = ArrayList<Target>()
 
         hint.visibility = if (edit) View.VISIBLE else View.GONE
         hint.text = if (moving != null) "Tap where it should go."
-        else "Tap + to add. Tap an icon to move or remove it. Back when done."
+        else "Drag an icon to move it. Tap + to add, tap an icon for more. Back when done."
+        placeLine.visibility = if (edit) View.VISIBLE else View.GONE
         anyApp.visibility = if (edit && !EdgeService.on) View.VISIBLE else View.GONE
 
+        over = null
         grid.removeAllViews()
-        for (i in 0 until rows * COLS) {
-            grid.addView(cell(panel.slots.getOrNull(i) ?: Slot.Empty, i, wanted), pitch, pitch)
+        for (i in 0 until rows * cols) {
+            grid.addView(cell(panel.slots.getOrNull(i) ?: Slot.Empty, i, wanted), cellW, pitch)
         }
 
         val at = folder
@@ -233,11 +299,15 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
         } else {
             folderTitle.text = open.name
             open.items.forEachIndexed { n, target ->
-                val v = icon(target, wanted)
+                val v = icon(target, pitch, wanted)
                 v.background = ripple()
                 v.setOnClickListener { start(target) }
                 v.setOnLongClickListener { anchor ->
-                    menu(anchor, Choice("Remove") { dropFromFolder(at, n) })
+                    menu(
+                        anchor,
+                        Choice("Out to the panel") { outOfFolder(at, n) },
+                        Choice("Remove") { dropFromFolder(at, n) },
+                    )
                     true
                 }
                 folderGrid.addView(v, pitch, pitch)
@@ -254,25 +324,27 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
     private fun cell(slot: Slot, i: Int, wanted: MutableList<Target>): View {
         val v: View = when (slot) {
             is Slot.Empty -> if (edit) sign("+", FAINT, 20f) else View(context)
-            is Slot.One -> icon(slot.target, wanted)
-            is Slot.Folder -> sign(face(slot.name), Color.WHITE, 22f)
+            is Slot.One -> icon(slot.target, cellW, wanted)
+            is Slot.Folder -> folderSign(slot)
         }
         // A free slot outside editing takes no touch: it is part of the card.
         if (slot !is Slot.Empty || edit) {
             v.background = ripple()
             v.setOnClickListener { tap(i, it) }
+            // Holding switches editing on. While editing, holding an icon
+            // is the start of a drag, so it must not switch editing off.
             v.setOnLongClickListener {
-                toggleEdit()
+                if (!edit) toggleEdit()
                 true
             }
         }
+        if (edit && slot !is Slot.Empty) drag(v, i)
         if (i == moving) v.alpha = 0.35f
         return v
     }
 
-    private fun icon(target: Target, wanted: MutableList<Target>): ImageView = ImageView(context).apply {
-        val pad = (pitch - iconPx) / 2
-        setPadding(pad, pad, pad, pad)
+    private fun icon(target: Target, width: Int, wanted: MutableList<Target>): ImageView = ImageView(context).apply {
+        setPadding((width - iconPx) / 2, (pitch - iconPx) / 2, (width - iconPx) / 2, (pitch - iconPx) / 2)
         val bitmap = Icons.cached(target)
         if (bitmap != null) {
             setImageBitmap(bitmap)
@@ -285,6 +357,19 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
                     setStroke(dp(1), 0x55FFFFFF)
                 },
             )
+        }
+    }
+
+    /** A folder in the panel: the sign the user chose for it, or the first
+     *  letter of its name. */
+    private fun folderSign(slot: Slot.Folder): View {
+        val drawn = if (slot.icon.isEmpty()) null else Signs.drawable(context, slot.icon, Color.WHITE)
+        if (drawn == null) return sign(face(slot.name), Color.WHITE, 22f)
+        return ImageView(context).apply {
+            val side = dp(SIGN)
+            setPadding((cellW - side) / 2, (pitch - side) / 2, (cellW - side) / 2, (pitch - side) / 2)
+            setImageDrawable(drawn)
+            contentDescription = slot.name
         }
     }
 
@@ -307,6 +392,92 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
 
     private fun dp(n: Int): Int = (n * density).roundToInt()
 
+    // ---- dragging ----
+
+    /** While editing, an icon follows the finger and lands in the slot it
+     *  is let go over. A finger that stays put is a tap, as before. */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun drag(v: View, from: Int) {
+        var x0 = 0f
+        var y0 = 0f
+        var dragging = false
+        v.setOnTouchListener { _, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    x0 = ev.rawX
+                    y0 = ev.rawY
+                    dragging = false
+                    // The card must not scroll away under a drag.
+                    v.parent?.requestDisallowInterceptTouchEvent(true)
+                    false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = ev.rawX - x0
+                    val dy = ev.rawY - y0
+                    if (!dragging && moving == null && folder == null && hypot(dx, dy) > slop) {
+                        dragging = true
+                        v.cancelLongPress()
+                        v.isPressed = false
+                        // Above its neighbours, and a little larger.
+                        v.translationZ = dp(8).toFloat()
+                        v.scaleX = 1.15f
+                        v.scaleY = 1.15f
+                    }
+                    if (dragging) {
+                        v.translationX = dx
+                        v.translationY = dy
+                        mark(slotUnder(ev))
+                    }
+                    dragging
+                }
+                MotionEvent.ACTION_UP -> if (dragging) {
+                    drop(from, slotUnder(ev))
+                    true
+                } else {
+                    false
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    if (dragging) render()
+                    false
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun slotUnder(ev: MotionEvent): Int? {
+        grid.getLocationOnScreen(spot)
+        return slotAt(ev.rawX - spot[0], ev.rawY - spot[1], cellW, pitch, cols, grid.childCount / cols)
+    }
+
+    /** Frame the slot the dragged icon would land in. */
+    private fun mark(slot: Int?) {
+        val next = slot?.let { grid.getChildAt(it) }
+        if (next === over) return
+        over?.foreground = null
+        next?.foreground = GradientDrawable().apply {
+            cornerRadius = dp(10).toFloat()
+            setStroke(dp(1), 0x66FFFFFF)
+        }
+        over = next
+    }
+
+    /** On a folder an icon goes into it. Anywhere else the two slots
+     *  change places, and one of them may be free. */
+    private fun drop(from: Int, to: Int?) {
+        over = null
+        if (to == null || to == from) {
+            render()
+            return
+        }
+        val panel = now()
+        val into = panel.slots.getOrNull(from) is Slot.One && panel.slots.getOrNull(to) is Slot.Folder
+        save(
+            if (into) panelIntoFolder(panel, from.toUInt(), to.toUInt())
+            else panelSwap(panel, from.toUInt(), to.toUInt()),
+        )
+    }
+
     // ---- taps ----
 
     private fun tap(i: Int, v: View) {
@@ -324,14 +495,16 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
         when {
             edit && slot is Slot.Empty -> menu(
                 v,
-                Choice("App") { pickApp { save(panelPut(now(), i.toUInt(), Slot.One(it))) } },
-                Choice("Folder") { askName("") { save(panelPut(now(), i.toUInt(), Slot.Folder(it, emptyList()))) } },
+                Choice("Apps") { pickApps { save(panelFill(now(), i.toUInt(), it)) } },
+                Choice("Folder") { newFolder(i) },
+                Choice("Call") { pickContact(i) },
             )
             edit && slot is Slot.Folder -> menu(
                 v,
                 Choice("Open") { open(i) },
-                Choice("Move") { move(i) },
+                Choice("Icon") { pickSign(slot.name) { setSign(i, it) } },
                 Choice("Rename") { askName(slot.name) { rename(i, it) } },
+                Choice("Move") { move(i) },
                 Choice("Remove") {
                     if (slot.items.isEmpty()) remove(i)
                     else confirm("Remove the folder ${slot.name} with the ${slot.items.size} in it?") { remove(i) }
@@ -353,9 +526,19 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
         render()
     }
 
+    /** A new folder gets its name first, then its sign. */
+    private fun newFolder(i: Int) = askName("") { name ->
+        pickSign(name) { icon -> save(panelPut(now(), i.toUInt(), Slot.Folder(name, icon, emptyList()))) }
+    }
+
     private fun rename(i: Int, name: String) {
         val old = now().slots.getOrNull(i) as? Slot.Folder ?: return
-        save(panelPut(now(), i.toUInt(), Slot.Folder(name, old.items)))
+        save(panelPut(now(), i.toUInt(), Slot.Folder(name, old.icon, old.items)))
+    }
+
+    private fun setSign(i: Int, icon: String) {
+        val old = now().slots.getOrNull(i) as? Slot.Folder ?: return
+        save(panelPut(now(), i.toUInt(), Slot.Folder(old.name, icon, old.items)))
     }
 
     private fun remove(i: Int) {
@@ -371,7 +554,7 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
 
     private fun addToFolder() {
         val at = folder ?: return
-        pickApp { save(panelFolderAdd(now(), at.toUInt(), it)) }
+        pickApps { apps -> save(apps.fold(now()) { panel, app -> panelFolderAdd(panel, at.toUInt(), app) }) }
     }
 
     private fun dropFromFolder(at: Int, n: Int) {
@@ -380,8 +563,14 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
         letGo(listOf(gone))
     }
 
-    /** Android keeps a shortcut only while the home app says it is in use.
-     *  So when one leaves the panel, its app gets the list of those left. */
+    private fun outOfFolder(at: Int, n: Int) {
+        val item = (now().slots.getOrNull(at) as? Slot.Folder)?.items?.getOrNull(n) ?: return
+        save(panelAdd(panelFolderDrop(now(), at.toUInt(), n.toUInt()), item))
+    }
+
+    /** Tidy up after what left the panel. Android keeps a shortcut only
+     *  while the home app says it is in use, so its app gets the list of
+     *  those left. A contact's picture is deleted with its last icon. */
     private fun letGo(gone: List<Target>) {
         val panel = now()
         for (pkg in gone.filterIsInstance<Target.Shortcut>().map { it.pkg }.distinct()) {
@@ -389,6 +578,11 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
                 launcher.pinShortcuts(pkg, panelPins(panel, pkg), me)
             } catch (_: Exception) {
             }
+        }
+        for (call in gone.filterIsInstance<Target.Call>()) {
+            if (panelHas(panel, call)) continue
+            File(context.filesDir, faceFile(call.number)).delete()
+            Icons.forget(call)
         }
     }
 
@@ -398,10 +592,34 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
                 is Target.App ->
                     launcher.startMainActivity(ComponentName.unflattenFromString(target.component), me, null, null)
                 is Target.Shortcut -> launcher.startShortcut(target.pkg, target.id, null, null, me)
+                is Target.Call -> {
+                    // With no leave to call, the dialler opens with the number in it.
+                    val may = context.checkSelfPermission(Manifest.permission.CALL_PHONE) ==
+                        PackageManager.PERMISSION_GRANTED
+                    context.startActivity(
+                        Intent(if (may) Intent.ACTION_CALL else Intent.ACTION_DIAL, Uri.fromParts("tel", target.number, null))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                    )
+                }
             }
             close()
         } catch (_: Exception) {
             say("That one is gone from the phone. Hold the panel to remove it.")
+        }
+    }
+
+    /** The phone's own contact list is an app of its own, so the panel
+     *  steps aside for it and comes back when a number is picked. */
+    private fun pickContact(i: Int) {
+        try {
+            context.startActivity(
+                Intent(context, ContactActivity::class.java)
+                    .putExtra(ContactActivity.AT, i)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+            close()
+        } catch (_: Exception) {
+            say("The contact list did not open.")
         }
     }
 
@@ -437,28 +655,15 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
         popup.show()
     }
 
-    /** Every app with an icon, by name. */
-    private fun pickApp(then: (Target) -> Unit) {
-        val apps = try {
-            launcher.getActivityList(null, me)
-                .map { it.label.toString() to it.componentName.flattenToString() }
-                .sortedBy { it.first.lowercase() }
-        } catch (_: Exception) {
-            emptyList()
-        }
-        show(
-            AlertDialog.Builder(context)
-                .setTitle("App")
-                .setItems(apps.map { it.first }.toTypedArray()) { _, n -> then(Target.App(apps[n].second)) }
-                .setNegativeButton("Cancel", null),
-        )
-    }
+    private fun pickApps(then: (List<Target>) -> Unit) = show(appsDialog(context, launcher, iconPx, then))
+
+    private fun pickSign(name: String, then: (String) -> Unit) = show(signsDialog(context, name, then))
 
     private fun askName(old: String, then: (String) -> Unit) {
         val field = EditText(context).apply {
             setText(old)
             setSelection(old.length)
-            hint = "Name"
+            setHint("Name")
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
             requestFocus()
         }
@@ -469,13 +674,13 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
         show(
             AlertDialog.Builder(context)
                 .setTitle("Folder")
-                .setMessage("The panel shows its first letter, or the emoji it starts with.")
                 .setView(frame)
                 .setPositiveButton("OK") { _, _ ->
                     val name = field.text.toString().trim()
                     if (name.isNotEmpty()) then(name)
                 }
-                .setNegativeButton("Cancel", null),
+                .setNegativeButton("Cancel", null)
+                .create(),
             keyboard = true,
         )
     }
@@ -484,13 +689,13 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
         AlertDialog.Builder(context)
             .setMessage(question)
             .setPositiveButton("Remove") { _, _ -> then() }
-            .setNegativeButton("Cancel", null),
+            .setNegativeButton("Cancel", null)
+            .create(),
     )
 
     /** A dialog over the panel must be the panel's kind of window, or it
      *  comes up behind it. */
-    private fun show(builder: AlertDialog.Builder, keyboard: Boolean = false) {
-        val dialog = builder.create()
+    private fun show(dialog: AlertDialog, keyboard: Boolean = false) {
         dialog.window?.setType(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY)
         if (keyboard) dialog.window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE)
         try {
@@ -501,16 +706,16 @@ class PanelView(context: Context, private val close: () -> Unit) : FrameLayout(c
     }
 
     private companion object {
-        const val COLS = 3
         const val FOLDER_COLS = 4
 
         /** Free rows shown below the last icon while editing. */
         const val SPARE = 2
 
-        // In dp: from one icon to the next, the icon itself, the card's
-        // rim and its corner.
+        // In dp: from one icon to the next, the icon itself, a folder's
+        // sign, the card's rim and its corner.
         const val PITCH = 46
         const val ICON = 36
+        const val SIGN = 26
         const val PAD = 10
         const val RADIUS = 24
 

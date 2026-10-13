@@ -4,8 +4,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.pm.LauncherApps
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.BitmapShader
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Shader
 import android.graphics.drawable.AdaptiveIconDrawable
@@ -13,6 +15,7 @@ import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
 import android.os.Process
+import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import uniffi.fe2o3_mobile_core.Target
 
@@ -36,6 +39,17 @@ object Icons {
 
     /** Try what was gone once more: the app may be back. */
     fun retry() = gone.clear()
+
+    /** Drop one picture, so it is drawn anew: a contact got a new face. */
+    fun forget(t: Target) {
+        cache.remove(t)
+        gone.remove(t)
+    }
+
+    /** Draw one picture and keep nothing. The list of all apps uses this,
+     *  so a hundred icons do not stay in memory after it closes. Not for
+     *  the main thread. */
+    fun drawNow(ctx: Context, t: Target, size: Int): Bitmap? = draw(ctx, t, size)
 
     /** Draw those of `wanted` that are not drawn yet, then call `done` on
      *  the main thread. Nothing happens when all of them are there. */
@@ -72,6 +86,14 @@ object Icons {
                 val icon = info?.let { launcher.getShortcutIconDrawable(it, ctx.resources.displayMetrics.densityDpi) }
                 icon?.let { round(it, size, always = true) }
             }
+            is Target.Call -> {
+                // The contact's picture, kept when the number was picked,
+                // or the first letter of the name on a colour.
+                val file = File(ctx.filesDir, faceFile(t.number))
+                val photo = if (file.exists()) BitmapFactory.decodeFile(file.path) else null
+                val flat = photo?.let { Bitmap.createScaledBitmap(it, size, size, true) } ?: letter(t.name, size)
+                disc(flat).also { phoneMark(ctx, it) }
+            }
         }
     } catch (_: Exception) {
         // The app is gone, or OnePage is not the home app and may not ask.
@@ -97,7 +119,12 @@ object Icons {
             icon.setBounds(0, 0, size, size)
             icon.draw(canvas)
         }
-        if (layers == null && !always) return flat
+        return if (layers == null && !always) flat else disc(flat)
+    }
+
+    /** Cut a square picture round. */
+    private fun disc(flat: Bitmap): Bitmap {
+        val size = flat.width
         val disc = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             shader = BitmapShader(flat, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
@@ -105,4 +132,38 @@ object Icons {
         Canvas(disc).drawCircle(size / 2f, size / 2f, size / 2f, paint)
         return disc
     }
+
+    /** A face for a contact with no picture: the first letter of the name.
+     *  The colour follows from the name, so it is the same every time. */
+    private fun letter(name: String, size: Int): Bitmap {
+        val flat = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(flat)
+        canvas.drawColor(FACES[Math.floorMod(name.hashCode(), FACES.size)])
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = size * 0.48f
+            textAlign = Paint.Align.CENTER
+        }
+        canvas.drawText(face(name), size / 2f, size / 2f - (paint.ascent() + paint.descent()) / 2, paint)
+        return flat
+    }
+
+    /** A small green dot with a handset, bottom right: this icon calls. */
+    private fun phoneMark(ctx: Context, on: Bitmap) {
+        val r = on.width * 0.19f
+        val cx = on.width - r
+        val cy = on.height - r
+        val canvas = Canvas(on)
+        canvas.drawCircle(cx, cy, r, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = CALL })
+        val phone = Signs.drawable(ctx, "phone", Color.WHITE, 2.6f) ?: return
+        val half = (r * 0.62f).toInt()
+        phone.setBounds((cx - half).toInt(), (cy - half).toInt(), (cx + half).toInt(), (cy + half).toInt())
+        phone.draw(canvas)
+    }
+
+    private val CALL = 0xFF2E9E5B.toInt()
+    private val FACES = intArrayOf(
+        0xFF5B7BB5.toInt(), 0xFF8A62A8.toInt(), 0xFFB5605B.toInt(),
+        0xFFB58A3F.toInt(), 0xFF4F9A8C.toInt(), 0xFF6E8F4E.toInt(),
+    )
 }

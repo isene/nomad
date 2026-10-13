@@ -1,0 +1,220 @@
+#!/usr/bin/env python3
+"""Make the folder signs of OnePage's app panel from Lucide's line icons.
+
+    tools/onepage-signs <folder with Lucide's .svg files>
+
+Lucide (https://lucide.dev, ISC licence) draws each icon in a box of 24 by
+24 with lines, circles, boxes and arcs. This writes each as one outline of
+three kinds of steps only: M (move to), L (line to), C (curve to), and Z
+(close). The app then needs no SVG reader. The result is
+apps/onepage/src/main/assets/signs.txt, one sign a line, in the order of
+SIGNS below, which is the order the app shows them in.
+
+To add a sign: add its Lucide name to SIGNS, get the icons
+(npm pack lucide-static, then unpack), and run this again.
+"""
+import math
+import re
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+SIGNS = """
+wrench hammer settings sliders-horizontal plug lightbulb
+plane car train-front bus bike ship
+map-pin map compass globe mountain tent
+tag shopping-cart shopping-bag credit-card wallet landmark
+monitor smartphone terminal code cpu database
+chart-line chart-pie calculator briefcase building-2 banknote
+user users baby heart smile paw-print
+message-circle phone mail bell share-2 link
+camera image film tv music headphones
+gamepad-2 dice-5 puzzle swords trophy ghost
+book-open newspaper graduation-cap pencil palette file-text
+calendar clock cloud sun moon star
+utensils coffee dumbbell activity pill stethoscope
+flask-conical atom telescope rocket leaf brain
+lock key shield wifi search folder
+house anchor zap flame gift bot
+""".split()
+
+OUT = Path(__file__).resolve().parent.parent / "apps/onepage/src/main/assets/signs.txt"
+NUMBER = re.compile(r"[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?")
+# How many numbers each step of an SVG outline takes.
+TAKES = {"m": 2, "l": 2, "h": 1, "v": 1, "c": 6, "s": 4, "q": 4, "t": 2, "a": 7, "z": 0}
+
+
+def arc(x1, y1, rx, ry, turn, large, sweep, x2, y2):
+    """An SVG arc as curves: a list of (c1x, c1y, c2x, c2y, x, y)."""
+    if rx == 0 or ry == 0 or (x1, y1) == (x2, y2):
+        return [(x1, y1, x2, y2, x2, y2)]
+    rx, ry = abs(rx), abs(ry)
+    cos, sin = math.cos(math.radians(turn)), math.sin(math.radians(turn))
+    dx, dy = (x1 - x2) / 2, (y1 - y2) / 2
+    px, py = cos * dx + sin * dy, -sin * dx + cos * dy
+    grow = px * px / (rx * rx) + py * py / (ry * ry)
+    if grow > 1:
+        rx, ry = rx * math.sqrt(grow), ry * math.sqrt(grow)
+    top = rx * rx * ry * ry - rx * rx * py * py - ry * ry * px * px
+    k = math.sqrt(max(0.0, top / (rx * rx * py * py + ry * ry * px * px)))
+    if large == sweep:
+        k = -k
+    cxp, cyp = k * rx * py / ry, -k * ry * px / rx
+    cx, cy = cos * cxp - sin * cyp + (x1 + x2) / 2, sin * cxp + cos * cyp + (y1 + y2) / 2
+    start = math.atan2((py - cyp) / ry, (px - cxp) / rx)
+    span = math.atan2((-py - cyp) / ry, (-px - cxp) / rx) - start
+    if sweep and span < 0:
+        span += 2 * math.pi
+    if not sweep and span > 0:
+        span -= 2 * math.pi
+    parts = max(1, math.ceil(abs(span) / (math.pi / 2) - 1e-9))
+    step = span / parts
+    t = 4 / 3 * math.tan(step / 4)
+
+    def at(x, y):
+        return cos * rx * x - sin * ry * y + cx, sin * rx * x + cos * ry * y + cy
+
+    out = []
+    for i in range(parts):
+        a, b = start + i * step, start + (i + 1) * step
+        c1 = at(math.cos(a) - t * math.sin(a), math.sin(a) + t * math.cos(a))
+        c2 = at(math.cos(b) + t * math.sin(b), math.sin(b) - t * math.cos(b))
+        out.append((*c1, *c2, *at(math.cos(b), math.sin(b))))
+    # End on the point the icon names, with no rounding drift.
+    out[-1] = (*out[-1][:4], x2, y2)
+    return out
+
+
+def outline(d):
+    """An SVG outline as steps: ("M", x, y), ("L", x, y), ("C", six), ("Z",)."""
+    steps, i, cmd = [], 0, None
+    x = y = sx = sy = 0.0
+    last = None  # the second handle of the curve before, for s and t
+
+    def number(flag=False):
+        nonlocal i
+        while i < len(d) and d[i] in " ,\t\r\n":
+            i += 1
+        if flag:  # the two flags of an arc are one digit each, often unspaced
+            i += 1
+            return float(d[i - 1])
+        m = NUMBER.match(d, i)
+        if not m:
+            raise ValueError(f"no number at {i} in {d!r}")
+        i = m.end()
+        return float(m.group())
+
+    while True:
+        while i < len(d) and d[i] in " ,\t\r\n":
+            i += 1
+        if i >= len(d):
+            return steps
+        if d[i].isalpha():
+            cmd = d[i]
+            i += 1
+        elif cmd in "mM":  # more pairs after a move are lines
+            cmd = "l" if cmd == "m" else "L"
+        low, rel = cmd.lower(), cmd.islower()
+        n = [number(low == "a" and k in (3, 4)) for k in range(TAKES[low])]
+        ox, oy = (x, y) if rel else (0.0, 0.0)
+        if low == "z":
+            steps.append(("Z",))
+            x, y, last = sx, sy, None
+        elif low == "m":
+            x, y = sx, sy = ox + n[0], oy + n[1]
+            steps.append(("M", x, y))
+            last = None
+        elif low in "lhv":
+            if low == "h":
+                x = ox + n[0]
+            elif low == "v":
+                y = oy + n[0]
+            else:
+                x, y = ox + n[0], oy + n[1]
+            steps.append(("L", x, y))
+            last = None
+        elif low in "cs":
+            if low == "s":
+                c1 = (2 * x - last[0], 2 * y - last[1]) if last and last[2] == "c" else (x, y)
+                n = [c1[0] - ox, c1[1] - oy] + n
+            c = [ox + n[0], oy + n[1], ox + n[2], oy + n[3], ox + n[4], oy + n[5]]
+            steps.append(("C", *c))
+            last, (x, y) = (c[2], c[3], "c"), (c[4], c[5])
+        elif low in "qt":
+            if low == "t":
+                q = (2 * x - last[0], 2 * y - last[1]) if last and last[2] == "q" else (x, y)
+                n = [q[0] - ox, q[1] - oy] + n
+            qx, qy, ex, ey = ox + n[0], oy + n[1], ox + n[2], oy + n[3]
+            steps.append(("C", x + 2 / 3 * (qx - x), y + 2 / 3 * (qy - y),
+                          ex + 2 / 3 * (qx - ex), ey + 2 / 3 * (qy - ey), ex, ey))
+            last, (x, y) = (qx, qy, "q"), (ex, ey)
+        elif low == "a":
+            ex, ey = ox + n[5], oy + n[6]
+            steps += [("C", *c) for c in arc(x, y, n[0], n[1], n[2], n[3], n[4], ex, ey)]
+            x, y, last = ex, ey, None
+
+
+def shape(el):
+    """One element of an icon as an SVG outline."""
+    tag = el.tag.split("}")[-1]
+    f = lambda k: float(el.get(k, 0))
+    if tag == "path":
+        return el.get("d")
+    if tag == "line":
+        return f"M{f('x1')} {f('y1')}L{f('x2')} {f('y2')}"
+    if tag in ("polyline", "polygon"):
+        p = NUMBER.findall(el.get("points"))
+        d = "M" + "L".join(f"{p[k]} {p[k + 1]}" for k in range(0, len(p), 2))
+        return d + ("Z" if tag == "polygon" else "")
+    if tag in ("circle", "ellipse"):
+        cx, cy = f("cx"), f("cy")
+        rx, ry = (f("r"), f("r")) if tag == "circle" else (f("rx"), f("ry"))
+        return f"M{cx - rx} {cy}A{rx} {ry} 0 1 0 {cx + rx} {cy}A{rx} {ry} 0 1 0 {cx - rx} {cy}Z"
+    if tag == "rect":
+        x, y, w, h = f("x"), f("y"), f("width"), f("height")
+        rx = float(el.get("rx", el.get("ry", 0)))
+        ry = float(el.get("ry", rx))
+        if not rx:
+            return f"M{x} {y}H{x + w}V{y + h}H{x}Z"
+        return (f"M{x + rx} {y}H{x + w - rx}A{rx} {ry} 0 0 1 {x + w} {y + ry}V{y + h - ry}"
+                f"A{rx} {ry} 0 0 1 {x + w - rx} {y + h}H{x + rx}A{rx} {ry} 0 0 1 {x} {y + h - ry}"
+                f"V{y + ry}A{rx} {ry} 0 0 1 {x + rx} {y}Z")
+    raise ValueError(f"an element this does not know: {tag}")
+
+
+def short(v):
+    return f"{v:.2f}".rstrip("0").rstrip(".").replace("-0", "0") if round(v, 2) else "0"
+
+
+def main():
+    if len(sys.argv) != 2:
+        sys.exit(__doc__)
+    folder = Path(sys.argv[1])
+    missing = [name for name in SIGNS if not (folder / f"{name}.svg").is_file()]
+    if missing:
+        sys.exit("no such icon: " + " ".join(missing))
+    lines = [
+        "# The folder signs of the app panel, one a line: its name, a tab, its outline.",
+        "# An outline is drawn in a box of 24 by 24 with M (move to), L (line to),",
+        "# C (curve to, two handles and the end) and Z (close).",
+        "# Made by tools/onepage-signs. Do not edit by hand.",
+        "#",
+        "# The signs are from Lucide (https://lucide.dev), ISC License.",
+        "# Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as",
+        "# part of Feather (MIT). All other copyright (c) for Lucide are held by",
+        "# Lucide Contributors 2022.",
+        "# Permission to use, copy, modify, and/or distribute this software for any",
+        "# purpose with or without fee is hereby granted, provided that the above",
+        "# copyright notice and this permission notice appear in all copies.",
+    ]
+    for name in SIGNS:
+        steps = []
+        for el in ET.parse(folder / f"{name}.svg").getroot():
+            steps += outline(shape(el))
+        lines.append(name + "\t" + " ".join(" ".join([s[0]] + [short(v) for v in s[1:]]) for s in steps))
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text("\n".join(lines) + "\n")
+    print(f"{len(SIGNS)} signs, {OUT.stat().st_size} bytes: {OUT}")
+
+
+main()

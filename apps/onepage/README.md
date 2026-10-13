@@ -8,7 +8,7 @@
 
 **One screen. Your widgets, placed freely. Nothing else.**
 
-![version](https://img.shields.io/badge/version-0.5.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android%2011%2B-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Views-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![idle](https://img.shields.io/badge/idle-zero%20cost-22c55e) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.6.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android%2011%2B-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Views-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![idle](https://img.shields.io/badge/idle-zero%20cost-22c55e) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A minimal home launcher — part of the [nomad](../../) mobile suite.
 
@@ -32,15 +32,22 @@ your home screen.
 
 - **One home page.** No drawer, no paging, no dock, no search bar, and no app
   icons on the page: they are in the app panel.
-- **App panel.** Swipe up and a card of icons comes up at the right edge, three
-  to a row, over the home page or over the app you are in.
-  - A tap starts an app or opens a folder. A tap beside the card, Back or Home
-    closes it.
-  - Hold the panel to edit: tap **+** in a free slot for an app or a folder, tap
-    an icon to move or remove it. Leave a row free and you have two groups.
-  - A folder shows the first letter of its name, or the emoji it starts with.
-  - A contact or a chat gets in through **Add to Home screen** in the app that
-    should open it. OnePage asks for no access to your contacts.
+- **App panel.** Swipe up and a card of icons comes up along the bottom of the
+  screen, just above the back, home and recent buttons, over the home page or
+  over the app you are in.
+  - A tap starts an app, calls a number or opens a folder. A tap beside the
+    card, Back or Home closes it.
+  - Hold the panel to edit. Drag an icon to another slot, or onto a folder to
+    put it inside. Leave a row free and you have two groups.
+  - Tap **+** in a free slot for apps, a folder or a call. The app list shows
+    every app with its icon and name, and you can tick several at once.
+  - A folder gets a sign you choose among 96 line drawings (a wrench, a plane,
+    a shopping cart), or the first letter of its name.
+  - **Call** opens the phone's own contact list. The number you pick becomes
+    an icon with that contact's picture, and a tap on it calls.
+  - The last line in edit mode moves the panel: bottom, right edge, left edge.
+  - A chat or a web page gets in through **Add to Home screen** in the app
+    that should open it.
   - On the home page the swipe works anywhere on the empty page. In other apps
     it starts at the very bottom edge, and that needs OnePage switched on under
     Accessibility (see First run).
@@ -83,6 +90,9 @@ The launcher is always alive, so the idle path is empty by design:
 - **The app panel does not exist while it is closed.** Its view is built when
   you swipe and dropped when it closes. An icon is drawn once, off the main
   thread, and kept in memory. The file is written when you change the panel.
+- **The app list and the folder signs are read when you ask for them.** The
+  icons of the app list are dropped when the list closes. The signs are one
+  small file, read the first time a sign is shown.
 - **The swipe strip is one empty window**, 14 dp tall along the bottom edge. It
   runs code only when a finger lands on it. The accessibility service behind it
   asks Android for no events and cannot read the screen.
@@ -111,6 +121,17 @@ export ANDROID_NDK_HOME="$HOME/.android-sdk/ndk/27.2.12479018"
 
 APK → `apps/onepage/build/outputs/apk/release/`. Sync and sideload.
 
+## Permissions for calls
+
+OnePage asks for two things, and only when you add your first call icon. You
+can say no to both.
+
+- **Phone**: lets a tap on the icon call at once. Without it the tap opens the
+  dialler with the number filled in.
+- **Contacts**: lets OnePage copy the picture of the one contact you pick.
+  Without it the icon is the first letter of the name. OnePage never reads the
+  rest of your contacts, and sends nothing anywhere: it has no network access.
+
 ## First run
 
 1. Install and open OnePage once.
@@ -121,6 +142,7 @@ APK → `apps/onepage/build/outputs/apk/release/`. Sync and sideload.
 4. The floating pill takes you home from any app.
 5. Swipe up on the empty page: the app panel opens, in edit mode while it is
    empty. Tap **+** to fill it.
+   The last line there moves the panel to the right or the left edge.
 6. To open the panel from any app: Settings → Accessibility → OnePage → on.
    Android refuses this the first time for an app installed from a file. After
    that refusal, open App info for OnePage, tap ⋮, choose **Allow restricted
@@ -133,3 +155,6 @@ APK → `apps/onepage/build/outputs/apk/release/`. Sync and sideload.
 ## License
 
 [Unlicense](https://unlicense.org/) — public domain. Part of [nomad](../../) · [isene.org/nomad](https://isene.org/nomad/)
+
+The folder signs are from [Lucide](https://lucide.dev), under the ISC License.
+Its notice is at the top of `src/main/assets/signs.txt`.

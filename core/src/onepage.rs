@@ -47,9 +47,10 @@ pub fn onepage_serialize(layout: Layout) -> String {
 // ---- The app panel ----
 //
 // A card of icons that pops up over the home page or over another app. It
-// is a grid three slots wide and as tall as it is filled. A slot is empty,
+// is a grid as tall as it is filled; Kotlin says how many slots wide it is
+// (three at the side of the screen, more along the bottom). A slot is empty,
 // starts one thing, or is a folder of things. An empty row between two
-// groups is three empty slots. Kotlin owns the file (filesDir/panel.json)
+// groups is a row of empty slots. Kotlin owns the file (filesDir/panel.json)
 // and the drawing; the format and the edits are here, so they are tested
 // on the laptop.
 
@@ -65,6 +66,8 @@ pub enum Target {
     App { component: String },
     /// A shortcut an app has handed to the home screen: a contact, a chat.
     Shortcut { pkg: String, id: String },
+    /// A phone number a tap calls, and the name it goes by.
+    Call { name: String, number: String },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, uniffi::Enum)]
@@ -72,13 +75,20 @@ pub enum Target {
 pub enum Slot {
     Empty,
     One { target: Target },
-    Folder { name: String, items: Vec<Target> },
+    Folder {
+        name: String,
+        /// The sign drawn for the folder, by its name in the app's table
+        /// of signs. Empty: the first letter of the folder's name.
+        #[serde(default)]
+        icon: String,
+        items: Vec<Target>,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, uniffi::Record)]
 pub struct Panel {
     pub version: u32,
-    /// Row by row, three to a row. Never ends in an empty slot.
+    /// Row by row. Never ends in an empty slot.
     pub slots: Vec<Slot>,
 }
 
@@ -142,6 +152,42 @@ pub fn panel_swap(mut panel: Panel, a: u32, b: u32) -> Panel {
     if reach(&mut panel, a.max(b)) {
         panel.slots.swap(a, b);
     }
+    trimmed(panel)
+}
+
+/// Put each of `targets` into the next free slot, from `at` on. This is
+/// how a list of ticked apps lands in the panel.
+#[uniffi::export]
+pub fn panel_fill(mut panel: Panel, at: u32, targets: Vec<Target>) -> Panel {
+    let mut at = at as usize;
+    for target in targets {
+        while panel.slots.get(at).is_some_and(|slot| *slot != Slot::Empty) {
+            at += 1;
+        }
+        if !reach(&mut panel, at) {
+            break;
+        }
+        panel.slots[at] = Slot::One { target };
+        at += 1;
+    }
+    trimmed(panel)
+}
+
+/// Drop the icon at `from` into the folder at `to`. When `from` has no
+/// single icon, or `to` is no folder, nothing changes.
+#[uniffi::export]
+pub fn panel_into_folder(mut panel: Panel, from: u32, to: u32) -> Panel {
+    let (from, to) = (from as usize, to as usize);
+    let Some(Slot::One { target }) = panel.slots.get(from).cloned() else {
+        return panel;
+    };
+    let Some(Slot::Folder { items, .. }) = panel.slots.get_mut(to) else {
+        return panel;
+    };
+    if !items.contains(&target) {
+        items.push(target);
+    }
+    panel.slots[from] = Slot::Empty;
     trimmed(panel)
 }
 
@@ -295,15 +341,20 @@ mod panel_tests {
         Slot::One { target: app(name) }
     }
 
+    fn folder(name: &str, items: Vec<Target>) -> Slot {
+        Slot::Folder { name: name.into(), icon: String::new(), items }
+    }
+
     #[test]
     fn a_panel_survives_the_file() {
         let mut p = panel_empty();
         p = panel_put(p, 0, one("mail"));
         p = panel_put(p, 4, Slot::One { target: chat("anna") });
-        p = panel_put(p, 5, Slot::Folder { name: "✈ Travel".into(), items: vec![app("maps"), chat("bo")] });
+        p = panel_put(p, 5, Slot::Folder { name: "Travel".into(), icon: "plane".into(), items: vec![app("maps"), chat("bo")] });
+        p = panel_put(p, 6, Slot::One { target: Target::Call { name: "Anna".into(), number: "+1 555 0100".into() } });
         let back = panel_parse(panel_serialize(p.clone())).unwrap();
         assert_eq!(back, p);
-        assert_eq!(back.slots.len(), 6);
+        assert_eq!(back.slots.len(), 7);
         assert_eq!(back.slots[1], Slot::Empty);
     }
 
@@ -320,6 +371,8 @@ mod panel_tests {
         // The empty slot at the end is cut.
         assert_eq!(p.slots.len(), 3);
         assert_eq!(p.slots[0], Slot::One { target: Target::App { component: "a/.B".into() } });
+        // A folder from before folders had signs reads with none.
+        assert_eq!(p.slots[2], folder("Tools", vec![Target::Shortcut { pkg: "c".into(), id: "7".into() }]));
         assert!(panel_parse("not json".into()).is_none());
         assert!(panel_parse("".into()).is_none());
     }
@@ -376,7 +429,7 @@ mod panel_tests {
         let again = panel_add(p.clone(), chat("anna"));
         assert_eq!(again, p);
         // One that sits in a folder is not added beside it.
-        let mut q = panel_put(panel_empty(), 0, Slot::Folder { name: "F".into(), items: vec![] });
+        let mut q = panel_put(panel_empty(), 0, folder("F", vec![]));
         q = panel_folder_add(q, 0, chat("bo"));
         assert!(panel_has(q.clone(), chat("bo")));
         assert_eq!(panel_add(q.clone(), chat("bo")), q);
@@ -384,13 +437,13 @@ mod panel_tests {
 
     #[test]
     fn a_folder_takes_and_gives_up_its_items() {
-        let mut p = panel_put(panel_empty(), 2, Slot::Folder { name: "Tools".into(), items: vec![] });
+        let mut p = panel_put(panel_empty(), 2, folder("Tools", vec![]));
         p = panel_folder_add(p, 2, app("maps"));
         p = panel_folder_add(p, 2, app("mail"));
         p = panel_folder_add(p, 2, app("maps"));
-        assert_eq!(p.slots[2], Slot::Folder { name: "Tools".into(), items: vec![app("maps"), app("mail")] });
+        assert_eq!(p.slots[2], folder("Tools", vec![app("maps"), app("mail")]));
         p = panel_folder_drop(p, 2, 0);
-        assert_eq!(p.slots[2], Slot::Folder { name: "Tools".into(), items: vec![app("mail")] });
+        assert_eq!(p.slots[2], folder("Tools", vec![app("mail")]));
         // A wrong number, or a slot that is no folder, changes nothing.
         assert_eq!(panel_folder_drop(p.clone(), 2, 9), p);
         assert_eq!(panel_folder_add(p.clone(), 0, app("x")), p);
@@ -401,11 +454,51 @@ mod panel_tests {
     fn the_shortcuts_of_one_app_are_listed_for_android() {
         let mut p = panel_put(panel_empty(), 0, Slot::One { target: chat("anna") });
         p = panel_put(p, 1, Slot::One { target: Target::Shortcut { pkg: "other".into(), id: "x".into() } });
-        p = panel_put(p, 2, Slot::Folder { name: "F".into(), items: vec![chat("bo"), app("mail"), chat("anna")] });
+        p = panel_put(p, 2, folder("F", vec![chat("bo"), app("mail"), chat("anna")]));
         assert_eq!(panel_pins(p.clone(), "com.example.chat".into()), vec!["anna".to_string(), "bo".to_string()]);
         // With anna out of the slot, she is still in the folder.
         p = panel_put(p, 0, Slot::Empty);
         assert_eq!(panel_pins(p.clone(), "com.example.chat".into()), vec!["bo".to_string(), "anna".to_string()]);
         assert!(panel_pins(p, "nobody".into()).is_empty());
+    }
+
+    #[test]
+    fn ticked_apps_fill_the_free_slots_in_order() {
+        // Slot 1 is taken, so the three go to 0, 2 and 3.
+        let p = panel_put(panel_empty(), 1, one("mail"));
+        let p = panel_fill(p, 0, vec![app("a"), app("b"), app("c")]);
+        assert_eq!(p.slots, vec![one("a"), one("mail"), one("b"), one("c")]);
+        // From a slot past the end, with the gap kept.
+        let q = panel_fill(panel_put(panel_empty(), 0, one("mail")), 6, vec![app("a")]);
+        assert_eq!(q.slots.len(), 7);
+        assert_eq!(q.slots[3], Slot::Empty);
+        assert_eq!(q.slots[6], one("a"));
+        // Nothing ticked changes nothing.
+        assert_eq!(panel_fill(q.clone(), 0, vec![]), q);
+    }
+
+    #[test]
+    fn an_icon_dropped_on_a_folder_goes_into_it() {
+        let mut p = panel_put(panel_empty(), 0, one("mail"));
+        p = panel_put(p, 1, folder("Tools", vec![app("maps")]));
+        p = panel_put(p, 2, one("maps"));
+        let q = panel_into_folder(p.clone(), 0, 1);
+        assert_eq!(q.slots[0], Slot::Empty);
+        assert_eq!(q.slots[1], folder("Tools", vec![app("maps"), app("mail")]));
+        // One that is in the folder already leaves its slot and is not doubled.
+        let r = panel_into_folder(q, 2, 1);
+        assert_eq!(r.slots, vec![Slot::Empty, folder("Tools", vec![app("maps"), app("mail")])]);
+        // A folder is not dropped into a folder, and an icon not into an icon.
+        assert_eq!(panel_into_folder(p.clone(), 1, 1), p);
+        assert_eq!(panel_into_folder(p.clone(), 0, 2), p);
+        assert_eq!(panel_into_folder(p.clone(), 9, 1), p);
+    }
+
+    #[test]
+    fn a_call_is_no_shortcut_for_android() {
+        let call = Target::Call { name: "Anna".into(), number: "+1 555 0100".into() };
+        let p = panel_put(panel_empty(), 0, Slot::One { target: call.clone() });
+        assert!(panel_has(p.clone(), call));
+        assert!(panel_pins(p, "com.example.chat".into()).is_empty());
     }
 }
