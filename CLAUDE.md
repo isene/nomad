@@ -379,6 +379,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
   file on first use.
 - The lists (`Pickers.kt`: apps to add, apps to start, the signs) are
   dialogs that keep nothing after they close.
+- A row of a list is never kept for later. A `ListView` finds its height
+  with one row and then shows that row as the first, so the row a
+  `getView` call handed out may show another item when its picture is
+  ready. Find the row by its tag among the list's children at that moment
+  (`AppRows.showing`). 0.7.0 showed one icon and eleven empty rows.
 - One folder may be the folder of all other apps (`rest` on
   `Slot::Folder`, "Other apps" under **+**). It stores no items:
   `panel_rest` gives the apps that are nowhere else in the panel, and the
