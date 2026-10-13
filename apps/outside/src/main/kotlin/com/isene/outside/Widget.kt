@@ -47,7 +47,9 @@ import kotlin.math.sin
 import uniffi.fe2o3_mobile_core.Almanac
 import uniffi.fe2o3_mobile_core.DialHour
 import uniffi.fe2o3_mobile_core.outsideDial
+import uniffi.fe2o3_mobile_core.outsideRequests
 import uniffi.fe2o3_mobile_core.outsideSky
+import uniffi.fe2o3_mobile_core.outsideUsable
 
 /** The three parts of the widget that take a tap, and the name of what
  *  each opens until another app is chosen for it in outside. */
@@ -69,7 +71,8 @@ enum class Tap(val view: Int, val title: String, val usual: String) {
  * alarm, the volume, the clock's zone, the place or its forecast. It has
  * no timer of its own, and nothing here runs while no widget is placed.
  * The one thing that stays up is InboxWatch, and only while the dot for
- * waiting messages is switched on in the app.
+ * waiting messages is switched on in the app. RingFetch fetches a
+ * new forecast once an hour.
  *
  * It is plain RemoteViews and not Glance: TextClock and AnalogClock exist
  * only there, and Glance starts a worker for every update.
@@ -84,6 +87,7 @@ class ClockWidget : AppWidgetProvider() {
         InboxWatch.stop(ctx)
         ctx.getSystemService(AlarmManager::class.java).cancel(hourly(ctx))
         ctx.getSystemService(JobScheduler::class.java).cancel(SOUND_JOB)
+        RingFetch.stop(ctx)
     }
 
     companion object {
@@ -171,13 +175,16 @@ class ClockWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.lit, "${sky.lit}%")
             views.setTextViewText(R.id.phase, sky.phase)
 
-            // The weather is from the forecasts the app last fetched for
-            // that place. The widget fetches nothing itself.
+            // The weather is from the forecasts last fetched for that
+            // place, by the app or by RingFetch. This run draws what is
+            // there; RingFetch draws again when it has a new one.
             val dial = spot?.let {
                 val cache = Cache(ctx)
                 val key = cache.key(it)
-                val oldest = System.currentTimeMillis() - FRESH_MS
-                val bodies = SOURCES.map { s -> if (cache.fetched(key, s) > oldest) cache.read(key, s) else null }
+                val at = System.currentTimeMillis()
+                val fetched = SOURCES.map { s -> cache.fetched(key, s) }
+                if (fetched.max() < at - RingFetch.STALE_MS) RingFetch.ask(ctx, store, at)
+                val bodies = SOURCES.mapIndexed { i, s -> if (fetched[i] > at - FRESH_MS) cache.read(key, s) else null }
                 if (bodies.all { b -> b == null }) null
                 else outsideDial(bodies[0], bodies[1], bodies[2], tzOf(""), now.toEpochSecond())
             } ?: emptyList()
@@ -333,6 +340,68 @@ class WidgetSound : JobService() {
     }
 
     override fun onStopJob(params: JobParameters) = false
+}
+
+/**
+ * Fetches the forecast for the widget's place, so that the ring has its
+ * weather when the app has not been opened for hours, or shows another
+ * place. The widget asks for it on the full hour, and Android runs it
+ * once the phone has a network. That is three requests an hour, and
+ * none while the phone sleeps: the widget never wakes the phone.
+ */
+class RingFetch : JobService() {
+    override fun onStartJob(params: JobParameters): Boolean {
+        // The network may not be used on the main thread.
+        Thread {
+            var got = false
+            Store(this).here()?.let { spot ->
+                val cache = Cache(this)
+                val key = cache.key(spot)
+                val req = outsideRequests(spot.lat, spot.lon, System.currentTimeMillis() / 1000)
+                val bodies = listOf(Net.get(req.yrUrl), Net.post(req.stormUrl, req.stormBody), Net.get(req.gfsUrl))
+                bodies.forEachIndexed { i, body ->
+                    // Only a body with a forecast in it replaces the old one.
+                    if (body != null && outsideUsable(i.toUInt(), body)) {
+                        cache.write(key, SOURCES[i], body)
+                        got = true
+                    }
+                }
+            }
+            if (got) ClockWidget.refresh(this)
+            jobFinished(params, false)
+        }.start()
+        return true
+    }
+
+    // Android took the network away. The widget asks again within the hour.
+    override fun onStopJob(params: JobParameters) = false
+
+    companion object {
+        private const val JOB = 2
+
+        /** The widget asks for a new forecast when its own is older.
+         *  Less than an hour, so that the run on every full hour asks:
+         *  the forecast of the hour before is then seconds short of an
+         *  hour old. */
+        const val STALE_MS = 50 * 60_000L
+
+        /** Ask Android to run the fetch, unless that was asked less
+         *  than `STALE_MS` ago: a service that is down is asked no more
+         *  often than one that answers. */
+        fun ask(ctx: Context, store: Store, now: Long) {
+            if (now - store.asked() < STALE_MS) return
+            store.setAsked(now)
+            val job = JobInfo.Builder(JOB, ComponentName(ctx, RingFetch::class.java))
+                .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY)
+            try {
+                ctx.getSystemService(JobScheduler::class.java).schedule(job.build())
+            } catch (_: Exception) {
+                // Android refused. The ring keeps the forecast it has.
+            }
+        }
+
+        fun stop(ctx: Context) = ctx.getSystemService(JobScheduler::class.java).cancel(JOB)
+    }
 }
 
 /**

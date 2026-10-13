@@ -2,6 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- For the widget's ring: Android runs the fetch of a new forecast
+         once the phone has a network, and wants this of an app that
+         asks for that. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Coarse is enough for weather: the forecast is asked for a point on
          a one-kilometre grid. -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
@@ -77,6 +81,10 @@
 
         <service
             android:name=".WidgetSound"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+        <service
+            android:name=".RingFetch"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
         <!-- Up only while the dot is switched on in the app. -->

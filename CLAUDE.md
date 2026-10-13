@@ -210,8 +210,19 @@ when building the core. Same rule as the rest of Fe₂O₃.
     Until 0.3.3 rain was 0.1 mm as the mean of the
     sources, and the ring was grey for an hour the app showed rain in. `refresh` reads the three cached
     bodies for `Store.here()` and skips one older than twelve hours.
-    That is three file reads and one parse a run; the widget never
-    fetches. Geir asked for the ring on 2026-10-10 (0.3.0 had one blue
+    That is three file reads and one parse a run. Since 0.3.16 the
+    widget fetches for itself, once an hour: when the newest body is
+    older than 50 minutes (`STALE_MS`; under an hour so that every
+    full-hour run asks), `refresh` asks `RingFetch` (a `JobService`
+    with a network condition, hence `ACCESS_NETWORK_STATE`), at most
+    once in that time (`Store.asked`). It fetches the three bodies for
+    `Store.here()` and calls `refresh` when one came. Until then only
+    the app fetched, and only the place on its screen: with a searched
+    place there, or the app unopened for twelve hours, the ring had no
+    colours. Geir had such a ring on 2026-10-12 and said yes to the
+    widget's own fetch on 2026-10-13, and asked for one every hour
+    ("Fetch it on every hour"; I had proposed every three). Which of
+    the two it was on his phone is not known. Geir asked for the ring on 2026-10-10 (0.3.0 had one blue
     tick for the hour now, 0.3.1 blue ticks for rain).
   - The alarm's icon is green (`ALARM_SOON`) when the alarm rings
     within twelve hours and grey when it rings later (0.3.11; Geir

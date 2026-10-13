@@ -48,12 +48,13 @@ A clock for the home screen, one row tall and the full width.
   dot follows the queue within about a minute.
 
 The sun, the moon and the weather are for the place where outside last saw
-the phone. The widget never asks for the position itself, so open outside
-after a journey.
+the phone, whatever place is on outside's screen. The widget never asks
+for the position itself, so choose "Current location" in outside after a
+journey.
 
-The weather is from the forecast outside last fetched, since the widget
-fetches nothing. A forecast older than twelve hours colours nothing. The
-ring is drawn again the moment outside has fetched a new one.
+The widget fetches the forecast for that place itself, once an hour. A
+forecast older than twelve hours colours nothing: a ring with no colours
+has had no answer for half a day.
 
 ## Sources
 
@@ -77,10 +78,11 @@ changes its page. The other two columns keep working when it does.
 
 - The app fetches when you open it, and only what is older than half an
   hour. Without the widget, nothing runs in the background.
+- The widget fetches a forecast once an hour: three requests, and none
+  while the phone sleeps.
 - The home screen draws the widget's clocks by itself. The app is run on
   the full hour, and when the next alarm or the volume changes. It never
-  wakes a sleeping phone. The widget uses no network, but for the dot
-  when that is switched on.
+  wakes a sleeping phone.
 - The phone's position is rounded to about a kilometre before it leaves
   the phone. The app asks for coarse location only.
 - To let you choose what a tap on the widget opens, the app can see

@@ -17,8 +17,9 @@ class MainActivity : ComponentActivity() {
         setContent { OutsideTheme { OutsideScreen(vm) } }
     }
 
-    // The only time the app fetches: when it comes to the front, and then
-    // only what has gone stale. Nothing runs while it is in the background.
+    // The only time the screen fetches: when it comes to the front, and
+    // then only what has gone stale. The widget fetches for itself, see
+    // RingFetch.
     override fun onResume() {
         super.onResume()
         vm.resume()
