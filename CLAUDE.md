@@ -349,6 +349,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
 
 - The home screen: one page of widgets, and since 0.5.0 an app panel.
   Plain Views and no Compose, except the setup wizard.
+- Where the panel comes up is a setting the user asked for (`Prefs.panelPlace`):
+  along the bottom above the button bar (the default), or at the right or the
+  left edge. The line that changes it is the last one in the panel's edit mode.
+  The number of columns follows from the place, so the file stores slots only.
 - The panel is a window of its own (`PanelWindow`,
   `TYPE_APPLICATION_OVERLAY`), so it comes up over any app, and the app
   below keeps running. It is built on open and dropped on close. Keep it
@@ -362,15 +366,26 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - The panel's file is `filesDir/panel.json`. Its format and every edit
   (put, swap, add, folders, the shortcut list for Android) are in
   `core/src/onepage.rs`, with tests. Kotlin draws and starts things.
-- A shortcut (a contact, a chat) arrives through `PinActivity`, which
+- A shortcut (a chat, a web page) arrives through `PinActivity`, which
   takes Android's pin request. Only the default home app may show or
   start a shortcut, so the panel cannot move to an app of its own.
+- A call icon (`Target::Call`) comes from `ContactActivity`: the phone's own
+  contact list picks one number, and the contact's picture is copied to
+  `filesDir/face_<digits>.png`. `CALL_PHONE` and `READ_CONTACTS` are asked
+  for there and may both be refused; keep both ways working.
+- A folder's sign is a name from `assets/signs.txt`: 96 Lucide line icons as
+  outlines. `tools/onepage-signs <lucide icons dir>` writes that file; add a
+  sign by adding its name to the list in the script. `Signs.kt` reads the
+  file on first use.
+- The two lists (`Pickers.kt`: all apps with icons, the signs) are dialogs
+  that keep nothing after they close.
 - The user fills the panel on the phone. His apps and contacts never go
   into the code, a default file or a test.
 - Dialogs over the panel need `window.setType(TYPE_APPLICATION_OVERLAY)`
   or they come up behind it.
-- `Rules.kt` has the swipe rule and a folder's sign, with a test that
-  runs on the laptop: `:apps:onepage:testReleaseUnitTest`.
+- `Rules.kt` has what can be tested with no phone: the swipe rule, the
+  number of columns, the slot under a finger, the reader of the signs file.
+  The tests run on the laptop: `:apps:onepage:testReleaseUnitTest`.
 - Not seen on a phone by Claude: there is no emulator here. Say so after
   every change to the panel.
 

@@ -7,6 +7,14 @@
          apps" allowlist and can't be brought back over a fullscreen app. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <!-- An icon in the app panel that calls a number. Both are asked for
+         when the user adds the first such icon, and both may be refused:
+         with no CALL_PHONE a tap opens the dialler with the number in it,
+         with no READ_CONTACTS the icon is a letter and not the picture. -->
+    <uses-permission android:name="android.permission.CALL_PHONE" />
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
+
     <!-- AppWidget hosting. BIND_APPWIDGET is signature-level for system
          launchers; standard launchers go through the user-consent
          ACTION_APPWIDGET_BIND flow instead, which is what we do. -->
@@ -81,6 +89,16 @@
                 <action android:name="android.content.pm.action.CONFIRM_PIN_SHORTCUT" />
             </intent-filter>
         </activity>
+
+        <!-- Opens the phone's contact list for a number to put in the app
+             panel. See-through: it shows nothing of its own. A task of its
+             own, so the app the user was in is back when it is done. -->
+        <activity
+            android:name=".ContactActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
 
         <!-- The swipe up from the bottom edge that opens the app panel in
              any app. Off until the user switches it on under Accessibility.
