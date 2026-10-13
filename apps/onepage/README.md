@@ -8,7 +8,7 @@
 
 **One screen. Your widgets, placed freely. Nothing else.**
 
-![version](https://img.shields.io/badge/version-0.7.1-3ddc84) ![platform](https://img.shields.io/badge/platform-Android%2011%2B-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Views-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![idle](https://img.shields.io/badge/idle-zero%20cost-22c55e) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.8.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android%2011%2B-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Views-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![idle](https://img.shields.io/badge/idle-zero%20cost-22c55e) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A minimal home launcher — part of the [nomad](../../) mobile suite.
 
@@ -39,6 +39,8 @@ your home screen.
     card, Back or Home closes it.
   - Hold the panel to edit. Drag an icon to another slot, or onto a folder to
     put it inside. Leave a row free and you have two groups.
+  - A folder is put in order the same way: hold an icon in it, then drag it to
+    its place. A tap on an icon there takes it out to the panel or removes it.
   - Tap **+** in a free slot for apps, a folder or a call. The app list shows
     every app with its icon and name, and you can tick several at once.
   - A folder gets a sign you choose among 96 line drawings (a wrench, a plane,
