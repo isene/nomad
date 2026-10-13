@@ -186,7 +186,12 @@ when building the core. Same rule as the rest of Fe₂O₃.
   - `ClockWidget.refresh` is run by events only: an exact `RTC` alarm on
     the full hour (never `RTC_WAKEUP`), `WidgetEvents` for a new next
     alarm or a set clock, a content-trigger job (`WidgetSound`) for the
-    volume, and `MainActivity.onStop`. `WidgetEvents` is disabled in the
+    volume, `MainActivity.onStop`, and `OutsideViewModel.load` when a
+    fetch brought a forecast (0.3.15). The app shows the old forecast at
+    once and may wait 8 s for a position before it fetches. Until
+    0.3.15 a look shorter than that left the ring on the old forecast
+    until the full hour, and bare when that forecast was past
+    `FRESH_MS`. `WidgetEvents` is disabled in the
     manifest and enabled while a widget is placed.
   - The dial and the two hands are vectors of one 92 dp square, because
     `AnalogClock` lays them centre on centre. `refresh` draws the

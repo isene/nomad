@@ -210,7 +210,7 @@ class OutsideViewModel(app: Application) : AndroidViewModel(app) {
     private fun key(spot: Spot): String = cache.key(spot)
 
     /** Show what the cache has, then fetch the bodies older than `staleMs`
-     *  and show again. */
+     *  and show again, in the app and on the widget. */
     private suspend fun load(spot: Spot, staleMs: Long) {
         val key = key(spot)
         paint(spot)
@@ -249,6 +249,9 @@ class OutsideViewModel(app: Application) : AndroidViewModel(app) {
         }
         stale.forEachIndexed { n, i -> if (got[n]) failed.remove("$key/$i") else failed["$key/$i"] = now }
         paint(spot)
+        // The widget's ring is drawn from these bodies, so it is drawn
+        // again now. Left to itself it waits for the full hour.
+        if (got.any { ok -> ok }) ClockWidget.refresh(getApplication())
         _ui.update {
             it.copy(
                 loading = false,
