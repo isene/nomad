@@ -35,7 +35,6 @@ import androidx.glance.unit.ColorProvider
 import com.isene.mail.MainActivity
 import com.isene.mail.data.WidgetStore
 import androidx.datastore.preferences.core.intPreferencesKey
-import androidx.glance.appwidget.cornerRadius
 import androidx.glance.background
 import com.isene.mail.data.Settings
 
@@ -102,7 +101,7 @@ private fun WidgetContent(
             .fillMaxSize()
             // No background until the user chooses one: the wallpaper
             // shows through.
-            .let { if (back ushr 24 == 0) it else it.background(Color(back)).cornerRadius(16.dp) }
+            .let { if (back ushr 24 == 0) it else it.background(Color(back)) }
             .padding(8.dp)
             .clickable(openApp),
         contentAlignment = Alignment.TopStart,

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The widget's panel. White, since the colour the user chose is laid
-     over it as a tint; until one is chosen the tint is clear. -->
+<!-- The widget's panel, with square corners. White, since the colour the
+     user chose is laid over it as a tint; until one is chosen the tint
+     is clear. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <solid android:color="#FFFFFFFF" />
-    <corners android:radius="@android:dimen/system_app_widget_background_radius" />
 </shape>
