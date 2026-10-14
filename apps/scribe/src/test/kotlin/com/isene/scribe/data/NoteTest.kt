@@ -28,4 +28,9 @@ class NoteTest {
         assertNull(NoteInfo("Milk\n#card-nope").colour)
         assertNull(NoteInfo("Milk").colour)
     }
+
+    @Test
+    fun aColourIsNotATagToPickFrom() {
+        assertEquals(listOf("idea"), NoteInfo("Milk\n#idea #card-red").tags)
+    }
 }

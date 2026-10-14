@@ -25,7 +25,8 @@ Every note is one text file, so nothing is locked inside the app.
   a phone: the picture, the name, the first lines and the tags. The rows
   icon goes back to the list. The app remembers which one you left it in.
   Hold a card and pick Colour to give it one of eleven colours. The
-  colour is a tag on the note's last line, such as `#card-red`.
+  colour is a tag on the note's last line, such as `#card-red`, left
+  out of the row of tags.
 - **Tags**: write `#idea` anywhere in a note. The tags of all notes sit in
   a row above the list; tap one to see only its notes. A note tagged
   `#pinned` stays at the top.
