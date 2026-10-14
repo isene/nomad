@@ -18,13 +18,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -42,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +56,7 @@ private val Dim = Color(0xFF8A8A99)
 
 private val Colors = darkColorScheme(
     primary = Rust,
+    onPrimary = Color(0xFF0A0A14),
     background = Color(0xFF0A0A14),
     surface = Color(0xFF0A0A14),
 )
@@ -138,16 +137,23 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun PrismScreen(p: Picker, copy: (String) -> Unit) {
     val cur = p.current
+    // One screen, no scrolling: the sample takes the height that is left.
+    // The hex field is near the top, so the keyboard leaves it in view.
     Scaffold { pad ->
         Column(
-            Modifier.fillMaxSize().padding(pad).imePadding()
-                .verticalScroll(rememberScrollState()).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxSize().padding(pad).padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("prism", style = MaterialTheme.typography.titleLarge, color = Rust, fontWeight = FontWeight.Bold)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Slot("FG", p.fg, p.editing == 0, Modifier.weight(1f)) { p.editing = 0 }
                 Slot("BG", p.bg, p.editing == 1, Modifier.weight(1f)) { p.editing = 1 }
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                HexField(cur, Modifier.weight(1f)) { p.current = it }
+                TextButton(onClick = {
+                    p.format = Format.entries[(p.format.ordinal + 1) % Format.entries.size]
+                }) { Text(p.format.name.lowercase()) }
+                Button(onClick = { copy(cur.text(p.format)) }) { Text("Copy") }
             }
             val ratio = contrast(p.fg, p.bg)
             val (level, mark) = wcag(ratio)
@@ -158,26 +164,21 @@ fun PrismScreen(p: Picker, copy: (String) -> Unit) {
                 )
                 Text("WCAG: AAA ≥ 7   AA ≥ 4.5   AA· ≥ 3", style = MaterialTheme.typography.bodySmall, color = Dim)
             }
-            Column(Modifier.fillMaxWidth().background(p.bg.color).padding(12.dp)) {
+            Column(
+                Modifier.weight(1f).fillMaxWidth().clipToBounds().background(p.bg.color).padding(10.dp),
+            ) {
                 SAMPLE.forEach {
-                    Text(it, color = p.fg.color, fontFamily = FontFamily.Monospace, fontSize = 12.sp)
+                    Text(
+                        it,
+                        color = p.fg.color,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 11.sp,
+                        lineHeight = 14.sp,
+                    )
                 }
             }
             Column {
                 Channel.entries.forEach { ch -> ChannelRow(ch, cur) { p.current = it } }
-            }
-            HexField(cur) { p.current = it }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = {
-                    p.format = Format.entries[(p.format.ordinal + 1) % Format.entries.size]
-                }) { Text(p.format.name.lowercase()) }
-                Text(
-                    cur.text(p.format),
-                    Modifier.weight(1f),
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 13.sp,
-                )
-                Button(onClick = { copy(cur.text(p.format)) }) { Text("Copy") }
             }
         }
     }
@@ -191,8 +192,8 @@ private fun Slot(label: String, c: Rgb, chosen: Boolean, modifier: Modifier, onT
             .border(2.dp, if (chosen) Rust else Color(0xFF2A2A3A))
             .padding(4.dp),
     ) {
-        Box(Modifier.fillMaxWidth().height(72.dp).background(c.color))
-        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+        Box(Modifier.fillMaxWidth().height(36.dp).background(c.color))
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(label, fontWeight = FontWeight.Bold, color = if (chosen) Rust else Dim)
             Text(c.hex, fontFamily = FontFamily.Monospace)
         }
@@ -215,7 +216,7 @@ private fun ChannelRow(ch: Channel, c: Rgb, onSet: (Rgb) -> Unit) {
             modifier = Modifier.weight(1f),
         )
         Step("+", { onSet(ch.step(c, 1)) }, { onSet(ch.step(c, 10)) })
-        Text(n.toString(), Modifier.width(36.dp), textAlign = TextAlign.End, fontFamily = FontFamily.Monospace)
+        Text(n.toString(), Modifier.width(44.dp), textAlign = TextAlign.End, maxLines = 1, softWrap = false)
     }
 }
 
@@ -230,7 +231,7 @@ private fun Step(sign: String, one: () -> Unit, ten: () -> Unit) {
 
 /** Six hex digits; the colour changes when the sixth is typed. */
 @Composable
-private fun HexField(c: Rgb, onSet: (Rgb) -> Unit) {
+private fun HexField(c: Rgb, modifier: Modifier, onSet: (Rgb) -> Unit) {
     var text by remember(c) { mutableStateOf(c.hex.drop(1)) }
     OutlinedTextField(
         value = text,
@@ -238,10 +239,9 @@ private fun HexField(c: Rgb, onSet: (Rgb) -> Unit) {
             text = t.filter { it in '0'..'9' || it.lowercaseChar() in 'a'..'f' }.take(6).lowercase()
             Rgb.fromHex(text)?.let(onSet)
         },
-        label = { Text("Hex") },
         prefix = { Text("#") },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier,
     )
 }

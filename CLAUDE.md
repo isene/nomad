@@ -485,6 +485,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
   line in the prefs, written in `onStop` and only when it changed.
 - The state is RGB, as on the laptop, so dragging S or V to 0 forgets
   the hue.
+- The screen fits without scrolling (0.1.1; Geir asked on 2026-10-14):
+  the sample text takes the height that is left, and the hex field is
+  near the top, above the keyboard. `ScreenOnAndroidTest` lays it out on
+  Android's own code at 360 by 700 dp with text at 130 % and fails when
+  a slider or Copy falls off; it writes `build/screen.png` to look at.
 
 ## Anti-patterns (don't drift into these)
 
