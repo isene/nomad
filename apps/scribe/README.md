@@ -24,6 +24,8 @@ Every note is one text file, so nothing is locked inside the app.
 - **Cards**: the grid icon shows the notes as cards, two side by side on
   a phone: the picture, the name, the first lines and the tags. The rows
   icon goes back to the list. The app remembers which one you left it in.
+  Hold a card and pick Colour to give it one of eleven colours. The
+  colour is a tag on the note's last line, such as `#card-red`.
 - **Tags**: write `#idea` anywhere in a note. The tags of all notes sit in
   a row above the list; tap one to see only its notes. A note tagged
   `#pinned` stays at the top.
@@ -37,7 +39,8 @@ Every note is one text file, so nothing is locked inside the app.
 - **The editor**: the text and nothing else, with find in the note (▲▼ to
   step) and a word count. A button puts a tag in at the cursor.
 - Saves when you go back and when the app leaves the screen.
-- Per note: rename, duplicate, delete (the ⋮ menu, or hold a card).
+- Per note: rename, duplicate, delete (the ⋮ menu, or hold a card); a card
+  also takes a colour.
 - Also lists `.hl` and `.txt` files, and opens a text file another app
   hands it.
 - No permissions and no network. The folder is one you grant once.

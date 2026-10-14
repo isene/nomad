@@ -15,6 +15,61 @@ class NoteInfo(text: String) {
     /** The whole note in lower case, for search. */
     val lower: String = text.lowercase()
     val pinned: Boolean = tags.any { it.equals("pinned", ignoreCase = true) }
+    val colour: CardColour? = colourOf(tags)
+}
+
+/** A card colour, light and dark as Keep has them. */
+class CardColour(val name: String, val light: Long, val dark: Long)
+
+val CARD_COLOURS = listOf(
+    CardColour("red", 0xFFFAAFA8, 0xFF77172E),
+    CardColour("orange", 0xFFF39F76, 0xFF692B17),
+    CardColour("yellow", 0xFFFFF8B8, 0xFF7C4A03),
+    CardColour("green", 0xFFE2F6D3, 0xFF264D3B),
+    CardColour("teal", 0xFFB4DDD3, 0xFF0C625D),
+    CardColour("blue", 0xFFD4E4ED, 0xFF256377),
+    CardColour("darkblue", 0xFFAECCDC, 0xFF284255),
+    CardColour("purple", 0xFFD3BFDB, 0xFF472E5B),
+    CardColour("pink", 0xFFF6E2DD, 0xFF6C394F),
+    CardColour("brown", 0xFFE9E3D4, 0xFF4B443A),
+    CardColour("grey", 0xFFEFEFF1, 0xFF232427),
+)
+
+// A card's colour is a tag, #card-red, so it travels with the note.
+private const val CARD = "card-"
+private val CARD_TAG = Regex("#card-[\\p{L}\\p{N}_-]*", RegexOption.IGNORE_CASE)
+
+fun colourOf(tags: List<String>): CardColour? = tags.firstNotNullOfOrNull { t ->
+    if (!t.startsWith(CARD, ignoreCase = true)) null
+    else CARD_COLOURS.firstOrNull { it.name.equals(t.substring(CARD.length), ignoreCase = true) }
+}
+
+/**
+ * The text with its card colour set to `name`, or with none when null.
+ * The tag goes on the last line when that line holds tags, as keep-import
+ * writes them, or on a line of its own at the end.
+ */
+fun withColour(text: String, name: String?): String {
+    val end = if (text.endsWith("\n")) "\n" else ""
+    val lines = text.removeSuffix("\n").split('\n').mapNotNull { line ->
+        val words = line.split(' ')
+        val kept = words.filterNot { CARD_TAG.matches(it) }
+        when {
+            kept.size == words.size -> line
+            kept.all { it.isEmpty() } -> null
+            else -> kept.joinToString(" ")
+        }
+    }.toMutableList()
+    while (lines.isNotEmpty() && lines.last().isBlank()) lines.removeAt(lines.size - 1)
+    if (name != null) {
+        val tag = "#$CARD$name"
+        when {
+            lines.isEmpty() -> lines += tag
+            onlyTags(lines.last().trim()) -> lines[lines.size - 1] = lines.last().trimEnd() + " " + tag
+            else -> { lines += ""; lines += tag }
+        }
+    }
+    return lines.joinToString("\n") + end
 }
 
 /** The folder inside the notes folder where pictures live. */

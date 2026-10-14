@@ -23,8 +23,8 @@ android {
         applicationId = "com.isene.scribe"
         minSdk = 33
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.5.0"
+        versionCode = 9
+        versionName = "0.6.0"
     }
 
     signingConfigs {
@@ -75,4 +75,5 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
 
     debugImplementation(libs.androidx.ui.tooling)
+    testImplementation("junit:junit:4.13.2")
 }
