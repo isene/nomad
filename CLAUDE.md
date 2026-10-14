@@ -67,6 +67,8 @@ These come from the original mobile-architecture artifact. Do not drift.
   has one setting for the colour behind it: "Widget background", six hex
   digits and how solid (Geir asked for it on 2026-10-13). The app keeps
   it as one ARGB number, 0 for none. A new widget gets the same.
+  kastrup's dialog is "Widget colours": it sets the header line's colour
+  too (Geir asked on 2026-10-14).
   The corners are square: he asked for that the same day, so no widget
   draws a radius. onepage rounds nothing either.
   - In a `RemoteViews` widget the root has the id
