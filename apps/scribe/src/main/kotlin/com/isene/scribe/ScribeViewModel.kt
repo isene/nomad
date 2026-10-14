@@ -15,6 +15,7 @@ import com.isene.scribe.data.Index
 import com.isene.scribe.data.NoteInfo
 import com.isene.scribe.data.NoteRef
 import com.isene.scribe.data.NotesRepo
+import com.isene.scribe.data.withColour
 import com.isene.scribe.data.freeName
 import com.isene.scribe.data.titleOf
 import kotlinx.coroutines.Dispatchers
@@ -170,6 +171,16 @@ class ScribeViewModel(app: Application) : AndroidViewModel(app) {
             val ok = repo.duplicate(uri, ref, taken)
             withContext(Dispatchers.Main) {
                 if (ok) refresh() else message = "Duplicate failed"
+            }
+        }
+    }
+
+    /** Give a note's card a colour, or none (null). */
+    fun setColour(ref: NoteRef, name: String?) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val ok = runCatching { repo.write(ref.uri, withColour(repo.read(ref.uri), name)) }.isSuccess
+            withContext(Dispatchers.Main) {
+                if (ok) refresh() else message = "Could not change the colour"
             }
         }
     }

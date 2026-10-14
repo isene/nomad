@@ -8,6 +8,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.shape.CircleShape
+import com.isene.scribe.data.CARD_COLOURS
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -42,6 +45,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Image
@@ -368,12 +372,16 @@ private fun NoteCard(
     onDelete: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
+    var colours by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(12.dp)
+    val dark = isSystemInDarkTheme()
+    val tint = info?.colour?.let { Color(if (dark) it.dark else it.light) }
     Box {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(shape)
+                .let { m -> if (tint != null) m.background(tint) else m }
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape)
                 .combinedClickable(onClick = onClick, onLongClick = { menu = true }),
         ) {
@@ -407,8 +415,55 @@ private fun NoteCard(
                 }
             }
         }
-        NoteMenu(menu, { menu = false }, onRename, onDuplicate, onDelete)
+        NoteMenu(menu, { menu = false }, onRename, onDuplicate, onDelete, onColour = { colours = true })
     }
+    if (colours) {
+        ColourDialog(
+            chosen = info?.colour?.name,
+            dark = dark,
+            onPick = { colours = false; vm.setColour(ref, it) },
+            onDismiss = { colours = false },
+        )
+    }
+}
+
+/** The card colours as round swatches; the crossed one takes the colour away. */
+@Composable
+private fun ColourDialog(chosen: String?, dark: Boolean, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
+    val choices: List<Pair<String?, Color>> =
+        listOf<Pair<String?, Color>>(null to MaterialTheme.colorScheme.surface) +
+            CARD_COLOURS.map { it.name to Color(if (dark) it.dark else it.light) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Card colour") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                for (row in choices.chunked(4)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        for ((name, c) in row) {
+                            val on = name == chosen
+                            Box(
+                                Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(c)
+                                    .border(
+                                        if (on) 3.dp else 1.dp,
+                                        if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
+                                        CircleShape,
+                                    )
+                                    .clickable { onPick(name) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (name == null) Icon(Icons.Filled.Close, "No colour", tint = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
 }
 
 /** Rename, duplicate or delete a note: the menu of a row and of a card. */
@@ -419,8 +474,16 @@ private fun NoteMenu(
     onRename: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
+    onColour: (() -> Unit)? = null,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        onColour?.let { colour ->
+            DropdownMenuItem(
+                text = { Text("Colour") },
+                leadingIcon = { Icon(Icons.Filled.Palette, null) },
+                onClick = { onDismiss(); colour() },
+            )
+        }
         DropdownMenuItem(
             text = { Text("Rename") },
             leadingIcon = { Icon(Icons.Filled.Edit, null) },
