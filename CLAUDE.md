@@ -46,7 +46,7 @@ These come from the original mobile-architecture artifact. Do not drift.
   of an icon. An app with no twin (fresh, hyperlist, onepage, outside, ref,
   relay, tasks, vox) gets a drawing of what it does. Draw
   `apps/<app>/logo.svg` by the rules at the top of `tools/logo`, then run
-  `tools/logo <app>`. All nineteen apps have one.
+  `tools/logo <app>`. All twenty apps have one.
 
 ## Per-app responsibilities
 
@@ -473,6 +473,18 @@ when building the core. Same rule as the rest of Fe₂O₃.
   accounts to fetch (`Phone.sync`, the call "Sync now" makes), at most
   once in 15 minutes (`fetchDue`). The widget asks for nothing; a timer
   for that was not built.
+
+### prism (com.isene.prism)
+
+- The colour picker of the laptop's prism. Signed with the tasks key.
+  Kotlin only, like fresh: `Color.kt` copies the colour rules of prism's
+  `src/main.rs` line by line and touches no Android class. A rule changed
+  on one side is changed on the other. Tests:
+  `./gradlew :apps:prism:testReleaseUnitTest`.
+- No permissions. The two colours, the chosen one and the format are one
+  line in the prefs, written in `onStop` and only when it changed.
+- The state is RGB, as on the laptop, so dragging S or V to 0 forgets
+  the hue.
 
 ## Anti-patterns (don't drift into these)
 

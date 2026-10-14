@@ -6,7 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
-// fresh: the ten most recently installed apps, newest first. All data
+// fresh: every installed app, newest first. All data
 // comes from PackageManager, so this app has no Rust core wiring.
 
 val keyProps = Properties().apply {
@@ -22,8 +22,8 @@ android {
         applicationId = "com.isene.fresh"
         minSdk = 30
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.2.1"
+        versionCode = 4
+        versionName = "0.3.0"
     }
 
     signingConfigs {

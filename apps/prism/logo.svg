@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="prism">
+  <!-- The prism logo of the Fe2O3 suite in few shapes, so it reads at the size of an icon. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a1a2e"/>
+      <stop offset="1" stop-color="#0a0a14"/>
+    </linearGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- White light in, the glass, the colours out -->
+  <line x1="34" y1="128" x2="96" y2="128" stroke="#ffffff" stroke-width="8" stroke-linecap="round"/>
+  <polygon points="162,128 226,74 226,92" fill="#ff2a2a"/>
+  <polygon points="162,128 226,92 226,110" fill="#ff8c00"/>
+  <polygon points="162,128 226,110 226,128" fill="#ffe800"/>
+  <polygon points="162,128 226,128 226,146" fill="#3ee83e"/>
+  <polygon points="162,128 226,146 226,164" fill="#3a7aff"/>
+  <polygon points="162,128 226,164 226,182" fill="#a040ff"/>
+  <polygon points="128,50 94,128 128,168" fill="#c8d2f0" stroke="#ffffff" stroke-width="6" stroke-linejoin="round"/>
+  <polygon points="128,50 162,128 128,168" fill="#7d8bbd" stroke="#ffffff" stroke-width="6" stroke-linejoin="round"/>
+</svg>
