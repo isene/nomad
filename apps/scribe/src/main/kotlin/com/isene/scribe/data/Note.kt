@@ -9,13 +9,15 @@ data class NoteRef(val uri: Uri, val name: String, val modified: Long, val size:
 
 /** What the list and the cards show of a note: read once, kept until the file changes. */
 class NoteInfo(text: String) {
-    val tags: List<String> = tagsOf(text)
+    private val allTags = tagsOf(text)
+    /** The tags to show and pick from. A card colour is not one of them. */
+    val tags: List<String> = allTags.filterNot { it.startsWith(CARD, ignoreCase = true) }
     val images: List<String> = imagesOf(text)
     val preview: String = previewOf(text)
     /** The whole note in lower case, for search. */
     val lower: String = text.lowercase()
     val pinned: Boolean = tags.any { it.equals("pinned", ignoreCase = true) }
-    val colour: CardColour? = colourOf(tags)
+    val colour: CardColour? = colourOf(allTags)
 }
 
 /** A card colour, light and dark as Keep has them. */
