@@ -31,12 +31,14 @@ object WidgetPush {
         val app = context.applicationContext
         val widget = TasksWidget()
         val text = widget.loadText(app)
-        val back = app.getSharedPreferences("tasks_prefs", Context.MODE_PRIVATE)
-            .getInt("widget_back", 0)
+        val saved = app.getSharedPreferences("tasks_prefs", Context.MODE_PRIVATE)
         for (id in GlanceAppWidgetManager(app).getGlanceIds(TasksWidget::class.java)) {
             updateAppWidgetState(app, id) { prefs ->
                 if (text != null) prefs[LIST] = text
-                prefs[BACK] = back
+                prefs[BACK] = saved.getInt("widget_back", 0)
+                prefs[TEXT] = saved.getInt(KEY_TEXT, TEXT_SIZE)
+                prefs[NAMES] = saved.getBoolean(KEY_NAMES, false)
+                prefs[COLORS] = saved.getString(KEY_COLORS, null) ?: "{}"
             }
         }
         TasksWidgetReceiver.update(app)
