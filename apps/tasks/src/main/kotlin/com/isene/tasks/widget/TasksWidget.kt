@@ -39,6 +39,10 @@ import com.isene.tasks.data.TaskRepository
 import uniffi.fe2o3_mobile_core.WidgetRow
 import uniffi.fe2o3_mobile_core.parse
 import uniffi.fe2o3_mobile_core.widgetRows
+import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.glance.unit.ColorProvider
+import org.json.JSONObject
 
 // Home-screen widget. Shows up to MAX_ROWS items from todo.hl across all
 // categories. Tap anywhere opens MainActivity.
@@ -50,6 +54,12 @@ import uniffi.fe2o3_mobile_core.widgetRows
 private const val PREFS = "tasks_prefs"
 private const val KEY_URI = "doc_uri"
 private const val KEY_BACK = "widget_back"
+internal const val KEY_TEXT = "widget_text"
+internal const val KEY_NAMES = "widget_names"
+internal const val KEY_COLORS = "widget_colors"
+
+/** The size of the widget's text, in sp, until another is chosen. */
+internal const val TEXT_SIZE = 13
 private const val MAX_ROWS: UInt = 12u
 
 /** The list this widget is drawing, in the widget's own state. */
@@ -57,6 +67,35 @@ internal val LIST = stringPreferencesKey("list")
 /** The colour behind the widget, as ARGB. 0 is none: the wallpaper
  *  shows through. */
 internal val BACK = intPreferencesKey("back")
+
+/** How the lines are written: the text size, whether each starts with
+ *  its category's name, and the colours chosen per category. */
+internal val TEXT = intPreferencesKey("text")
+internal val NAMES = booleanPreferencesKey("names")
+internal val COLORS = stringPreferencesKey("colors")
+
+private const val OPAQUE = 0xFF000000.toInt()
+
+// A line takes its category's colour. Until one is chosen it is one of
+// these, by the category's place in the list. All are light, for text on
+// the wallpaper.
+private val PALETTE = intArrayOf(
+    0xFF7FC8E8.toInt(), 0xFFF4A261.toInt(), 0xFF90D58C.toInt(), 0xFFF28FAD.toInt(),
+    0xFFE9D66B.toInt(), 0xFFB39DDB.toInt(), 0xFF6FD3C9.toInt(), 0xFFEF8A80.toInt(),
+)
+
+/** A category's colour: the one chosen for it, or one from the palette
+ *  by its place in the list. */
+internal fun categoryColor(name: String, place: Int, chosen: Map<String, Int>): Int =
+    chosen[name] ?: PALETTE[place.mod(PALETTE.size)]
+
+/** The chosen colours, kept as JSON: category name to ARGB. */
+internal fun colorsFrom(json: String?): Map<String, Int> = runCatching {
+    val o = JSONObject(json ?: return emptyMap())
+    o.keys().asSequence().associateWith { o.getInt(it) or OPAQUE }
+}.getOrDefault(emptyMap())
+
+internal fun colorsText(colors: Map<String, Int>): String = JSONObject(colors as Map<*, *>).toString()
 
 class TasksWidget : GlanceAppWidget() {
 
@@ -78,14 +117,18 @@ class TasksWidget : GlanceAppWidget() {
             val ctx = LocalContext.current
             // Falling back to the file covers a widget just placed on the
             // home screen, whose state nobody has written yet.
-            val rows = prefs[LIST]?.let {
-                runCatching { widgetRows(parse(it), MAX_ROWS) }.getOrDefault(emptyList())
-            } ?: loadRows(ctx)
-            val back = prefs[BACK]
-                ?: ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                    .getInt(KEY_BACK, 0)
+            val list = (prefs[LIST] ?: loadText(ctx))?.let { runCatching { parse(it) }.getOrNull() }
+            val rows = list?.let { runCatching { widgetRows(it, MAX_ROWS) }.getOrNull() }.orEmpty()
+            val cats = list?.categories?.map { it.name }.orEmpty()
+            val saved = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            val look = Look(
+                back = prefs[BACK] ?: saved.getInt(KEY_BACK, 0),
+                size = prefs[TEXT] ?: saved.getInt(KEY_TEXT, TEXT_SIZE),
+                names = prefs[NAMES] ?: saved.getBoolean(KEY_NAMES, false),
+                colors = colorsFrom(prefs[COLORS] ?: saved.getString(KEY_COLORS, null)),
+            )
             GlanceTheme {
-                WidgetContent(rows, back)
+                WidgetContent(rows, cats, look)
             }
         }
     }
@@ -106,37 +149,17 @@ class TasksWidget : GlanceAppWidget() {
             null
         }
     }
-
-    private fun loadRows(context: Context): List<WidgetRow> {
-        // The local copy first: a SAF read of the synced file costs a
-        // documents-provider round trip on every launcher redraw. Fall
-        // back to SAF only before the app has ever saved.
-        TaskRepository.widgetCache(context)?.let {
-            return runCatching { widgetRows(parse(it), MAX_ROWS) }.getOrDefault(emptyList())
-        }
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val uriStr = prefs.getString(KEY_URI, null) ?: return emptyList()
-        val uri = Uri.parse(uriStr)
-        return try {
-            val text = context.contentResolver.openInputStream(uri)?.use { input ->
-                input.bufferedReader(Charsets.UTF_8).readText()
-            } ?: return emptyList()
-            TaskRepository.cacheForWidget(context, text)
-            widgetRows(parse(text), MAX_ROWS)
-        } catch (_: Exception) {
-            // SAF permission may have been revoked, or Syncthing moved the
-            // file; widget stays silent rather than crashing the host.
-            emptyList()
-        }
-    }
 }
 
+/** What the user chose for the widget's look. */
+private class Look(val back: Int, val size: Int, val names: Boolean, val colors: Map<String, Int>)
+
 @Composable
-private fun WidgetContent(rows: List<WidgetRow>, back: Int) {
+private fun WidgetContent(rows: List<WidgetRow>, cats: List<String>, look: Look) {
     val openApp = actionStartActivity<MainActivity>()
     val base = GlanceModifier
         .fillMaxSize()
-        .let { if (back ushr 24 == 0) it else it.background(Color(back)) }
+        .let { if (look.back ushr 24 == 0) it else it.background(Color(look.back)) }
         .padding(8.dp)
         .clickable(openApp)
     Box(
@@ -166,6 +189,7 @@ private fun WidgetContent(rows: List<WidgetRow>, back: Int) {
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                 items(rows.size) { idx ->
                     val row = rows[idx]
+                    val color = ColorProvider(Color(categoryColor(row.category, cats.indexOf(row.category), look.colors)))
                     Row(
                         modifier = GlanceModifier
                             .fillMaxWidth()
@@ -175,18 +199,21 @@ private fun WidgetContent(rows: List<WidgetRow>, back: Int) {
                             // the app.
                             .clickable(openApp),
                     ) {
-                        Text(
-                            text = row.category,
-                            style = TextStyle(
-                                fontWeight = FontWeight.Medium,
-                                color = GlanceTheme.colors.secondary,
-                            ),
-                            modifier = GlanceModifier.width(72.dp),
-                            maxLines = 1,
-                        )
+                        if (look.names) {
+                            Text(
+                                text = row.category,
+                                style = TextStyle(
+                                    fontWeight = FontWeight.Medium,
+                                    color = color,
+                                    fontSize = look.size.sp,
+                                ),
+                                modifier = GlanceModifier.width(72.dp),
+                                maxLines = 1,
+                            )
+                        }
                         Text(
                             text = row.item,
-                            style = TextStyle(color = GlanceTheme.colors.onBackground),
+                            style = TextStyle(color = color, fontSize = look.size.sp),
                             maxLines = 1,
                             modifier = GlanceModifier.fillMaxWidth(),
                         )

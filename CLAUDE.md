@@ -124,6 +124,12 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - The hyperlist parser, serializer, and transforms live in the Rust
   core (`core/src/hyperlist.rs`). Kotlin handles SAF I/O, Compose UI,
   and the Glance widget.
+- Since 0.8.0 (Geir asked on 2026-10-14) a widget line has its
+  category's colour, and the name in front is off unless chosen. "Widget
+  text" sets the size (13 sp at first), the names and a colour per
+  category, kept as JSON by name. A category with no colour of its own
+  takes one of eight by its place in the list (`categoryColor`), so the
+  dialog and the widget must count places in the same full list.
 - Glance widget: shows the first ~10 items across categories, tap
   opens the app. No editing from the widget in v1 (keeps the widget
   side trivial; widgets that edit need a hosted Activity hop anyway).

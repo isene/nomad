@@ -25,6 +25,12 @@ import uniffi.fe2o3_mobile_core.moveCategoryTo as rustMoveCategoryTo
 import uniffi.fe2o3_mobile_core.moveItemTo as rustMoveItemTo
 import uniffi.fe2o3_mobile_core.renameCategory as rustRenameCategory
 import uniffi.fe2o3_mobile_core.renameItem as rustRenameItem
+import com.isene.tasks.widget.KEY_COLORS
+import com.isene.tasks.widget.KEY_NAMES
+import com.isene.tasks.widget.KEY_TEXT
+import com.isene.tasks.widget.TEXT_SIZE
+import com.isene.tasks.widget.colorsFrom
+import com.isene.tasks.widget.colorsText
 
 private const val PREFS = "tasks_prefs"
 private const val KEY_URI = "doc_uri"
@@ -40,6 +46,11 @@ data class UiState(
     val loading: Boolean = false,
     /** The colour behind the widget, as ARGB; 0 for none. */
     val widgetBack: Int = 0,
+    /** How the widget writes its lines: text size in sp, the category's
+     *  name in front or not, and the colours chosen per category. */
+    val widgetText: Int = TEXT_SIZE,
+    val widgetNames: Boolean = false,
+    val widgetColors: Map<String, Int> = emptyMap(),
 )
 
 class TasksViewModel(app: Application) : AndroidViewModel(app) {
@@ -48,7 +59,12 @@ class TasksViewModel(app: Application) : AndroidViewModel(app) {
     private val prefs = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow(
-        UiState(widgetBack = prefs.getInt(KEY_WIDGET_BACK, 0)),
+        UiState(
+            widgetBack = prefs.getInt(KEY_WIDGET_BACK, 0),
+            widgetText = prefs.getInt(KEY_TEXT, TEXT_SIZE),
+            widgetNames = prefs.getBoolean(KEY_NAMES, false),
+            widgetColors = colorsFrom(prefs.getString(KEY_COLORS, null)),
+        ),
     )
     val state: StateFlow<UiState> = _state.asStateFlow()
 
@@ -255,6 +271,17 @@ class TasksViewModel(app: Application) : AndroidViewModel(app) {
     fun setWidgetBack(argb: Int) {
         prefs.edit().putInt(KEY_WIDGET_BACK, argb).apply()
         _state.value = _state.value.copy(widgetBack = argb)
+        pokeWidget()
+    }
+
+    /** Set how the widget writes its lines, then draw it again. */
+    fun setWidgetText(size: Int, names: Boolean, colors: Map<String, Int>) {
+        prefs.edit()
+            .putInt(KEY_TEXT, size)
+            .putBoolean(KEY_NAMES, names)
+            .putString(KEY_COLORS, colorsText(colors))
+            .apply()
+        _state.value = _state.value.copy(widgetText = size, widgetNames = names, widgetColors = colors)
         pokeWidget()
     }
 

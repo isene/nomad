@@ -84,6 +84,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.ui.graphics.Color
 import kotlin.math.roundToInt
+import androidx.compose.material.icons.filled.FormatSize
+import androidx.compose.material3.Checkbox
+import androidx.compose.runtime.mutableStateMapOf
+import com.isene.tasks.widget.categoryColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -123,6 +127,7 @@ fun TasksScreen(vm: TasksViewModel) {
     var overflowOpen by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var showBack by remember { mutableStateOf(false) }
+    var showText by remember { mutableStateOf(false) }
 
     val cats = state.hyperlist.categories
     val rows = state.hyperlist.flatRows(state.collapsed)
@@ -160,6 +165,11 @@ fun TasksScreen(vm: TasksViewModel) {
                             text = { Text("Widget background") },
                             leadingIcon = { Icon(Icons.Filled.Opacity, null) },
                             onClick = { overflowOpen = false; showBack = true },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Widget text") },
+                            leadingIcon = { Icon(Icons.Filled.FormatSize, null) },
+                            onClick = { overflowOpen = false; showText = true },
                         )
                         DropdownMenuItem(
                             text = { Text("About") },
@@ -362,6 +372,16 @@ fun TasksScreen(vm: TasksViewModel) {
         )
     }
     if (showBack) WidgetBackDialog(state.widgetBack, vm::setWidgetBack) { showBack = false }
+    if (showText) {
+        WidgetTextDialog(
+            cats = state.hyperlist.categories.map { it.name },
+            size = state.widgetText,
+            names = state.widgetNames,
+            colors = state.widgetColors,
+            set = vm::setWidgetText,
+            close = { showText = false },
+        )
+    }
     if (showAbout) {
         AboutDialog(onDismiss = { showAbout = false })
     }
@@ -402,6 +422,63 @@ private fun WidgetBackDialog(argb: Int, set: (Int) -> Unit, close: () -> Unit) {
                     close()
                 },
             ) { Text("OK") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
+}
+
+/** How the widget writes its lines: the text size, the category's name in
+ *  front of each line or not, and a colour per category. An empty colour
+ *  is the one the category has by its place in the list. */
+@Composable
+private fun WidgetTextDialog(
+    cats: List<String>,
+    size: Int,
+    names: Boolean,
+    colors: Map<String, Int>,
+    set: (Int, Boolean, Map<String, Int>) -> Unit,
+    close: () -> Unit,
+) {
+    var sp by remember { mutableStateOf(size.toFloat()) }
+    var named by remember { mutableStateOf(names) }
+    val hex = remember { mutableStateMapOf<String, String>().apply { colors.forEach { (k, v) -> put(k, "%06X".format(v and 0xFFFFFF)) } } }
+    fun rgb(typed: String) = typed.toIntOrNull(16)?.takeIf { typed.length == 6 }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Widget text") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Size: ${sp.roundToInt()} sp")
+                Slider(value = sp, onValueChange = { sp = it }, valueRange = 9f..20f, steps = 10)
+                Row(Modifier.clickable { named = !named }, verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = named, onCheckedChange = { named = it })
+                    Text("The category's name in front of each line")
+                }
+                Text("A colour per category, as six hex digits:")
+                cats.forEachIndexed { i, cat ->
+                    val usual = categoryColor(cat, i, emptyMap())
+                    val typed = hex[cat].orEmpty()
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(24.dp).background(Color(rgb(typed)?.let { 0xFF000000.toInt() or it } ?: usual)))
+                        Spacer(Modifier.width(12.dp))
+                        Text(cat, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        OutlinedTextField(
+                            value = typed,
+                            onValueChange = { t -> hex[cat] = t.uppercase().filter { it in "0123456789ABCDEF" }.take(6) },
+                            placeholder = { Text("%06X".format(usual and 0xFFFFFF)) },
+                            singleLine = true,
+                            modifier = Modifier.width(110.dp),
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val chosen = cats.mapNotNull { cat -> rgb(hex[cat].orEmpty())?.let { cat to (0xFF000000.toInt() or it) } }.toMap()
+                set(sp.roundToInt(), named, chosen)
+                close()
+            }) { Text("OK") }
         },
         dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
     )
