@@ -33,4 +33,11 @@ class NoteTest {
     fun aColourIsNotATagToPickFrom() {
         assertEquals(listOf("idea"), NoteInfo("Milk\n#idea #card-red").tags)
     }
+
+    @Test
+    fun byColourGoesInSwatchOrderWithUncolouredLast() {
+        val notes = listOf("A\n#card-grey", "B", "C\n#card-red", "D\n#card-blue").map { NoteInfo(it) }
+        val order = notes.sortedBy { colourRank(it.colour) }.map { it.preview.take(1) }
+        assertEquals(listOf("C", "D", "A", "B"), order)
+    }
 }

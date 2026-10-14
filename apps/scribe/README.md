@@ -20,7 +20,8 @@ Point it at a notes folder, shared with your laptop through Syncthing.
 Every note is one text file, so nothing is locked inside the app.
 
 - **The list**: each note with its first lines, its tags, its date and its
-  first picture. Newest first or A–Z. Search looks in names and in the text.
+  first picture. Sorted newest or oldest first, A–Z, Z–A, or by colour.
+  Search looks in names and in the text.
 - **Cards**: the grid icon shows the notes as cards, two side by side on
   a phone: the picture, the name, the first lines and the tags. The rows
   icon goes back to the list. The app remembers which one you left it in.

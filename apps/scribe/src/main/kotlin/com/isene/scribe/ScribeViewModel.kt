@@ -17,6 +17,7 @@ import com.isene.scribe.data.NoteRef
 import com.isene.scribe.data.NotesRepo
 import com.isene.scribe.data.withColour
 import com.isene.scribe.data.freeName
+import com.isene.scribe.data.colourRank
 import com.isene.scribe.data.titleOf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -25,7 +26,14 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 
-enum class SortMode { MODIFIED, NAME }
+/** The orders the notes can be shown in, with the name the sort menu gives each. */
+enum class SortMode(val label: String) {
+    NEWEST("Newest first"),
+    OLDEST("Oldest first"),
+    NAME("A to Z"),
+    NAME_DESC("Z to A"),
+    COLOUR("By colour"),
+}
 
 class ScribeViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = NotesRepo(app)
@@ -37,7 +45,7 @@ class ScribeViewModel(app: Application) : AndroidViewModel(app) {
     /** Tags, pictures, preview and search text of each note, by its URI. */
     val info = mutableStateMapOf<String, NoteInfo>()
     var loading by mutableStateOf(false); private set
-    var sortMode by mutableStateOf(SortMode.MODIFIED); private set
+    var sortMode by mutableStateOf(Prefs.sort(app)); private set
     /** The notes as cards, not as a list. */
     var cards by mutableStateOf(Prefs.cards(app)); private set
     var query by mutableStateOf("")
@@ -71,8 +79,12 @@ class ScribeViewModel(app: Application) : AndroidViewModel(app) {
         val q = query.trim().lowercase()
         val tag = tagFilter
         val order = when (sortMode) {
-            SortMode.MODIFIED -> compareByDescending<NoteRef> { it.modified }
+            SortMode.NEWEST -> compareByDescending<NoteRef> { it.modified }
+            SortMode.OLDEST -> compareBy { it.modified }
             SortMode.NAME -> compareBy { it.name.lowercase() }
+            SortMode.NAME_DESC -> compareByDescending { it.name.lowercase() }
+            SortMode.COLOUR -> compareBy<NoteRef> { colourRank(info[it.uri.toString()]?.colour) }
+                .thenByDescending { it.modified }
         }
         notes
             .filter { n ->
@@ -135,8 +147,9 @@ class ScribeViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun toggleSort() {
-        sortMode = if (sortMode == SortMode.MODIFIED) SortMode.NAME else SortMode.MODIFIED
+    fun setSort(mode: SortMode) {
+        sortMode = mode
+        Prefs.setSort(getApplication(), mode)
     }
 
     fun toggleCards() {

@@ -41,6 +41,9 @@ val CARD_COLOURS = listOf(
 private const val CARD = "card-"
 private val CARD_TAG = Regex("#card-[\\p{L}\\p{N}_-]*", RegexOption.IGNORE_CASE)
 
+/** Where a colour comes when sorting by colour: in the order of the swatches, notes with none last. */
+fun colourRank(c: CardColour?): Int = c?.let { CARD_COLOURS.indexOf(it) } ?: CARD_COLOURS.size
+
 fun colourOf(tags: List<String>): CardColour? = tags.firstNotNullOfOrNull { t ->
     if (!t.startsWith(CARD, ignoreCase = true)) null
     else CARD_COLOURS.firstOrNull { it.name.equals(t.substring(CARD.length), ignoreCase = true) }
