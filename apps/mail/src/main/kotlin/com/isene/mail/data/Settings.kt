@@ -54,6 +54,11 @@ class Settings(ctx: Context) {
         get() = p.getInt("widget_back", 0)
         set(v) = p.edit().putInt("widget_back", v).apply()
 
+    /** The colour of the widget's header line, as ARGB. */
+    var widgetHead: Int
+        get() = p.getInt("widget_head", 0xFF7FC8E8.toInt())
+        set(v) = p.edit().putInt("widget_head", v).apply()
+
     /** How far back to fetch. Beyond this the laptop is the archive. */
     var days: Int
         get() = p.getInt("days", 30)

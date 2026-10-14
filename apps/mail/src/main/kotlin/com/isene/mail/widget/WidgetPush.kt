@@ -60,10 +60,12 @@ object WidgetPush {
             // handing it the old summary again.
             val text = WidgetStore.text(app)
             val back = Settings(app).widgetBack
+            val head = Settings(app).widgetHead
             for (id in GlanceAppWidgetManager(app).getGlanceIds(MailWidget::class.java)) {
                 updateAppWidgetState(app, id) {
                     it[SUMMARY] = text
                     it[BACK] = back
+                    it[HEAD] = head
                 }
             }
             MailWidget().updateAll(app)

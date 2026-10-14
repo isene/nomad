@@ -131,8 +131,9 @@ at all — a widget nobody looks at wakes nothing. The background fetch
 keeps it current; without one it is as fresh as the last time the app
 ran.
 
-The wallpaper shows through the widget. "Widget background" in the menu
-puts a colour behind it, as solid as you like.
+The wallpaper shows through the widget. "Widget colours" in the menu
+puts a colour behind it, as solid as you like, and sets the colour of
+its header line.
 
 Its header names the scope it is showing (`kastrup · Discord  2`),
 because it draws the list through the app's scope and two counts under

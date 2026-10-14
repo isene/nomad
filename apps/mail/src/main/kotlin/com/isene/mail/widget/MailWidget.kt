@@ -41,9 +41,9 @@ import com.isene.mail.data.Settings
 // Fixed colours rather than GlanceTheme's. With no panel behind it the
 // text sits directly on the wallpaper, where a colour that follows the
 // system light/dark theme is invisible half the time.
-private val ACCENT = ColorProvider(Color(0xFF7FC8E8))
 private val NAME = ColorProvider(Color(0xFFCFE3F0))
 private val BODY = ColorProvider(Color.White)
+private val GREY = ColorProvider(Color(0xFF9E9E9E))
 
 /** The summary this widget is drawing, in the widget's own state. */
 internal val SUMMARY = stringPreferencesKey("summary")
@@ -51,6 +51,9 @@ internal val SUMMARY = stringPreferencesKey("summary")
 /** The colour behind the widget, as ARGB. 0 is none: the wallpaper shows
  *  through. */
 internal val BACK = intPreferencesKey("back")
+
+/** The colour of the header line, as ARGB. */
+internal val HEAD = intPreferencesKey("head")
 
 /**
  * Unread mail on the home screen: a count and who it is from.
@@ -79,7 +82,8 @@ class MailWidget : GlanceAppWidget() {
             val ctx = LocalContext.current
             val state = WidgetStore.parse(prefs[SUMMARY] ?: WidgetStore.text(ctx))
             val back = prefs[BACK] ?: Settings(ctx).widgetBack
-            GlanceTheme { WidgetContent(state.unread, state.rows, state.scope, back) }
+            val head = prefs[HEAD] ?: Settings(ctx).widgetHead
+            GlanceTheme { WidgetContent(state.unread, state.rows, state.scope, back, head) }
         }
     }
 }
@@ -90,6 +94,7 @@ private fun WidgetContent(
     rows: List<com.isene.mail.data.WidgetRow>,
     scope: String,
     back: Int,
+    head: Int,
 ) {
     // The widget shows the list through the app's scope, so it has to say
     // which one: a count of two under Discord and a count of two under All
@@ -114,14 +119,14 @@ private fun WidgetContent(
                 if (rows.isEmpty()) title else "$title  $unread",
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
-                    color = ACCENT,
+                    color = ColorProvider(Color(head)),
                 ),
                 modifier = GlanceModifier.padding(bottom = 4.dp).clickable(openApp),
             )
             if (rows.isEmpty()) {
                 Text(
                     if (unread == 0) "Nothing unread" else "Open the app",
-                    style = TextStyle(color = BODY),
+                    style = TextStyle(color = if (unread == 0) GREY else BODY),
                 )
             } else {
                 LazyColumn(modifier = GlanceModifier.fillMaxSize()) {

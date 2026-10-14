@@ -143,7 +143,7 @@ fun MailApp(vm: MailViewModel) {
                                 )
                             }
                             DropdownMenuItem(text = { Text("Settings") }, onClick = { menuOpen = false; showSettings = true })
-                            DropdownMenuItem(text = { Text("Widget background") }, onClick = { menuOpen = false; showBack = true })
+                            DropdownMenuItem(text = { Text("Widget colours") }, onClick = { menuOpen = false; showBack = true })
                             DropdownMenuItem(text = { Text("About") }, onClick = { menuOpen = false; showAbout = true })
                         }
                     },
@@ -209,10 +209,12 @@ fun MailApp(vm: MailViewModel) {
     if (showAbout) AboutDialog { showAbout = false }
     if (showBack) {
         val ctx = LocalContext.current
-        WidgetBackDialog(
+        WidgetColoursDialog(
             argb = vm.settingsObj().widgetBack,
-            set = {
-                vm.settingsObj().widgetBack = it
+            head = vm.settingsObj().widgetHead,
+            set = { back, head ->
+                vm.settingsObj().widgetBack = back
+                vm.settingsObj().widgetHead = head
                 WidgetPush.now(ctx)
             },
             close = { showBack = false },
@@ -563,44 +565,54 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
     )
 }
 
-/** The colour behind the home-screen widget: six hex digits, and how
- *  solid it is. At 0 % the wallpaper shows through, as it does at first. */
+/** The home-screen widget's colours: six hex digits for the background
+ *  and how solid it is, six for the header line. At 0 % the wallpaper
+ *  shows through, as it does at first. */
 @Composable
-private fun WidgetBackDialog(argb: Int, set: (Int) -> Unit, close: () -> Unit) {
+private fun WidgetColoursDialog(argb: Int, head: Int, set: (Int, Int) -> Unit, close: () -> Unit) {
     var hex by remember { mutableStateOf("%06X".format(argb and 0xFFFFFF)) }
+    var headHex by remember { mutableStateOf("%06X".format(head and 0xFFFFFF)) }
     var solid by remember { mutableStateOf((argb ushr 24) / 255f) }
     val rgb = hex.toIntOrNull(16)?.takeIf { hex.length == 6 }
+    val headRgb = headHex.toIntOrNull(16)?.takeIf { headHex.length == 6 }
     AlertDialog(
         onDismissRequest = close,
-        title = { Text("Widget background") },
+        title = { Text("Widget colours") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(
-                        value = hex,
-                        onValueChange = { typed -> hex = typed.uppercase().filter { it in "0123456789ABCDEF" }.take(6) },
-                        label = { Text("Colour, six hex digits") },
-                        singleLine = true,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(Modifier.width(16.dp))
-                    Box(Modifier.size(40.dp).background(Color(0xFF000000.toInt() or (rgb ?: 0))))
-                }
+                HexRow("Background, six hex digits", hex, rgb) { hex = it }
                 Text("Solid: ${(solid * 100).roundToInt()} %. At 0 the wallpaper shows through.")
                 Slider(value = solid, onValueChange = { solid = it })
+                HexRow("Header, six hex digits", headHex, headRgb) { headHex = it }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = rgb != null,
+                enabled = rgb != null && headRgb != null,
                 onClick = {
-                    set(((solid * 255).roundToInt() shl 24) or (rgb ?: 0))
+                    set(((solid * 255).roundToInt() shl 24) or (rgb ?: 0), 0xFF000000.toInt() or (headRgb ?: 0))
                     close()
                 },
             ) { Text("OK") }
         },
         dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
     )
+}
+
+/** A hex field with a square of the colour it names beside it. */
+@Composable
+private fun HexRow(label: String, hex: String, rgb: Int?, onHex: (String) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = hex,
+            onValueChange = { typed -> onHex(typed.uppercase().filter { it in "0123456789ABCDEF" }.take(6)) },
+            label = { Text(label) },
+            singleLine = true,
+            modifier = Modifier.weight(1f),
+        )
+        Spacer(Modifier.width(16.dp))
+        Box(Modifier.size(40.dp).background(Color(0xFF000000.toInt() or (rgb ?: 0))))
+    }
 }
 
 @Composable
