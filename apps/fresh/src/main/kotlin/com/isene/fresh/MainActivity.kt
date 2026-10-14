@@ -3,7 +3,6 @@ package com.isene.fresh
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
-import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -37,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -56,22 +56,19 @@ data class InstalledApp(
     val label: String,
     val packageName: String,
     val installedAt: Long,
-    val icon: Drawable,
 )
 
-private fun recentInstalls(pm: PackageManager, count: Int): List<InstalledApp> =
+/** Every app the user installed, newest first. Icons load per row, as it shows. */
+private fun installs(pm: PackageManager): List<InstalledApp> =
     pm.getInstalledPackages(0)
         .filter { it.applicationInfo != null &&
             (it.applicationInfo!!.flags and ApplicationInfo.FLAG_SYSTEM) == 0 }
         .sortedByDescending { it.firstInstallTime }
-        .take(count)
         .map {
-            val ai = it.applicationInfo!!
             InstalledApp(
-                label = ai.loadLabel(pm).toString(),
+                label = it.applicationInfo!!.loadLabel(pm).toString(),
                 packageName = it.packageName,
                 installedAt = it.firstInstallTime,
-                icon = ai.loadIcon(pm),
             )
         }
 
@@ -101,7 +98,7 @@ fun FreshScreen() {
     // removed app leaves the list.
     var tick by remember { mutableIntStateOf(0) }
     val apps by produceState<List<InstalledApp>?>(initialValue = null, tick) {
-        value = withContext(Dispatchers.Default) { recentInstalls(pm, 10) }
+        value = withContext(Dispatchers.Default) { installs(pm) }
     }
     val comeBack = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -124,6 +121,7 @@ fun FreshScreen() {
             items(apps ?: emptyList(), key = { it.packageName }) { app ->
                 AppRow(
                     app = app,
+                    pm = pm,
                     date = dateFmt.format(Date(app.installedAt)),
                     onOpen = {
                         pm.getLaunchIntentForPackage(app.packageName)?.let { ctx.startActivity(it) }
@@ -152,12 +150,18 @@ fun FreshScreen() {
 @Composable
 private fun AppRow(
     app: InstalledApp,
+    pm: PackageManager,
     date: String,
     onOpen: () -> Unit,
     onInfo: () -> Unit,
     onUninstall: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
+    val icon by produceState<ImageBitmap?>(initialValue = null, app.packageName) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { pm.getApplicationIcon(app.packageName).toBitmap(96, 96).asImageBitmap() }.getOrNull()
+        }
+    }
     Box {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -166,11 +170,9 @@ private fun AppRow(
                 .combinedClickable(onClick = onOpen, onLongClick = { menu = true })
                 .padding(vertical = 8.dp),
         ) {
-            Image(
-                bitmap = app.icon.toBitmap(96, 96).asImageBitmap(),
-                contentDescription = null,
-                modifier = Modifier.size(44.dp),
-            )
+            Box(Modifier.size(44.dp)) {
+                icon?.let { Image(bitmap = it, contentDescription = null, modifier = Modifier.size(44.dp)) }
+            }
             Spacer(Modifier.width(14.dp))
             Column {
                 Text(app.label, style = MaterialTheme.typography.bodyLarge)
