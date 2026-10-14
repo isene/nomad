@@ -155,6 +155,7 @@ fun ScribeScreen(vm: ScribeViewModel) {
 @Composable
 private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
     var showAbout by remember { mutableStateOf(false) }
+    var sortMenu by remember { mutableStateOf(false) }
     var renameRef by remember { mutableStateOf<NoteRef?>(null) }
     var deleteRef by remember { mutableStateOf<NoteRef?>(null) }
     val visible = vm.visible
@@ -179,12 +180,29 @@ private fun FileListScreen(vm: ScribeViewModel, onPickFolder: () -> Unit) {
                                 contentDescription = if (vm.cards) "Show as a list" else "Show as cards",
                             )
                         }
-                        IconButton(onClick = { vm.toggleSort() }) {
-                            Icon(
-                                if (vm.sortMode == SortMode.NAME) Icons.Filled.SortByAlpha
-                                else Icons.Filled.Schedule,
-                                contentDescription = "Sort",
-                            )
+                        Box {
+                            IconButton(onClick = { sortMenu = true }) {
+                                Icon(
+                                    when (vm.sortMode) {
+                                        SortMode.NAME, SortMode.NAME_DESC -> Icons.Filled.SortByAlpha
+                                        SortMode.COLOUR -> Icons.Filled.Palette
+                                        else -> Icons.Filled.Schedule
+                                    },
+                                    contentDescription = "Sort by",
+                                )
+                            }
+                            DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                                SortMode.entries.forEach { mode ->
+                                    DropdownMenuItem(
+                                        text = { Text(mode.label) },
+                                        leadingIcon = {
+                                            if (mode == vm.sortMode) Icon(Icons.Filled.Check, null)
+                                            else Spacer(Modifier.size(24.dp))
+                                        },
+                                        onClick = { sortMenu = false; vm.setSort(mode) },
+                                    )
+                                }
+                            }
                         }
                         IconButton(onClick = { vm.refresh() }) {
                             Icon(Icons.Filled.Refresh, contentDescription = "Reload")
@@ -799,8 +817,9 @@ private fun AboutDialog(onClose: () -> Unit) {
                         "• Tap a note to edit; the ⋮ menu renames, duplicates, or deletes.\n" +
                         "• The grid icon shows the notes as cards, the rows icon as a list. " +
                         "Hold a card for its menu.\n" +
-                        "• Search looks in names and in the text; the sort icon toggles " +
-                        "newest-first / A–Z. A note tagged #pinned stays on top.\n" +
+                        "• Search looks in names and in the text. The sort icon shows the notes " +
+                        "newest or oldest first, A–Z, Z–A, or by colour. " +
+                        "A note tagged #pinned stays on top.\n" +
                         "• A tag is #word anywhere in a note. Tap a tag above the list " +
                         "to see only its notes.\n" +
                         "• In the editor: # types a tag, the picture icon adds a picture " +
