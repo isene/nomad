@@ -43,7 +43,7 @@ import com.isene.mail.data.Settings
 // system light/dark theme is invisible half the time.
 private val NAME = ColorProvider(Color(0xFFCFE3F0))
 private val BODY = ColorProvider(Color.White)
-private val GREY = ColorProvider(Color(0xFF9E9E9E))
+private val GREY = ColorProvider(Color(0xFF666666))
 
 /** The summary this widget is drawing, in the widget's own state. */
 internal val SUMMARY = stringPreferencesKey("summary")
