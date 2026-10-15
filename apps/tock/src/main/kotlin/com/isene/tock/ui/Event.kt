@@ -62,6 +62,7 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
 import com.isene.tock.Draft
 import com.isene.tock.Page
+import com.isene.tock.Repeat
 import com.isene.tock.Showing
 import com.isene.tock.TockViewModel
 import com.isene.tock.Ui
@@ -266,15 +267,21 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
     var end by rememberSaveable { mutableStateOf(first.end) }
     var calendar by rememberSaveable { mutableStateOf(first.calendarId) }
     var remind by rememberSaveable { mutableStateOf(first.remind) }
-    // Which picker is open: "", "start day", "start time", "end day", "end time".
+    var repeat by rememberSaveable { mutableStateOf(first.repeat) }
+    var until by rememberSaveable { mutableStateOf(first.until) }
+    var teams by rememberSaveable { mutableStateOf(false) }
+    // Which picker is open: "", "start day", "start time", "end day", "end time", "until".
     var picking by remember { mutableStateOf("") }
     var choosing by remember { mutableStateOf(false) }
     var reminding by remember { mutableStateOf(false) }
+    var repeating by remember { mutableStateOf(false) }
 
     val dim = MaterialTheme.colorScheme.onSurfaceVariant
     val cal = ui.calendars.firstOrNull { it.id == calendar }
     // An event stays in its calendar; a new one can go into any that takes it.
     val choices = if (first.id == null) vm.writable(ui) else emptyList()
+    // Only a new timed event can go to Teams.
+    val toTeams = teams && first.id == null && !allDay
 
     // A new start keeps the event as long as it was.
     fun moveStart(to: LocalDateTime) {
@@ -290,15 +297,14 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
                 navigationIcon = { IconButton(onClick = { vm.back() }) { Icon(Icons.Default.Close, "Cancel") } },
                 actions = {
                     TextButton(onClick = {
-                        vm.save(
-                            first.copy(
-                                calendarId = calendar, title = title, allDay = allDay, start = start,
-                                // An end before the start is an event of no length.
-                                end = if (end.isBefore(start)) start else end,
-                                place = place, notes = notes, remind = remind,
-                            ),
+                        val d = first.copy(
+                            calendarId = calendar, title = title, allDay = allDay, start = start,
+                            // An end before the start is an event of no length.
+                            end = if (end.isBefore(start)) start else end,
+                            place = place, notes = notes, remind = remind, repeat = repeat, until = until,
                         )
-                    }) { Text("Save") }
+                        if (toTeams) vm.teams(d) else vm.save(d)
+                    }) { Text(if (toTeams) "Teams" else "Save") }
                 },
             )
         },
@@ -357,6 +363,40 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
                 if (!allDay) TextButton(onClick = { picking = "end time" }) { Text(clock(end)) }
             }
 
+            if (first.id == null && !allDay) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Teams meeting", Modifier.weight(1f))
+                    Switch(checked = teams, onCheckedChange = { teams = it })
+                }
+            }
+            // Teams asks for its own repeat; a link to it cannot carry one.
+            if (first.id == null && !toTeams) {
+                Box {
+                    Text(
+                        repeat.label,
+                        Modifier.fillMaxWidth().clickable { repeating = true }.padding(vertical = 12.dp),
+                    )
+                    DropdownMenu(expanded = repeating, onDismissRequest = { repeating = false }) {
+                        for (r in Repeat.entries) {
+                            DropdownMenuItem(
+                                text = { Text(r.label) },
+                                onClick = {
+                                    repeat = r
+                                    repeating = false
+                                },
+                            )
+                        }
+                    }
+                }
+                if (repeat != Repeat.NEVER) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("Until", Modifier.width(56.dp), color = dim)
+                        TextButton(onClick = { picking = "until" }) { Text(until?.let { shortDay(it) } ?: "No end") }
+                        if (until != null) IconButton(onClick = { until = null }) { Icon(Icons.Default.Close, "No end") }
+                    }
+                }
+            }
+
             OutlinedTextField(
                 value = place, onValueChange = { place = it }, label = { Text("Place") },
                 singleLine = true, modifier = Modifier.fillMaxWidth(),
@@ -393,6 +433,11 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
     when (picking) {
         "start day" -> PickDay(start.toLocalDate()) { day ->
             if (day != null) moveStart(day.atTime(start.toLocalTime()))
+            picking = ""
+        }
+        "until" -> PickDay(until ?: start.toLocalDate()) { day ->
+            // The last time is never before the first.
+            if (day != null) until = if (day.isBefore(start.toLocalDate())) start.toLocalDate() else day
             picking = ""
         }
         "end day" -> PickDay(end.toLocalDate()) { day ->

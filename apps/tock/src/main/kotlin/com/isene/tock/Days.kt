@@ -1,10 +1,14 @@
 package com.isene.tock
 
+import java.net.URLEncoder
+import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.TreeMap
 
@@ -136,3 +140,54 @@ fun laptopColors(text: String): Map<String, Int> = buildMap {
  *  that is alone in its account also goes by the account's name. */
 fun laptopColor(colors: Map<String, Int>, name: String, owner: String, account: String, alone: Boolean): Int? =
     colors[owner.lowercase()] ?: colors[name.lowercase()] ?: if (alone) colors[account.lowercase()] else null
+
+/** How often a new event comes back. */
+enum class Repeat(val label: String) {
+    NEVER("Does not repeat"),
+    DAILY("Every day"),
+    WEEKDAYS("Every weekday"),
+    WEEKLY("Every week"),
+    FORTNIGHT("Every two weeks"),
+    MONTHLY("Every month"),
+    YEARLY("Every year"),
+}
+
+/** The repeat rule the calendar store takes (RFC 5545), or null when the
+ *  event happens once. */
+fun rrule(d: Draft, zone: ZoneId): String? {
+    val day = d.start.dayOfWeek.name.take(2)
+    val rule = when (d.repeat) {
+        Repeat.NEVER -> return null
+        Repeat.DAILY -> "FREQ=DAILY"
+        Repeat.WEEKDAYS -> "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"
+        Repeat.WEEKLY -> "FREQ=WEEKLY;BYDAY=$day"
+        Repeat.FORTNIGHT -> "FREQ=WEEKLY;INTERVAL=2;BYDAY=$day"
+        Repeat.MONTHLY -> "FREQ=MONTHLY;BYMONTHDAY=${d.start.dayOfMonth}"
+        Repeat.YEARLY -> "FREQ=YEARLY"
+    }
+    val until = d.until ?: return rule
+    // A whole-day event ends on a date; a timed one at the end of that
+    // day where the phone is, written in UTC.
+    val last = if (d.allDay) until.format(DateTimeFormatter.BASIC_ISO_DATE)
+    else until.plusDays(1).atStartOfDay(zone).minusSeconds(1).withZoneSameInstant(ZoneOffset.UTC)
+        .format(DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'"))
+    return "$rule;UNTIL=$last"
+}
+
+/** How long each time of a repeating event lasts, as the store writes it. */
+fun duration(d: Draft): String =
+    if (d.allDay) "P${ChronoUnit.DAYS.between(d.start.toLocalDate(), d.end.toLocalDate()) + 1}D"
+    else "P${maxOf(0, Duration.between(d.start, d.end).seconds)}S"
+
+/** A link that opens Teams with a new meeting filled in. Teams makes it in
+ *  the work calendar, which the phone then syncs; tock writes nothing. */
+fun teamsLink(d: Draft, zone: ZoneId): String {
+    val at = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX")
+    // Teams wants %20 for a space, never +.
+    fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
+    return "https://teams.microsoft.com/l/meeting/new" +
+        "?subject=" + enc(d.title.trim()) +
+        "&startTime=" + enc(d.start.atZone(zone).format(at)) +
+        "&endTime=" + enc(d.end.atZone(zone).format(at)) +
+        "&content=" + enc(d.notes)
+}

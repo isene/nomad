@@ -12,8 +12,12 @@ phone twin of [tock](https://github.com/isene/tock).
 - An event's own screen: time, place (a tap opens the map), notes with
   links that can be tapped, and who is invited.
 - New events, changes and deletes go to the phone's calendar store, and
-  the account syncs them. A repeating event can be deleted, one time or
-  every time. Changing one is not built yet.
+  the account syncs them. A new event can repeat: every day, weekday,
+  week, two weeks, month or year, with an end day or none. A repeating
+  event can be deleted, one time or every time. Changing one is not built
+  yet.
+- Teams meeting: a switch on a new event hands its title, times and notes
+  to the Teams app, which makes the meeting in the work calendar.
 - Reminders come as notifications, from the alarms the phone's calendar
   store keeps.
 - Widget: the coming 30 days as a list that scrolls. A tap opens the

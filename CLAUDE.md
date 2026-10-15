@@ -448,6 +448,8 @@ when building the core. Same rule as the rest of Fe₂O₃.
   only, like fresh: every event comes from Android's own calendar store
   (`CalendarContract`), which the phone's accounts keep in sync with the
   laptop on or off. No INTERNET permission, no tokens; keep it that way.
+  A Teams meeting goes out as a `teams.microsoft.com/l/meeting/new` link
+  that the Teams app opens (`teamsLink`); tock writes nothing for it.
 - The day and colour rules are in `Days.kt`, which touches no Android
   class. Their tests run on the laptop:
   `./gradlew :apps:tock:testReleaseUnitTest`. An all-day event is
