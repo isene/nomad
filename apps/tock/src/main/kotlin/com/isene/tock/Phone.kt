@@ -16,6 +16,7 @@ import android.provider.CalendarContract.Events
 import android.provider.CalendarContract.Instances
 import android.provider.CalendarContract.Reminders
 import androidx.core.content.edit
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -63,6 +64,9 @@ data class Draft(
     val notes: String = "",
     /** Minutes before the start, or null for no reminder. */
     val remind: Int? = 15,
+    val repeat: Repeat = Repeat.NEVER,
+    /** The last day a repeating event happens, or null for no end. */
+    val until: LocalDate? = null,
 )
 
 /** What the user has chosen in this app: which calendars to show, and a
@@ -209,7 +213,8 @@ object Phone {
     } ?: emptyList()
 
     /** Write a new event, or the changes to one that is not a repeating
-     *  event. True when the phone took it. */
+     *  event. Only a new event can be made to repeat. True when the phone
+     *  took it. */
     fun save(ctx: Context, d: Draft, zone: ZoneId): Boolean {
         val values = ContentValues().apply {
             put(Events.TITLE, d.title.trim())
@@ -225,6 +230,12 @@ object Phone {
                 put(Events.DTSTART, d.start.atZone(zone).toInstant().toEpochMilli())
                 put(Events.DTEND, d.end.atZone(zone).toInstant().toEpochMilli())
                 put(Events.EVENT_TIMEZONE, zone.id)
+            }
+            // A repeating event has a length in place of an end.
+            rrule(d, zone)?.takeIf { d.id == null }?.let { rule ->
+                put(Events.RRULE, rule)
+                put(Events.DURATION, duration(d))
+                putNull(Events.DTEND)
             }
         }
         val cr = ctx.contentResolver

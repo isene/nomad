@@ -290,7 +290,8 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 Text(
                     "• Swipe the month sideways. Tap a day to list the days from it on.\n" +
                         "• Tap an event to see it, change it or delete it. A repeating event can be " +
-                        "deleted, not changed. + makes a new event.\n" +
+                        "deleted, not changed. + makes a new event, which can repeat. " +
+                        "Teams meeting hands it to the Teams app, which puts it in your work calendar.\n" +
                         "• ⋮, then Calendars: tick the calendars to show. Tap a calendar's dot to give " +
                         "it a colour by its number.\n" +
                         "• \"Colours from the laptop\" on that page reads a text file with the colour " +

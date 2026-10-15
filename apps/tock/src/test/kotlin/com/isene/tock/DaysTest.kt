@@ -132,4 +132,43 @@ class DaysTest {
         // The clock was set back to before the last time.
         assertTrue(fetchDue(1_000_000_000L - 5, 1_000_000_000L, quarter))
     }
+
+    private fun draft(start: LocalDateTime, end: LocalDateTime, repeat: Repeat, until: LocalDate? = null, allDay: Boolean = false) =
+        Draft(calendarId = 1, title = "Stand up", start = start, end = end, repeat = repeat, until = until, allDay = allDay)
+
+    @Test
+    fun aNewEventRepeatsByTheRuleTheStoreTakes() {
+        // Thursday 15 October 2026, 09:00 to 09:30 in Oslo.
+        val start = LocalDateTime.of(2026, 10, 15, 9, 0)
+        val end = start.plusMinutes(30)
+        assertNull(rrule(draft(start, end, Repeat.NEVER), oslo))
+        assertEquals("FREQ=WEEKLY;BYDAY=TH", rrule(draft(start, end, Repeat.WEEKLY), oslo))
+        assertEquals("FREQ=WEEKLY;INTERVAL=2;BYDAY=TH", rrule(draft(start, end, Repeat.FORTNIGHT), oslo))
+        assertEquals("FREQ=MONTHLY;BYMONTHDAY=15", rrule(draft(start, end, Repeat.MONTHLY), oslo))
+        // The last day ends at midnight in Oslo, 23:59:59 UTC in winter time.
+        assertEquals(
+            "FREQ=DAILY;UNTIL=20261220T225959Z",
+            rrule(draft(start, end, Repeat.DAILY, LocalDate.of(2026, 12, 20)), oslo),
+        )
+        assertEquals("P1800S", duration(draft(start, end, Repeat.WEEKLY)))
+    }
+
+    @Test
+    fun aWholeDayRepeatEndsOnADateAndLastsWholeDays() {
+        val day = LocalDate.of(2026, 10, 15).atStartOfDay()
+        val d = draft(day, day.plusDays(1), Repeat.YEARLY, LocalDate.of(2030, 10, 15), allDay = true)
+        assertEquals("FREQ=YEARLY;UNTIL=20301015", rrule(d, oslo))
+        assertEquals("P2D", duration(d))
+    }
+
+    @Test
+    fun theTeamsLinkCarriesTitleTimesAndNotes() {
+        val start = LocalDateTime.of(2026, 10, 15, 9, 0)
+        val d = Draft(calendarId = 1, title = "Plan Q4", start = start, end = start.plusHours(1), notes = "a+b")
+        assertEquals(
+            "https://teams.microsoft.com/l/meeting/new?subject=Plan%20Q4" +
+                "&startTime=2026-10-15T09%3A00%3A00%2B02%3A00&endTime=2026-10-15T10%3A00%3A00%2B02%3A00&content=a%2Bb",
+            teamsLink(d, oslo),
+        )
+    }
 }

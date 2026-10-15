@@ -1,6 +1,7 @@
 package com.isene.tock
 
 import android.app.Application
+import android.content.Intent
 import android.database.ContentObserver
 import android.net.Uri
 import android.os.Handler
@@ -250,6 +251,18 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
             pick(d.start.toLocalDate())
             load()
         }
+    }
+
+    /** Hand a new event to Teams, which makes it a Teams meeting in the
+     *  work calendar. tock itself saves nothing. */
+    fun teams(d: Draft) {
+        val open = Intent(Intent.ACTION_VIEW, Uri.parse(teamsLink(d, ZoneId.systemDefault())))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (runCatching { getApplication<Application>().startActivity(open) }.isFailure) {
+            say("Nothing on the phone opens Teams links")
+            return
+        }
+        _ui.update { it.copy(page = Page.Main) }
     }
 
     /** Delete an event. `one` takes out this time only of a repeating one. */
