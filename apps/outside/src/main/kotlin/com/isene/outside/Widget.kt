@@ -261,7 +261,7 @@ class ClockWidget : AppWidgetProvider() {
 
         /** What the dial cannot draw by itself: the ring between two hour
          *  ticks in the colour of that hour's weather (blue for rain, grey
-         *  for cloud, light yellow for partly cloudy, yellow for sun), on
+         *  for cloud, light yellow for partly cloudy, amber for sun), on
          *  the rim an icon at the time of sunrise and of sunset, inside
          *  the ring one at the time of the next alarm (green when it
          *  rings within twelve hours), and a dot in the top right corner
@@ -286,7 +286,8 @@ class ClockWidget : AppWidgetProvider() {
                     DialHour.RAIN -> 0xFF3D9BFF
                     DialHour.CLOUD -> 0xFF8E8E8E
                     DialHour.PARTLY -> 0xFFF8FA6E
-                    DialHour.SUN -> 0xFFF5F821
+                    // Halfway between the sunrise and sunset icons.
+                    DialHour.SUN -> 0xFFF0C020
                     DialHour.UNKNOWN -> return@forEachIndexed
                 }.toInt()
                 // An arc is counted from 3 o'clock, the dial from 12.
