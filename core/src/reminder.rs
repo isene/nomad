@@ -73,18 +73,8 @@ fn two(s: &str) -> Option<u32> {
 /// so an unstamped item is simply never scheduled.
 #[uniffi::export]
 pub fn parse_item(line: String) -> StampedItem {
-    let mut rest = line.trim();
-    let mut done = false;
-    // Optional checkbox.
-    if let Some(after) = rest.strip_prefix('[') {
-        if let Some((mark, tail)) = after.split_once(']') {
-            let m = mark.trim();
-            if m.is_empty() || m.eq_ignore_ascii_case("x") || m == "_" || m == "O" {
-                done = m.eq_ignore_ascii_case("x");
-                rest = tail.trim_start();
-            }
-        }
-    }
+    let (checkbox, rest) = split_checkbox(line.trim());
+    let done = checkbox.trim_matches(['[', ']']).trim().eq_ignore_ascii_case("x");
     let unstamped = |text: &str| StampedItem {
         stamp: None,
         text: text.to_string(),
@@ -118,6 +108,31 @@ pub fn parse_item(line: String) -> StampedItem {
         text: text.trim().to_string(),
         done,
     }
+}
+
+/// A leading `[ ]`, `[x]`, `[_]` or `[O]`, and the rest of the line. No
+/// checkbox gives an empty first part.
+fn split_checkbox(line: &str) -> (&str, &str) {
+    if let Some((mark, tail)) = line.strip_prefix('[').and_then(|after| after.split_once(']')) {
+        let m = mark.trim();
+        if m.is_empty() || m.eq_ignore_ascii_case("x") || m == "_" || m == "O" {
+            return (&line[..line.len() - tail.len()], tail.trim_start());
+        }
+    }
+    ("", line)
+}
+
+/// The item with `stamp` in place of the stamp it had, after its checkbox
+/// if it has one. `None` takes the stamp away.
+#[uniffi::export]
+pub fn set_stamp(line: String, stamp: Option<Stamp>) -> String {
+    let (checkbox, rest) = split_checkbox(line.trim());
+    let text = parse_item(rest.to_string()).text;
+    let item = match stamp {
+        Some(s) => format_item(s, text),
+        None => text,
+    };
+    if checkbox.is_empty() { item } else { format!("{checkbox} {item}") }
 }
 
 /// The separator between the clock and the text. Named so the `.` vs `:`
@@ -485,6 +500,15 @@ mod tests {
         let line = format_item(s, "Call Alice".into());
         assert_eq!(line, "2026-07-27 12.08: Call Alice");
         assert_eq!(parse_item(line).stamp, Some(s));
+    }
+
+    #[test]
+    fn sets_and_clears_a_stamp() {
+        let s = Stamp { year: 2026, month: 10, day: 17, hour: 9, minute: 0 };
+        assert_eq!(set_stamp("Call Alice".into(), Some(s)), "2026-10-17 09.00: Call Alice");
+        assert_eq!(set_stamp("[ ] 2026-07-27 12.08: Call Alice".into(), Some(s)), "[ ] 2026-10-17 09.00: Call Alice");
+        assert_eq!(set_stamp("[x] 2026-07-27 12.08: Call Alice".into(), None), "[x] Call Alice");
+        assert_eq!(set_stamp("Buy 2 litres of milk".into(), None), "Buy 2 litres of milk");
     }
 
     #[test]
