@@ -174,6 +174,9 @@ class MainActivity : ComponentActivity() {
     var saveOffer by mutableStateOf<Login?>(null)
     /** The link a finger is held on, while its menu shows. */
     var heldLink by mutableStateOf<String?>(null)
+
+    /** The picture a finger is held on, while the same menu shows. */
+    var heldImage by mutableStateOf<String?>(null)
     /** How far a pull past the top of the page has gone, 0 to 1 (1 reloads). */
     var pull by mutableFloatStateOf(0f)
     /** Bumped when the logins change, so the password list redraws. */
@@ -350,10 +353,13 @@ class MainActivity : ComponentActivity() {
         if (tabs.isEmpty()) newBlankTab() else show(current)
     }
 
-    // ---------- a link held down ----------
+    // ---------- a link or a picture held down ----------
 
-    fun holdLink(url: String) {
-        if (url.isNotEmpty() && !url.startsWith("javascript:")) heldLink = url
+    fun hold(link: String, image: String) {
+        val ok = { u: String -> u.isNotEmpty() && !u.startsWith("javascript:") }
+        if (!ok(link) && !ok(image)) return
+        heldLink = link.takeIf(ok)
+        heldImage = image.takeIf(ok)
     }
 
     /**

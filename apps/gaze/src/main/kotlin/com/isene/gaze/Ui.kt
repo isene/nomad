@@ -93,7 +93,7 @@ fun GazeApp(a: MainActivity) {
                 Screen.Settings -> SettingsScreen(a)
             }
             if (a.askMaster) MasterDialog(a)
-            a.heldLink?.let { LinkDialog(a, it) }
+            if (a.heldLink != null || a.heldImage != null) LinkDialog(a, a.heldLink, a.heldImage)
         }
     }
     LaunchedEffect(a.message) {
@@ -432,22 +432,30 @@ private fun Toggle(label: String, start: Boolean, save: (Boolean) -> Unit) {
     }
 }
 
-/** What to do with a link that is held down. */
+/** What to do with a link or a picture that is held down. */
 @Composable
-private fun LinkDialog(a: MainActivity, url: String) {
-    val close = { a.heldLink = null }
+private fun LinkDialog(a: MainActivity, url: String?, image: String?) {
+    val close = {
+        a.heldLink = null
+        a.heldImage = null
+    }
+    // A picture in the page itself has its bytes in its address.
+    val title = if (url != null) shown(url) else image?.takeUnless { it.startsWith("data:") }?.let { shown(it) } ?: "Picture"
     AlertDialog(
         onDismissRequest = close,
-        title = { Text(shown(url), color = Dim, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) },
+        title = { Text(title, color = Dim, fontSize = 14.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         text = {
             Column {
-                // From a private tab every new tab is private.
-                val private = a.current()?.private == true
-                if (url.startsWith("http") && !private) LinkChoice("Open in new tab") { close(); a.openBehind(url) }
-                if (url.startsWith("http")) LinkChoice("Open in private tab") { close(); a.openBehind(url, private = true) }
-                // A link to a sound file or a film plays when tapped. This saves it.
-                if (url.startsWith("http")) LinkChoice("Download link") { close(); a.downloadUrl(url) }
-                LinkChoice("Copy link address") { close(); a.copyLink(url) }
+                if (url != null) {
+                    // From a private tab every new tab is private.
+                    val private = a.current()?.private == true
+                    if (url.startsWith("http") && !private) LinkChoice("Open in new tab") { close(); a.openBehind(url) }
+                    if (url.startsWith("http")) LinkChoice("Open in private tab") { close(); a.openBehind(url, private = true) }
+                    // A link to a sound file or a film plays when tapped. This saves it.
+                    if (url.startsWith("http")) LinkChoice("Download link") { close(); a.downloadUrl(url) }
+                    LinkChoice("Copy link address") { close(); a.copyLink(url) }
+                }
+                if (image != null) LinkChoice("Download image") { close(); a.downloadUrl(image) }
             }
         },
         confirmButton = {},

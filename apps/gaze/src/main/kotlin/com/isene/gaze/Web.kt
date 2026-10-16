@@ -164,18 +164,23 @@ private fun WebView.setUp(a: MainActivity, tab: Tab) {
     }
     addJavascriptInterface(Bridge(a, tab), "gazeBridge")
 
-    // Holding a link asks what to do with it. Holding anything else keeps
-    // WebView's own answer: marking text.
+    // Holding a link or a picture asks what to do with it. Holding anything
+    // else keeps WebView's own answer: marking text.
     setOnLongClickListener {
-        val type = hitTestResult.type
-        if (type != WebView.HitTestResult.SRC_ANCHOR_TYPE && type != WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) {
-            return@setOnLongClickListener false
+        val hit = hitTestResult
+        when (hit.type) {
+            WebView.HitTestResult.IMAGE_TYPE -> a.hold("", hit.extra.orEmpty())
+            WebView.HitTestResult.SRC_ANCHOR_TYPE, WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE -> {
+                // For a picture inside a link, WebView gives the picture's
+                // address; the link's comes back as a message.
+                val picture = if (hit.type == WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE) hit.extra.orEmpty() else ""
+                requestFocusNodeHref(Handler(Looper.getMainLooper()) { m ->
+                    a.hold(m.data.getString("url").orEmpty(), m.data.getString("src").orEmpty().ifEmpty { picture })
+                    true
+                }.obtainMessage())
+            }
+            else -> return@setOnLongClickListener false
         }
-        // The address comes back as a message, also for a picture inside a link.
-        requestFocusNodeHref(Handler(Looper.getMainLooper()) { m ->
-            a.holdLink(m.data.getString("url").orEmpty())
-            true
-        }.obtainMessage())
         true
     }
 
