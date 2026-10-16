@@ -49,6 +49,11 @@ data class More(
     val reminders: List<Int>,
     /** True when the user is the one who made the event. */
     val mine: Boolean,
+    /** The user's own line on the guest list, or null when the user is
+     *  not on it. An answer to the invitation is written there. */
+    val me: Long? = null,
+    /** What the user has answered, an `Attendees.ATTENDEE_STATUS_*`. */
+    val answer: Int = Attendees.ATTENDEE_STATUS_NONE,
 )
 
 /** What the edit screen fills in. `id` is null for a new event. */
@@ -186,23 +191,36 @@ object Phone {
         val id = arrayOf(eventId.toString())
         var notes = ""
         var mine = true
+        var owner = ""
         cr.query(
             ContentUris.withAppendedId(Events.CONTENT_URI, eventId),
-            arrayOf(Events.DESCRIPTION, Events.IS_ORGANIZER), null, null, null,
+            arrayOf(Events.DESCRIPTION, Events.IS_ORGANIZER, Events.OWNER_ACCOUNT), null, null, null,
         )?.use { c ->
             if (c.moveToFirst()) {
                 notes = c.text(0)
                 mine = c.text(1) != "0"
+                owner = c.text(2)
             }
         }
+        // The user is the guest with the calendar's own address.
+        var me: Long? = null
+        var answer = Attendees.ATTENDEE_STATUS_NONE
         val guests = cr.query(
             Attendees.CONTENT_URI,
-            arrayOf(Attendees.ATTENDEE_NAME, Attendees.ATTENDEE_EMAIL, Attendees.ATTENDEE_STATUS),
+            arrayOf(Attendees.ATTENDEE_NAME, Attendees.ATTENDEE_EMAIL, Attendees.ATTENDEE_STATUS, Attendees._ID),
             "${Attendees.EVENT_ID} = ?", id, Attendees.ATTENDEE_NAME,
         )?.use { c ->
-            buildList { while (c.moveToNext()) add(Guest(c.text(0).ifEmpty { c.text(1) }, c.getInt(2))) }
+            buildList {
+                while (c.moveToNext()) {
+                    if (owner.isNotEmpty() && c.text(1).equals(owner, ignoreCase = true)) {
+                        me = c.getLong(3)
+                        answer = c.getInt(2)
+                    }
+                    add(Guest(c.text(0).ifEmpty { c.text(1) }, c.getInt(2)))
+                }
+            }
         } ?: emptyList()
-        return More(notes, guests, reminders(ctx, eventId), mine)
+        return More(notes, guests, reminders(ctx, eventId), mine, me, answer)
     }
 
     private fun reminders(ctx: Context, eventId: Long): List<Int> = ctx.contentResolver.query(
@@ -276,6 +294,29 @@ object Phone {
             put(Events.STATUS, Events.STATUS_CANCELED)
         },
     ) != null
+
+    /** Answer an invitation on the user's own line of its guest list.
+     *  `one` answers this time only of a repeating event. The phone's
+     *  account sends the answer to the one who invited. */
+    fun answer(ctx: Context, s: Showing, me: Long, status: Int, one: Boolean): Boolean = if (one) {
+        ctx.contentResolver.insert(
+            ContentUris.withAppendedId(Events.CONTENT_EXCEPTION_URI, s.eventId),
+            ContentValues().apply {
+                put(Events.ORIGINAL_INSTANCE_TIME, s.begin)
+                put(Events.SELF_ATTENDEE_STATUS, status)
+                put(Events.STATUS, Events.STATUS_CONFIRMED)
+            },
+        ) != null
+    } else {
+        ctx.contentResolver.update(
+            ContentUris.withAppendedId(Attendees.CONTENT_URI, me),
+            ContentValues().apply {
+                put(Attendees.ATTENDEE_STATUS, status)
+                put(Attendees.EVENT_ID, s.eventId)
+            },
+            null, null,
+        ) > 0
+    }
 
     /** Ask each account to fetch its calendars now. The phone does this by
      *  itself too, but it can take hours. */

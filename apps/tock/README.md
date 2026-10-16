@@ -10,7 +10,8 @@ phone twin of [tock](https://github.com/isene/tock).
 - A month with week numbers and a dot per event on each day, in its
   calendar's colour. The days from the picked one on are listed below it.
 - An event's own screen: time, place (a tap opens the map), notes with
-  links that can be tapped, and who is invited.
+  links that can be tapped, and who is invited. An invitation is answered
+  there: yes, maybe or no, for one time or every time of a repeating one.
 - New events, changes and deletes go to the phone's calendar store, and
   the account syncs them. A new event can repeat: every day, weekday,
   week, two weeks, month or year, with an end day or none. A repeating
