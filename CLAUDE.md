@@ -146,7 +146,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
   are re-armed on load, on save, after a reboot, and on the exported
   `com.isene.tasks.action.RESCAN` broadcast that vox sends after filing a
   spoken reminder. `[x]` items never fire, and a stamp in the past is
-  history, not a missed alarm.
+  history, not a missed alarm. Since 0.9.0 (asked 2026-10-16) the item dialog
+  has "Add a reminder": a day picker, then a time picker, written with
+  the core's `set_stamp`, which keeps a `[ ]` in front. A Compose test of
+  the dialog was tried on Robolectric and dropped: every AlertDialog,
+  the old ones too, never settles there (bare Text and TextField do).
 
 ### gaze (com.isene.gaze)
 

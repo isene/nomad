@@ -6,7 +6,7 @@
 
 **[Download for Android (APK)](https://github.com/isene/nomad/releases/download/apk/tasks.apk)** · [how to install](https://isene.org/nomad/#get)
 
-![version](https://img.shields.io/badge/version-0.8.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.9.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Phone editor and home-screen widget for the HyperList todo list — part of the [nomad](../../) mobile suite.
 
@@ -23,6 +23,9 @@ shows up on the other — no Google account, no cloud middleman.
 
 - Two-level hyperlist (categories → items), parsed and serialized by the Rust core
 - Add / edit / complete / delete items; categories collapse
+- **Reminders**: "Add a reminder" under an item's text picks a day and a time,
+  and the phone notifies you then. It is written into the list the HyperList
+  way, `2026-10-17 09.00: Call Alice`, so a stamp typed in scribe works too
 - **Glance home-screen widget** showing the first items across categories.
   The wallpaper shows through it; "Widget background" in the menu puts a
   colour behind it, as solid as you like. Each line has its category's

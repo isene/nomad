@@ -22,9 +22,11 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.Opacity
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.DriveFileMove
@@ -37,6 +39,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,8 +55,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -74,11 +81,20 @@ import com.isene.tasks.BuildConfig
 import com.isene.tasks.data.Row as TaskRow
 import com.isene.tasks.data.flatRows
 import com.isene.tasks.viewmodel.TasksViewModel
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalTime
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 import uniffi.fe2o3_mobile_core.Category as RustCategory
 import uniffi.fe2o3_mobile_core.Item as RustItem
+import uniffi.fe2o3_mobile_core.Stamp
+import uniffi.fe2o3_mobile_core.parseItem
+import uniffi.fe2o3_mobile_core.setStamp
 import androidx.compose.foundation.background
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -302,6 +318,7 @@ fun TasksScreen(vm: TasksViewModel) {
         val cat = cats.getOrNull(idx) ?: run { addItemUnderCat = null; return@let }
         TextDialog(
             title = "New item in \"${cat.name}\"",
+            reminder = true,
             onDismiss = { addItemUnderCat = null },
             onConfirm = { text ->
                 if (text.isNotBlank()) vm.addItem(idx, text.trim())
@@ -313,6 +330,7 @@ fun TasksScreen(vm: TasksViewModel) {
         TextDialog(
             title = "Edit item",
             initial = currentText,
+            reminder = true,
             onDismiss = { editItem = null },
             onConfirm = { text ->
                 if (text.isNotBlank() && text != currentText) vm.renameItem(catIdx, itemIdx, text.trim())
@@ -714,26 +732,95 @@ private fun ItemRow(
     }
 }
 
+/**
+ * One line of text. With [reminder], an item's stamp is set with a day and
+ * a time picker below the text instead of being typed into it.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TextDialog(
     title: String,
     initial: String = "",
+    reminder: Boolean = false,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    var value by remember { mutableStateOf(initial) }
+    var value by remember { mutableStateOf(if (reminder) setStamp(initial, null) else initial) }
+    var stamp by remember { mutableStateOf(if (reminder) parseItem(initial).stamp else null) }
+    var day by remember { mutableStateOf<LocalDate?>(null) }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            TextField(
-                value = value,
-                onValueChange = { value = it },
-                singleLine = false,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Column {
+                TextField(
+                    value = value,
+                    onValueChange = { value = it },
+                    singleLine = false,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (reminder) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = { day = stamp?.let { LocalDate.of(it.year, it.month.toInt(), it.day.toInt()) } ?: LocalDate.now() }) {
+                            Icon(Icons.Filled.Alarm, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stamp?.let { "Reminder ${shown(it)}" } ?: "Add a reminder")
+                        }
+                        if (stamp != null) {
+                            IconButton(onClick = { stamp = null }) { Icon(Icons.Filled.Close, "No reminder") }
+                        }
+                    }
+                }
+            }
         },
-        confirmButton = { TextButton(onClick = { onConfirm(value) }) { Text("OK") } },
+        confirmButton = {
+            TextButton(onClick = { onConfirm(if (reminder && value.isNotBlank()) setStamp(value, stamp) else value) }) { Text("OK") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+    day?.let { start ->
+        PickDayAndTime(start, stamp?.let { LocalTime.of(it.hour.toInt(), it.minute.toInt()) }) { picked ->
+            if (picked != null) stamp = picked
+            day = null
+        }
+    }
+}
+
+private fun shown(s: Stamp): String =
+    LocalDate.of(s.year, s.month.toInt(), s.day.toInt()).format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.ENGLISH)) +
+        String.format(Locale.ROOT, " at %02d.%02d", s.hour.toInt(), s.minute.toInt())
+
+/** A day, then a time; null when either is cancelled. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PickDayAndTime(start: LocalDate, time: LocalTime?, done: (Stamp?) -> Unit) {
+    var picked by remember { mutableStateOf<LocalDate?>(null) }
+    val chosen = picked
+    if (chosen == null) {
+        // The picker counts a day as its midnight, UTC.
+        val state = rememberDatePickerState(initialSelectedDateMillis = start.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+        DatePickerDialog(
+            onDismissRequest = { done(null) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val ms = state.selectedDateMillis ?: return@TextButton done(null)
+                    picked = Instant.ofEpochMilli(ms).atZone(ZoneOffset.UTC).toLocalDate()
+                }) { Text("Next") }
+            },
+            dismissButton = { TextButton(onClick = { done(null) }) { Text("Cancel") } },
+        ) { DatePicker(state = state) }
+    } else {
+        val at = time ?: LocalTime.now().plusHours(1).withMinute(0)
+        val state = rememberTimePickerState(initialHour = at.hour, initialMinute = at.minute, is24Hour = true)
+        AlertDialog(
+            onDismissRequest = { done(null) },
+            confirmButton = {
+                TextButton(onClick = {
+                    done(Stamp(chosen.year, chosen.monthValue.toUInt(), chosen.dayOfMonth.toUInt(), state.hour.toUInt(), state.minute.toUInt()))
+                }) { Text("Set") }
+            },
+            dismissButton = { TextButton(onClick = { done(null) }) { Text("Cancel") } },
+            text = { TimePicker(state = state) },
+        )
+    }
 }
