@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.provider.CalendarContract
+import android.provider.CalendarContract.Attendees
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import java.time.Instant
@@ -279,6 +280,27 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 say("The phone did not delete the event")
             }
+        }
+    }
+
+    /** Answer an invitation. `one` answers this time only of a repeating event. */
+    fun answer(s: Showing, more: More, status: Int, one: Boolean) {
+        val me = more.me ?: return
+        viewModelScope.launch {
+            val fresh = withContext(Dispatchers.IO) {
+                runCatching {
+                    if (Phone.answer(getApplication(), s, me, status, one)) Phone.more(getApplication(), s.eventId) else null
+                }.getOrNull()
+            }
+            if (fresh == null) {
+                say("The phone did not take the answer")
+                return@launch
+            }
+            // One time of a repeating event becomes an event of its own;
+            // the guest list read again is the whole series'.
+            val page = Page.View(s.copy(declined = status == Attendees.ATTENDEE_STATUS_DECLINED), fresh.copy(answer = status))
+            _ui.update { if (it.page == Page.View(s, more)) it.copy(page = page) else it }
+            load()
         }
     }
 

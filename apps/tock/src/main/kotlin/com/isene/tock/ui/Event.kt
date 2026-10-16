@@ -30,6 +30,7 @@ import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -106,6 +107,12 @@ private fun remindText(minutes: Int?): String = when {
     else -> "$minutes minutes before"
 }
 
+private val ANSWERS = listOf(
+    Attendees.ATTENDEE_STATUS_ACCEPTED to "Yes",
+    Attendees.ATTENDEE_STATUS_TENTATIVE to "Maybe",
+    Attendees.ATTENDEE_STATUS_DECLINED to "No",
+)
+
 private val LINK = Regex("https?://[^\\s<>\"]+")
 
 /** A text with its web addresses made into links, so the link to a
@@ -139,6 +146,8 @@ fun EventView(vm: TockViewModel, ui: Ui, page: Page.View) {
     val ctx = LocalContext.current
     val dim = MaterialTheme.colorScheme.onSurfaceVariant
     var asking by remember { mutableStateOf(false) }
+    // The answer waiting for "this time or every time" on a repeating event.
+    var answering by remember { mutableStateOf<Int?>(null) }
     val canDelete = cal?.writable == true
     // An event someone else made is theirs to change. One that repeats
     // cannot be changed here yet.
@@ -191,6 +200,25 @@ fun EventView(vm: TockViewModel, ui: Ui, page: Page.View) {
                 )
             }
             if (more != null) {
+                // An invitation from someone else can be answered here.
+                if (more.me != null && !more.mine && canDelete) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Your answer", style = MaterialTheme.typography.titleSmall, color = dim)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            for ((status, label) in ANSWERS) {
+                                FilterChip(
+                                    selected = more.answer == status,
+                                    onClick = {
+                                        if (status != more.answer) {
+                                            if (s.repeats) answering = status else vm.answer(s, more, status, one = false)
+                                        }
+                                    },
+                                    label = { Text(label) },
+                                )
+                            }
+                        }
+                    }
+                }
                 for (minutes in more.reminders) {
                     Text("Reminder: ${remindText(minutes).lowercase()}", style = MaterialTheme.typography.bodyMedium, color = dim)
                 }
@@ -221,6 +249,28 @@ fun EventView(vm: TockViewModel, ui: Ui, page: Page.View) {
                 }
             }
         }
+    }
+
+    answering?.let { status ->
+        AlertDialog(
+            onDismissRequest = { answering = null },
+            title = { Text("The meeting repeats") },
+            confirmButton = {
+                TextButton(onClick = {
+                    answering = null
+                    more?.let { vm.answer(s, it, status, one = true) }
+                }) { Text("Only this time") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        answering = null
+                        more?.let { vm.answer(s, it, status, one = false) }
+                    }) { Text("Every time") }
+                    TextButton(onClick = { answering = null }) { Text("Cancel") }
+                }
+            },
+        )
     }
 
     if (asking) {
