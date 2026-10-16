@@ -285,7 +285,7 @@ class ClockWidget : AppWidgetProvider() {
                 ring.color = when (hour) {
                     DialHour.RAIN -> 0xFF3D9BFF
                     DialHour.CLOUD -> 0xFF8E8E8E
-                    DialHour.PARTLY -> 0xFFF8FA6E
+                    DialHour.PARTLY -> 0xFFFAFB96
                     // Halfway between the sunrise and sunset icons.
                     DialHour.SUN -> 0xFFF0C020
                     DialHour.UNKNOWN -> return@forEachIndexed
