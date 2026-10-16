@@ -743,8 +743,11 @@ fn agreement(cells: &[Option<SourceDay>]) -> (Agreement, String) {
     };
     // A light breeze against a calm is no disagreement worth a mark.
     let wind = if w_hi >= 8.0 && w_hi - w_lo >= 4.0 { 1 } else { 0 };
+    // A clear or fair sky against a cloudy one.
+    let (s_lo, s_hi) = span(|d| cloud_rank(d.sky));
+    let sky = if s_lo <= 1.0 && s_hi >= 3.0 { 1 } else { 0 };
 
-    let level = match temp + rain + wind {
+    let level = match temp + rain + wind + sky {
         0 => Agreement::Agree,
         1 | 2 => Agreement::Mixed,
         _ => Agreement::Split,
@@ -756,6 +759,8 @@ fn agreement(cells: &[Option<SourceDay>]) -> (Agreement, String) {
         format!("Top temperature: {}° to {}°", t_lo.round() as i64, t_hi.round() as i64)
     } else if wind > 0 {
         format!("Wind: {} to {} m/s", w_lo.round() as i64, w_hi.round() as i64)
+    } else if sky > 0 {
+        format!("Sky: {} to cloudy", if s_lo == 0.0 { "clear" } else { "fair" })
     } else {
         String::new()
     };
@@ -1205,7 +1210,7 @@ pub enum DialHour {
 /// symbol, or an amount it prints. So the ring is never dry for an hour
 /// that has rain in the app. A dry hour is cloud when the sources together
 /// say more than "partly cloudy", and partly cloudy when they say more than
-/// "fair".
+/// "fair" or one of them says cloud.
 #[uniffi::export]
 pub fn outside_dial(
     yr: Option<String>,
@@ -1228,12 +1233,13 @@ pub fn outside_dial(
         // The hour going on is judged from now: the forecast may not
         // reach back to its start.
         let at = start.max(now);
-        let (mut n, mut rain, mut cloud) = (0.0, false, 0.0);
+        let (mut n, mut rain, mut cloud, mut most) = (0.0, false, 0.0, 0.0_f64);
         for steps in &sources {
             if let Some(s) = steps.iter().find(|s| s.epoch <= at && at < s.epoch + s.hours as i64 * 3600) {
                 n += 1.0;
                 rain |= is_wet(s.sky) || s.rain >= PRINTED_MM;
                 cloud += cloud_rank(s.sky);
+                most = most.max(cloud_rank(s.sky));
             }
         }
         if n == 0.0 {
@@ -1243,7 +1249,7 @@ pub fn outside_dial(
             DialHour::Rain
         } else if cloud / n > 2.0 {
             DialHour::Cloud
-        } else if cloud / n > 1.0 {
+        } else if cloud / n > 1.0 || most >= 3.0 {
             DialHour::Partly
         } else {
             DialHour::Sun
@@ -1555,6 +1561,12 @@ mod tests {
         assert_eq!((level, note.as_str()), (Agreement::Mixed, "Wind: 3 to 9 m/s"));
         let snow = Some(SourceDay { sky: Sky::Snow, ..day(-2.0, 9.0, 3.0).unwrap() });
         assert_eq!(agreement(&[day(-2.0, 0.0, 3.0), snow, None]).1, "Rain or snow: 0 to 9.0 mm");
+        // From a report: Yr and GFS a clear day, Storm a cloudy one, and
+        // the row said the forecasts agree.
+        let sky = |sky: Sky| Some(SourceDay { sky, ..day(6.0, 0.0, 3.0).unwrap() });
+        let (level, note) = agreement(&[sky(Sky::Clear), sky(Sky::Cloudy), sky(Sky::Clear)]);
+        assert_eq!((level, note.as_str()), (Agreement::Mixed, "Sky: clear to cloudy"));
+        assert_eq!(agreement(&[sky(Sky::Fair), sky(Sky::PartlyCloudy), None]).0, Agreement::Agree);
     }
 
     #[test]
@@ -1676,6 +1688,10 @@ mod tests {
         assert_eq!(hour3(yr("cloudy", 0.0), storm("CLOUDY", 0.0), gfs(3)), DialHour::Cloud);
         // The hours before it have only GFS, overcast and dry.
         assert_eq!(outside_dial(None, None, Some(gfs(61)), OSLO, now)[..3], [DialHour::Cloud; 3]);
+        // From a report: Storm a cloud, Yr and GFS a clear night, and the
+        // ring was sun. One cloud makes the hour partly cloudy.
+        assert_eq!(hour3(yr("clearsky_night", 0.0), storm("CLOUDY", 0.0), gfs(0)), DialHour::Partly);
+        assert_eq!(hour3(yr("fair_night", 0.0), storm("CLOUDY_LIGHT", 0.0), gfs(1)), DialHour::Sun);
     }
 
     /// How much of the disc an outline covers, 0 to 100, and whether the

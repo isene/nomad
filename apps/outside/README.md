@@ -29,7 +29,8 @@ A clock for the home screen, one row tall and the full width.
 - Middle: an analog clock. Its ring shows the weather of the next twelve
   hours, one stretch between two ticks for each hour: blue for rain, grey
   for cloud, light yellow for partly cloudy, amber for sun. An hour is
-  blue when one of the forecasts shows rain for it in the app. Small
+  blue when one of the forecasts shows rain for it in the app, and at
+  least light yellow when one shows cloud. Small
   icons on the rim mark sunrise and sunset. An icon inside the ring marks
   the next alarm: green when the alarm rings within twelve hours, grey
   when it rings later.
