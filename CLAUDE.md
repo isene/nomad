@@ -161,9 +161,6 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `bookmarks`, and `tabs/to-phone/`, `tabs/to-laptop/` (one file per tab,
   URL, a tab, the title). Both sides read a changed file again before
   they write it, so neither loses the other's login or bookmark.
-- The WebView sits in Compose (`AndroidView`). `PageView` asks for focus
-  on every touch down; without it a field on a page (Reddit's login,
-  2026-10-17) showed no keyboard. Untested on a phone when added.
 - `core/src/gaze.rs` holds the formats, the ad list and the suggestions.
   "Ask Claude" shares the page's text to the Claude app
   (`com.anthropic.claude`), so the user's own plan answers and no API key
