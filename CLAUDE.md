@@ -365,6 +365,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
   (through `AndroidView`), so text can be marked and copied. Keep it:
   Compose's `SelectionContainer` over a list of lines copies them with no
   line ends between, and forgets the lines that scrolled away.
+- The whole-phone views (Audio, Videos, Documents) ask Android's media
+  index (`MediaStore.Files`, by `MEDIA_TYPE`) when opened, and never walk
+  the disk. Paths with a hidden folder in them are left out.
 - Search inside files (`pointer_grep`) reads text files up to 8 MiB and
   only when the user asks. Video thumbnails come from `coil-video`, one
   frame per visible row.

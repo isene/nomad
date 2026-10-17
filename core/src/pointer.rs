@@ -174,6 +174,13 @@ fn kind_of(name: &str, is_dir: bool) -> Kind {
     }
 }
 
+/// The kind of a file by its name, for a file the phone's media index
+/// found rather than a listing.
+#[uniffi::export]
+pub fn pointer_kind(name: String) -> Kind {
+    kind_of(&name, false)
+}
+
 /// "0 B", "999 B", "1.4 KB", "12 MB".
 #[uniffi::export]
 pub fn pointer_size_text(bytes: u64) -> String {
@@ -1827,6 +1834,8 @@ mod tests {
         assert_eq!(kind_of("a.tar.GZ", false), Kind::Archive);
         assert_eq!(kind_of(".bashrc", false), Kind::Other);
         assert_eq!(kind_of("photos.jpg", true), Kind::Dir);
+        assert_eq!(pointer_kind("Take 1.MP3".into()), Kind::Audio);
+        assert_eq!(pointer_kind("notes.pdf".into()), Kind::Pdf);
         fs::remove_dir_all(dir).unwrap();
     }
 

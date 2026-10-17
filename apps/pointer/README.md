@@ -36,7 +36,12 @@ taken back.
   videos show what is in them right in the list.
 - **Places.** The phone's storage and the SD card with their free space,
   the folders Syncthing shares, and the folders you last worked in. The
-  star on a row marks that place.
+  star on a row marks that place. *Phone* opens the top of the storage,
+  with every folder in it.
+- **The whole phone.** *Audio*, *Videos* and *Documents* in Places list
+  every such file on the phone, newest first, whatever folder it is in.
+  Your voice recordings are under *Audio*. The folder button beside a
+  file walks to the folder it is in.
 - Sort by name, size, date or kind; show hidden files; see the size of
   a folder with all in it; share files to any app.
 

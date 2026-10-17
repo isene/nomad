@@ -3,8 +3,10 @@ package com.isene.pointer
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.isene.pointer.data.Gather
 import com.isene.pointer.data.Store
 import com.isene.pointer.data.Volume
+import com.isene.pointer.data.gather
 import com.isene.pointer.data.volumes
 import java.io.File
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +54,10 @@ data class Running(val label: String, val done: Long = 0, val total: Long = 0)
 /** One line for the bar at the bottom of the screen; `id` makes each new. */
 data class Notice(val id: Long, val text: String, val canUndo: Boolean)
 
+/** A whole-phone view: every file of one kind; `entries` is null while
+ *  Android's index is asked. */
+data class Gathered(val title: String, val entries: List<Entry>?)
+
 /** The "how much is in here" box; `text` is empty while it counts. */
 data class Sizing(val title: String, val text: String)
 
@@ -92,6 +98,8 @@ data class UiState(
     val synced: List<String> = emptyList(),
     /** The trash, when its screen is open. */
     val trash: List<Trashed>? = null,
+    /** A whole-phone view, when its screen is open. */
+    val gathered: Gathered? = null,
     /** The picture or text file on screen. */
     val viewing: Entry? = null,
     val text: String = "",
@@ -268,6 +276,7 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
         val s = _ui.value
         when {
             s.viewing != null -> closeView()
+            s.gathered != null -> _ui.update { it.copy(gathered = null) }
             s.trash != null -> _ui.update { it.copy(trash = null) }
             s.filter != null -> closeSearch()
             trail.isNotEmpty() -> list(trail.removeLast())
@@ -588,6 +597,23 @@ class PointerViewModel(app: Application) : AndroidViewModel(app) {
             }
             _ui.update { it.copy(volumes = vols, synced = synced) }
         }
+    }
+
+    /** Open a whole-phone view. Asked fresh each time, so it is never stale. */
+    fun gather(what: Gather) {
+        _ui.update { it.copy(gathered = Gathered(what.title, null)) }
+        viewModelScope.launch {
+            val found = withContext(Dispatchers.IO) {
+                runCatching { gather(getApplication(), what) }.getOrDefault(emptyList())
+            }
+            _ui.update { if (it.gathered?.title == what.title) it.copy(gathered = Gathered(what.title, found)) else it }
+        }
+    }
+
+    /** Leave a whole-phone view for the folder a file is in. */
+    fun showFolder(entry: Entry) {
+        _ui.update { it.copy(gathered = null) }
+        File(entry.path).parent?.let(::go)
     }
 
     /** Mark a folder, or take its mark away. With no path, the folder on
