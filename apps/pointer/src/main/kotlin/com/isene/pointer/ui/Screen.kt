@@ -142,12 +142,14 @@ import coil.compose.AsyncImage
 import coil.memory.MemoryCache
 import coil.request.ImageRequest
 import coil.request.videoFrameMillis
+import com.isene.pointer.Gathered
 import com.isene.pointer.PointerViewModel
 import com.isene.pointer.Running
 import com.isene.pointer.SEARCH_MAX
 import com.isene.pointer.Sizing
 import com.isene.pointer.TEXT_MAX
 import com.isene.pointer.UiState
+import com.isene.pointer.data.Gather
 import com.isene.pointer.data.Hand
 import com.isene.pointer.data.Volume
 import java.io.File
@@ -248,6 +250,7 @@ fun PointerScreen(vm: PointerViewModel) {
         ) { pad -> Listing(s, shown, query, vm, open, Modifier.padding(pad)) }
 
         s.trash?.let { TrashScreen(it, s.running != null, snack, vm) }
+        s.gathered?.let { g -> GatherScreen(g, s, vm) { e -> if (!vm.view(e)) hand(e) } }
         s.viewing?.let { entry ->
             if (entry.kind == Kind.IMAGE) Pictures(entry, shown, vm, ctx) else TextView(entry, s.text, vm, ctx)
         }
@@ -257,6 +260,7 @@ fun PointerScreen(vm: PointerViewModel) {
         PlaceSheet(
             s,
             onGo = { places = false; vm.go(it) },
+            onGather = { places = false; vm.gather(it) },
             onMark = { vm.toggleMark(it) },
             onTrash = { places = false; vm.openTrash() },
             onDismiss = { places = false },
@@ -839,6 +843,7 @@ private fun TagBar(s: UiState, vm: PointerViewModel, ctx: Context, onRename: (St
 private fun PlaceSheet(
     s: UiState,
     onGo: (String) -> Unit,
+    onGather: (Gather) -> Unit,
     onMark: (String) -> Unit,
     onTrash: () -> Unit,
     onDismiss: () -> Unit,
@@ -850,6 +855,8 @@ private fun PlaceSheet(
             items(s.volumes) { v ->
                 PlaceRow(Icons.Outlined.PhoneAndroid, v.name, v.space, v.path in marked, { onMark(v.path) }) { onGo(v.path) }
             }
+            item { Section("Whole phone") }
+            items(GATHERS) { (g, icon, detail) -> PlaceRow(icon, g.title, detail) { onGather(g) } }
             if (s.synced.isNotEmpty()) {
                 item { Section("Synced folders") }
                 items(s.synced) { p ->
@@ -865,6 +872,64 @@ private fun PlaceSheet(
             item {
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 PlaceRow(Icons.Outlined.Delete, "Trash", "Deleted items wait here until you empty it", onClick = onTrash)
+            }
+        }
+    }
+}
+
+/** The whole-phone views in the places sheet. */
+private val GATHERS = listOf(
+    Triple(Gather.AUDIO, Icons.Outlined.MusicNote, "Every sound file, recordings too"),
+    Triple(Gather.VIDEOS, Icons.Outlined.Movie, "Every video, in any folder"),
+    Triple(Gather.DOCUMENTS, Icons.Outlined.Description, "Every PDF, text and office file"),
+)
+
+/** Every file of one kind on the phone, newest first. A tap opens a file,
+ *  a long press tags it for a copy or move, the folder button walks to the
+ *  folder it is in. */
+@Composable
+private fun GatherScreen(g: Gathered, s: UiState, vm: PointerViewModel, onOpen: (Entry) -> Unit) {
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(g.title) },
+                navigationIcon = {
+                    IconButton(onClick = { vm.back() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                },
+                actions = {
+                    if (s.tagged.isNotEmpty()) {
+                        Text("${s.tagged.size} tagged", Modifier.padding(end = 16.dp), style = MaterialTheme.typography.labelLarge)
+                    }
+                },
+            )
+        },
+    ) { pad ->
+        val found = g.entries
+        LazyColumn(Modifier.padding(pad).fillMaxSize()) {
+            item(key = "note") {
+                Message(
+                    when {
+                        found == null -> "Looking through the phone"
+                        found.isEmpty() -> "None on the phone"
+                        else -> "${found.size} on the phone, newest first"
+                    },
+                )
+            }
+            items(found.orEmpty(), key = { it.path }) { e ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) {
+                        EntryRow(
+                            e,
+                            tagged = e.path in s.tagged,
+                            thumb = true,
+                            detail = listOf(short(File(e.path).parent.orEmpty(), s.volumes), e.sizeText, stamp(e.modified))
+                                .filter { it.isNotEmpty() }.joinToString(" · "),
+                            onOpen = { onOpen(e) },
+                            onTag = { vm.toggleTag(e.path) },
+                        )
+                    }
+                    IconButton(onClick = { vm.showFolder(e) }) { Icon(Icons.Filled.Folder, "Show it in its folder") }
+                }
             }
         }
     }

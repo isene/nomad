@@ -5,15 +5,19 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.os.storage.StorageManager
+import android.provider.MediaStore
+import android.provider.MediaStore.Files.FileColumns
 import android.provider.Settings
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import java.io.File
+import uniffi.fe2o3_mobile_core.Entry
 import uniffi.fe2o3_mobile_core.Kind
 import uniffi.fe2o3_mobile_core.Mark
 import uniffi.fe2o3_mobile_core.SortBy
 import uniffi.fe2o3_mobile_core.pointerMarksParse
 import uniffi.fe2o3_mobile_core.pointerMarksText
+import uniffi.fe2o3_mobile_core.pointerKind
 import uniffi.fe2o3_mobile_core.pointerRecentPush
 import uniffi.fe2o3_mobile_core.pointerSizeText
 
@@ -29,6 +33,36 @@ fun volumes(ctx: Context): List<Volume> {
     if (found.isNotEmpty()) return found
     val dir = Environment.getExternalStorageDirectory()
     return listOf(Volume("Phone", dir.path, space(dir)))
+}
+
+/** The whole-phone views: every file of one kind, whatever folder it is in. */
+enum class Gather(val title: String, val type: Int) {
+    AUDIO("Audio", FileColumns.MEDIA_TYPE_AUDIO),
+    VIDEOS("Videos", FileColumns.MEDIA_TYPE_VIDEO),
+    DOCUMENTS("Documents", FileColumns.MEDIA_TYPE_DOCUMENT),
+}
+
+/** Every file of one kind on the phone and its cards, newest first. Android
+ *  keeps this index itself, so no folder is walked. Files in hidden folders
+ *  (the trash among them) are left out, as a listing leaves them out. */
+fun gather(ctx: Context, what: Gather): List<Entry> {
+    val out = ArrayList<Entry>()
+    ctx.contentResolver.query(
+        MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL),
+        arrayOf(FileColumns.DATA, FileColumns.SIZE, FileColumns.DATE_MODIFIED),
+        "${FileColumns.MEDIA_TYPE} = ?",
+        arrayOf(what.type.toString()),
+        "${FileColumns.DATE_MODIFIED} DESC",
+    )?.use { c ->
+        while (c.moveToNext()) {
+            val path = c.getString(0) ?: continue
+            if ("/." in path) continue
+            val name = File(path).name
+            val size = c.getLong(1).coerceAtLeast(0).toULong()
+            out += Entry(name, path, pointerKind(name), size, pointerSizeText(size), c.getLong(2), false, 0u, "")
+        }
+    }
+    return out
 }
 
 private fun space(dir: File): String =
