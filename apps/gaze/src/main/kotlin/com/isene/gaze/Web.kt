@@ -106,6 +106,10 @@ class PageView(private val a: MainActivity, private val tab: Tab) : WebView(a) {
     override fun onTouchEvent(e: MotionEvent): Boolean {
         when (e.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                // A finger on the page takes the keyboard's focus. Compose,
+                // which holds this view, can keep the focus itself, and then
+                // a field in the page shows no keyboard and takes no typing.
+                if (!hasFocus()) requestFocus()
                 atTop = scrollY == 0
                 past = false
                 from = -1f
