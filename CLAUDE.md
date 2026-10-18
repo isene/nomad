@@ -393,6 +393,14 @@ when building the core. Same rule as the rest of Fe₂O₃.
   service may lie over the button bar, and that is the one reason
   `EdgeService` is one. It must go on asking for no events and no window
   content (`res/xml/edge_service.xml`).
+- Bank apps refuse to run while an accessibility service is on (his
+  bank app ran once he turned OnePage's off). An app marked "Swipe off
+  while it runs" in the panel's edit menu (`Prefs.quiet`) starts with
+  `EdgeService` turned off in Android's list, and `HomeActivity.onStart`
+  turns it on again (`Prefs.edgePaused`). Turning it on and off needs
+  WRITE_SECURE_SETTINGS, granted once over adb. Turning the component
+  off instead would not do: Android then takes the service out of its
+  list for good (`updateServicesLocked` in AccessibilityManagerService).
 - The panel's file is `filesDir/panel.json`. Its format and every edit
   (put, swap, add, folders, the shortcut list for Android) are in
   `core/src/onepage.rs`, with tests. Kotlin draws and starts things.

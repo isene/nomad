@@ -15,6 +15,8 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.RippleDrawable
 import android.net.Uri
+import android.os.Handler
+import android.os.Looper
 import android.os.Process
 import android.provider.Settings
 import android.text.InputType
@@ -82,6 +84,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private val launcher: LauncherApps = context.getSystemService(LauncherApps::class.java)
     private val me = Process.myUserHandle()
+    private val main = Handler(Looper.getMainLooper())
 
     /** How many icons wide the panel is, and how wide one slot is. Both
      *  follow from where the panel is (see [settle]). */
@@ -317,8 +320,11 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
                     if (!edit) start(target)
                     else menu(
                         anchor,
-                        Choice("Out to the panel") { outOfFolder(at, n) },
-                        Choice("Remove") { dropFromFolder(at, n) },
+                        *listOfNotNull(
+                            Choice("Out to the panel") { outOfFolder(at, n) },
+                            quietChoice(target),
+                            Choice("Remove") { dropFromFolder(at, n) },
+                        ).toTypedArray(),
                     )
                 }
                 v.setOnLongClickListener {
@@ -544,7 +550,14 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
                     else confirm("Remove the folder ${slot.name} with the ${slot.items.size} in it?") { remove(i) }
                 },
             )
-            edit -> menu(v, Choice("Move") { move(i) }, Choice("Remove") { remove(i) })
+            edit -> menu(
+                v,
+                *listOfNotNull(
+                    Choice("Move") { move(i) },
+                    quietChoice((slot as? Slot.One)?.target),
+                    Choice("Remove") { remove(i) },
+                ).toTypedArray(),
+            )
             slot is Slot.One -> start(slot.target)
             slot is Slot.Folder -> open(i)
         }
@@ -640,8 +653,11 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
     private fun start(target: Target) {
         try {
             when (target) {
-                is Target.App ->
-                    launcher.startMainActivity(ComponentName.unflattenFromString(target.component), me, null, null)
+                is Target.App -> {
+                    val app = ComponentName.unflattenFromString(target.component)
+                    if (app != null && turnedOffFor(app.packageName)) startOnceOff(app, 40)
+                    else launcher.startMainActivity(app, me, null, null)
+                }
                 is Target.Shortcut -> launcher.startShortcut(target.pkg, target.id, null, null, me)
                 is Target.Call -> {
                     // With no leave to call, the dialler opens with the number in it.
@@ -656,6 +672,43 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
             close()
         } catch (_: Exception) {
             say("That one is gone from the phone. Hold the panel to remove it.")
+        }
+    }
+
+    /** An app marked in its menu starts with the swipe strip's service
+     *  off. The home page turns it on again. */
+    private fun turnedOffFor(pkg: String): Boolean {
+        if (!EdgeService.on || pkg !in Prefs.quiet(context) || !EdgeService.turn(context, false)) return false
+        Prefs.setEdgePaused(context, true)
+        return true
+    }
+
+    /** Android lets go of the service a moment after it is turned off. The
+     *  app starts once it has, or after a second. */
+    private fun startOnceOff(app: ComponentName, tries: Int) {
+        if (EdgeService.on && tries > 0) {
+            main.postDelayed({ startOnceOff(app, tries - 1) }, 25)
+            return
+        }
+        try {
+            launcher.startMainActivity(app, me, null, null)
+        } catch (_: Exception) {
+        }
+    }
+
+    /** For an app: whether it starts with the swipe strip off, for an app
+     *  that refuses to run beside an accessibility service. */
+    private fun quietChoice(target: Target?): Choice? {
+        val pkg = (target as? Target.App)?.let { ComponentName.unflattenFromString(it.component)?.packageName }
+            ?: return null
+        if (pkg in Prefs.quiet(context)) return Choice("Keep swipe on in it") { Prefs.setQuiet(context, pkg, false) }
+        return Choice("Swipe off while it runs") {
+            Prefs.setQuiet(context, pkg, true)
+            if (!EdgeService.mayTurn(context)) tell(
+                "OnePage needs leave to turn its swipe off and on. Give it once from a computer, " +
+                    "with USB debugging on:\n\nadb shell pm grant ${context.packageName} " +
+                    "android.permission.WRITE_SECURE_SETTINGS",
+            )
         }
     }
 
@@ -735,6 +788,10 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
             keyboard = true,
         )
     }
+
+    private fun tell(what: String) = show(
+        AlertDialog.Builder(context).setMessage(what).setPositiveButton("OK", null).create(),
+    )
 
     private fun confirm(question: String, then: () -> Unit) = show(
         AlertDialog.Builder(context)

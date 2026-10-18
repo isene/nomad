@@ -1,8 +1,13 @@
 package com.isene.onepage
 
+import android.Manifest
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
+import android.content.ComponentName
+import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.PixelFormat
+import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -21,6 +26,10 @@ import kotlin.math.roundToInt
  *
  * Off until the user turns it on under Accessibility. While on it costs
  * one window nothing is drawn in, and it runs code only when touched.
+ *
+ * Some apps, bank apps above all, refuse to run while any accessibility
+ * service is on. An app marked for that in the panel starts with this one
+ * off, and the home page turns it on again ([turn]).
  */
 class EdgeService : AccessibilityService() {
 
@@ -107,5 +116,31 @@ class EdgeService : AccessibilityService() {
         @Volatile
         var on = false
             private set
+
+        /** Whether OnePage may turn this service off and on by itself. */
+        fun mayTurn(c: Context): Boolean =
+            c.checkSelfPermission(Manifest.permission.WRITE_SECURE_SETTINGS) == PackageManager.PERMISSION_GRANTED
+
+        /** Turn this service on or off in Android's own list, as the switch
+         *  under Accessibility does. False when OnePage may not. */
+        fun turn(c: Context, want: Boolean): Boolean = try {
+            val r = c.contentResolver
+            val key = Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+            val me = ComponentName(c, EdgeService::class.java)
+            Settings.Secure.putString(r, key, listed(Settings.Secure.getString(r, key), me, want))
+            if (want) Settings.Secure.putInt(r, Settings.Secure.ACCESSIBILITY_ENABLED, 1)
+            true
+        } catch (_: Exception) {
+            false
+        }
+
+        /** Android's list of services that are on, "pkg/class:pkg/class",
+         *  with [me] in it once when [want] and not at all otherwise. The
+         *  other services in it stay as they are. */
+        fun listed(list: String?, me: ComponentName, want: Boolean): String {
+            val rest = list.orEmpty().split(':')
+                .filter { it.isNotBlank() && ComponentName.unflattenFromString(it) != me }
+            return (if (want) rest + me.flattenToString() else rest).joinToString(":")
+        }
     }
 }

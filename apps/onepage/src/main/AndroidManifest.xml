@@ -7,6 +7,14 @@
          apps" allowlist and can't be brought back over a fullscreen app. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
+    <!-- Lets OnePage switch its own accessibility service (EdgeService) off
+         while an app runs that refuses to run beside one, such as a bank
+         app, and on again after. Only given from a computer, once:
+         adb shell pm grant com.isene.onepage android.permission.WRITE_SECURE_SETTINGS -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
+
     <!-- An icon in the app panel that calls a number. Both are asked for
          when the user adds the first such icon, and both may be refused:
          with no CALL_PHONE a tap opens the dialler with the number in it,

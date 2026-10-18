@@ -7,6 +7,8 @@ object Prefs {
     private const val KEY_SETUP_DONE = "setup_done"
     private const val KEY_HOME_BUTTON = "home_button"
     private const val KEY_PANEL_PLACE = "panel_place"
+    private const val KEY_QUIET = "quiet_apps"
+    private const val KEY_EDGE_PAUSED = "edge_paused"
 
     fun setupDone(c: Context): Boolean =
         c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_SETUP_DONE, false)
@@ -35,5 +37,27 @@ object Prefs {
     fun setPanelPlace(c: Context, v: String) {
         c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putString(KEY_PANEL_PLACE, v).apply()
+    }
+
+    /** The apps, by package, that start with the swipe strip's service
+     *  off: apps that refuse to run beside an accessibility service. */
+    fun quiet(c: Context): Set<String> =
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getStringSet(KEY_QUIET, null) ?: emptySet()
+
+    fun setQuiet(c: Context, pkg: String, v: Boolean) {
+        val next = quiet(c).toMutableSet()
+        if (v) next.add(pkg) else next.remove(pkg)
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putStringSet(KEY_QUIET, next).apply()
+    }
+
+    /** True from the moment OnePage switched its service off for such an
+     *  app until the home page switched it on again. */
+    fun edgePaused(c: Context): Boolean =
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_EDGE_PAUSED, false)
+
+    fun setEdgePaused(c: Context, v: Boolean) {
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_EDGE_PAUSED, v).apply()
     }
 }
