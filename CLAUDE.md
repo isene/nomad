@@ -398,7 +398,8 @@ when building the core. Same rule as the rest of Fe₂O₃.
   while it runs" in the panel's edit menu (`Prefs.quiet`) starts with
   `EdgeService` turned off in Android's list, and `HomeActivity.onStart`
   turns it on again (`Prefs.edgePaused`). Turning it on and off needs
-  WRITE_SECURE_SETTINGS, granted once over adb. Turning the component
+  WRITE_SECURE_SETTINGS, granted once with `adb install -r -g` (ColorOS
+  16 refuses `pm grant` and has no "Disable permission monitoring"). Turning the component
   off instead would not do: Android then takes the service out of its
   list for good (`updateServicesLocked` in AccessibilityManagerService).
 - The panel's file is `filesDir/panel.json`. Its format and every edit

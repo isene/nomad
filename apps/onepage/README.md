@@ -166,8 +166,10 @@ can say no to both.
    service is on. Hold the panel, tap such an app and choose **Swipe off while
    it runs**: it then starts with the swipe off, and the home page turns the
    swipe on again. OnePage may do that only after one step from a computer,
-   with USB debugging on:
-   `adb shell pm grant com.isene.onepage android.permission.WRITE_SECURE_SETTINGS`
+   with USB debugging on, install it again with all its permissions:
+   `adb install -r -g onepage.apk`. On stock Android this works too:
+   `adb shell pm grant com.isene.onepage android.permission.WRITE_SECURE_SETTINGS`,
+   but ColorOS 16 refuses it.
 
 > On ColorOS/OxygenOS the hardware/3-button Home action into third-party
 > launchers is an OEM bug with no real fix. The floating pill is the reliable

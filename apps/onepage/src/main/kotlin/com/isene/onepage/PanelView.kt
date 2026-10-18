@@ -706,8 +706,8 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
             Prefs.setQuiet(context, pkg, true)
             if (!EdgeService.mayTurn(context)) tell(
                 "OnePage needs leave to turn its swipe off and on. Give it once from a computer, " +
-                    "with USB debugging on:\n\nadb shell pm grant ${context.packageName} " +
-                    "android.permission.WRITE_SECURE_SETTINGS",
+                    "with USB debugging on, by installing OnePage again with all its permissions:" +
+                    "\n\nadb install -r -g onepage.apk",
             )
         }
     }

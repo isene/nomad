@@ -10,7 +10,7 @@
     <!-- Lets OnePage switch its own accessibility service (EdgeService) off
          while an app runs that refuses to run beside one, such as a bank
          app, and on again after. Only given from a computer, once:
-         adb shell pm grant com.isene.onepage android.permission.WRITE_SECURE_SETTINGS -->
+         adb install -r -g onepage.apk (ColorOS 16 refuses pm grant). -->
     <uses-permission
         android:name="android.permission.WRITE_SECURE_SETTINGS"
         tools:ignore="ProtectedPermissions" />
