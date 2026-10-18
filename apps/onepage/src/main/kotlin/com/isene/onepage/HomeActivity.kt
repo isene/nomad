@@ -98,6 +98,8 @@ class HomeActivity : Activity() {
         // Idempotent: it returns at once when already listening, which is
         // the normal case — see onStop.
         if (::host.isInitialized) host.startListening()
+        // Back from an app that started with the swipe strip off.
+        if (Prefs.edgePaused(this) && EdgeService.turn(this, true)) Prefs.setEdgePaused(this, false)
     }
 
     override fun onStop() {

@@ -162,6 +162,12 @@ can say no to both.
    Android refuses this the first time for an app installed from a file. After
    that refusal, open App info for OnePage, tap ⋮, choose **Allow restricted
    settings**, and switch it on again.
+7. Some apps, bank apps above all, refuse to run while an accessibility
+   service is on. Hold the panel, tap such an app and choose **Swipe off while
+   it runs**: it then starts with the swipe off, and the home page turns the
+   swipe on again. OnePage may do that only after one step from a computer,
+   with USB debugging on:
+   `adb shell pm grant com.isene.onepage android.permission.WRITE_SECURE_SETTINGS`
 
 > On ColorOS/OxygenOS the hardware/3-button Home action into third-party
 > launchers is an OEM bug with no real fix. The floating pill is the reliable
