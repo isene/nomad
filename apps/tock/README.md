@@ -15,8 +15,8 @@ phone twin of [tock](https://github.com/isene/tock).
 - New events, changes and deletes go to the phone's calendar store, and
   the account syncs them. A new event can repeat: every day, weekday,
   week, two weeks, month or year, with an end day or none. A repeating
-  event can be deleted, one time or every time. Changing one is not built
-  yet.
+  event can be deleted, one time or every time. A change to one is a
+  change to that time alone.
 - Teams meeting: a switch on a new event hands its title, times and notes
   to the Teams app, which makes the meeting in the work calendar.
 - Reminders come as notifications, from the alarms the phone's calendar

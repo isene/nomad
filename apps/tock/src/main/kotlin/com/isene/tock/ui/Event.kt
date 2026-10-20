@@ -149,9 +149,9 @@ fun EventView(vm: TockViewModel, ui: Ui, page: Page.View) {
     // The answer waiting for "this time or every time" on a repeating event.
     var answering by remember { mutableStateOf<Int?>(null) }
     val canDelete = cal?.writable == true
-    // An event someone else made is theirs to change. One that repeats
-    // cannot be changed here yet.
-    val canEdit = canDelete && more?.mine == true && !s.repeats
+    // An event someone else made is theirs to change. Of one that repeats,
+    // this time alone is changed.
+    val canEdit = canDelete && more?.mine == true
 
     Scaffold(
         topBar = {
@@ -343,7 +343,7 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (first.id == null) "New event" else "Change event") },
+                title = { Text(if (first.id == null) "New event" else if (first.instance != null) "Change this time" else "Change event") },
                 navigationIcon = { IconButton(onClick = { vm.back() }) { Icon(Icons.Default.Close, "Cancel") } },
                 actions = {
                     TextButton(onClick = {
