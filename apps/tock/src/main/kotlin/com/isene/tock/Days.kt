@@ -174,6 +174,46 @@ fun rrule(d: Draft, zone: ZoneId): String? {
     return "$rule;UNTIL=$last"
 }
 
+private val WEEK = listOf("MO", "TU", "WE", "TH", "FR", "SA", "SU")
+
+/** A repeat rule for a series whose time moved from one day to another:
+ *  its weekdays move with it, and a single day of the month, or a single
+ *  month, becomes the new one. */
+fun ruleMoved(rule: String, from: LocalDate, to: LocalDate): String {
+    if (from == to) return rule
+    val days = Math.floorMod(ChronoUnit.DAYS.between(from, to), 7L).toInt()
+    return rule.split(';').joinToString(";") { part ->
+        val value = part.substringAfter('=')
+        when (part.substringBefore('=')) {
+            // A weekday can have a number in front, as in 2WE, the second Wednesday.
+            "BYDAY" -> "BYDAY=" + value.split(',').joinToString(",") { d ->
+                val i = WEEK.indexOf(d.takeLast(2))
+                if (i < 0) d else d.dropLast(2) + WEEK[(i + days) % 7]
+            }
+            "BYMONTHDAY" -> if (',' in value) part else "BYMONTHDAY=${to.dayOfMonth}"
+            "BYMONTH" -> if (',' in value) part else "BYMONTH=${to.monthValue}"
+            else -> part
+        }
+    }
+}
+
+/** A repeat rule cut to end before `begin`, in ms. The times before it
+ *  stay; an end the rule had is replaced. */
+fun ruleUntil(rule: String, begin: Long, allDay: Boolean): String {
+    val last = Instant.ofEpochMilli(begin - 1000).atZone(ZoneOffset.UTC)
+    val until = if (allDay) last.toLocalDate().format(DateTimeFormatter.BASIC_ISO_DATE)
+    else last.format(DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'"))
+    return (rule.split(';').filter { !it.startsWith("UNTIL=") && !it.startsWith("COUNT=") } + "UNTIL=$until").joinToString(";")
+}
+
+/** True when a rule ends after a number of times. */
+fun counted(rule: String): Boolean = rule.split(';').any { it.startsWith("COUNT=") }
+
+/** A rule that ends after a number of times, less the times already gone. */
+fun ruleLeft(rule: String, gone: Int): String = rule.split(';').joinToString(";") {
+    if (it.startsWith("COUNT=")) "COUNT=${maxOf(1, (it.substringAfter('=').toIntOrNull() ?: 1) - gone)}" else it
+}
+
 /** How long each time of a repeating event lasts, as the store writes it. */
 fun duration(d: Draft): String =
     if (d.allDay) "P${ChronoUnit.DAYS.between(d.start.toLocalDate(), d.end.toLocalDate()) + 1}D"

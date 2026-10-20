@@ -487,9 +487,14 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `EVENT_REMINDER`. `Reminder` shows the notice and marks the alert as
   fired, or the store sends it again.
 - A repeating event is shown and can be deleted (one time through
-  `CONTENT_EXCEPTION_URI`, or all). A change to one changes that time
-  alone: `Draft.instance` holds its start, and `Phone.save` writes an
-  exception. Changing every time is not built.
+  `CONTENT_EXCEPTION_URI`, or all). A change is to one time
+  (`Draft.instance` holds its start; `Phone.save` writes an exception),
+  or to that time and the later ones (`Draft.later`). The later ones
+  split the series as Android's own calendar app does: the old rule gets
+  an UNTIL a second before that time (a COUNT is shared out), and one
+  batch inserts a new series with the guests. From the first time the
+  series is updated in place. Not handled, as in Android's app: a time
+  changed alone after the cut stays and shows beside the new series.
 - The phone can leave an account unfetched for hours: an Outlook
   invitation was missing for over three hours. So `resume()` asks the
   accounts to fetch (`Phone.sync`, the call "Sync now" makes), at most

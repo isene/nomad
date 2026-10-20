@@ -2,6 +2,7 @@ package com.isene.tock
 
 import android.Manifest
 import android.accounts.Account
+import android.content.ContentProviderOperation
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.ContentValues
@@ -16,6 +17,7 @@ import android.provider.CalendarContract.Events
 import android.provider.CalendarContract.Instances
 import android.provider.CalendarContract.Reminders
 import androidx.core.content.edit
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -75,6 +77,8 @@ data class Draft(
     /** When this changes one time of a repeating event alone: the start
      *  that time had, in ms. The other times stay as they are. */
     val instance: Long? = null,
+    /** With `instance`: that time and every time after it change. */
+    val later: Boolean = false,
 )
 
 /** What the user has chosen in this app: which calendars to show, and a
@@ -234,8 +238,9 @@ object Phone {
     } ?: emptyList()
 
     /** Write a new event, the changes to one, or the changes to one time
-     *  of a repeating event (`instance`). Only a new event can be made to
-     *  repeat. True when the phone took it. */
+     *  of a repeating event (`instance`), or to that time and the later
+     *  ones (`later`). Only a new event can be made to repeat. True when
+     *  the phone took it. */
     fun save(ctx: Context, d: Draft, zone: ZoneId): Boolean {
         val values = ContentValues().apply {
             put(Events.TITLE, d.title.trim())
@@ -263,6 +268,8 @@ object Phone {
         val id = if (d.id == null) {
             values.put(Events.CALENDAR_ID, d.calendarId)
             cr.insert(Events.CONTENT_URI, values)?.lastPathSegment?.toLongOrNull() ?: return false
+        } else if (d.instance != null && d.later) {
+            later(cr, d, zone, values) ?: return false
         } else if (d.instance != null) {
             // The one time becomes an event of its own, as deleteOne does.
             values.put(Events.ORIGINAL_INSTANCE_TIME, d.instance)
@@ -289,6 +296,80 @@ object Phone {
             }
         }
         return true
+    }
+
+    /** Change one time of a repeating event and every time after it, as
+     *  the phone's own calendar app does: the old series ends before that
+     *  time, and a new one with the changes and the same guests goes on
+     *  from it. From the first time the series itself changes. The id of
+     *  the event that now has that time, or null. */
+    private fun later(cr: ContentResolver, d: Draft, zone: ZoneId, values: ContentValues): Long? {
+        val series = d.id ?: return null
+        val at = d.instance ?: return null
+        val old = ContentUris.withAppendedId(Events.CONTENT_URI, series)
+        var rule = ""
+        var first = 0L
+        var allDay = false
+        cr.query(old, arrayOf(Events.RRULE, Events.DTSTART, Events.ALL_DAY), null, null, null)?.use { c ->
+            if (c.moveToFirst()) {
+                rule = c.text(0)
+                first = c.getLong(1)
+                allDay = c.getInt(2) == 1
+            }
+        }
+        if (rule.isEmpty()) return null
+        val day = Instant.ofEpochMilli(at).atZone(if (allDay) ZoneOffset.UTC else zone).toLocalDate()
+        val next = ruleMoved(rule, day, d.start.toLocalDate())
+        values.put(Events.RRULE, next)
+        values.put(Events.DURATION, duration(d))
+        values.putNull(Events.DTEND)
+        if (at <= first) return if (cr.update(old, values, null, null) > 0) series else null
+
+        // A rule that ends after so many times keeps that number in all.
+        if (counted(rule)) values.put(Events.RRULE, ruleLeft(next, gone(cr, series, first, at)))
+        values.put(Events.CALENDAR_ID, d.calendarId)
+        values.put(Events.HAS_ATTENDEE_DATA, 1)
+        // One batch, so the old series is never cut without the new one.
+        val ops = arrayListOf(
+            ContentProviderOperation.newInsert(Events.CONTENT_URI).withValues(values).build(),
+            ContentProviderOperation.newUpdate(old).withValue(Events.RRULE, ruleUntil(rule, at, allDay)).build(),
+        )
+        cr.query(
+            Attendees.CONTENT_URI,
+            arrayOf(Attendees.ATTENDEE_NAME, Attendees.ATTENDEE_EMAIL, Attendees.ATTENDEE_RELATIONSHIP, Attendees.ATTENDEE_TYPE, Attendees.ATTENDEE_STATUS),
+            "${Attendees.EVENT_ID} = ?", arrayOf(series.toString()), null,
+        )?.use { c ->
+            while (c.moveToNext()) {
+                val organizer = c.getInt(2) == Attendees.RELATIONSHIP_ORGANIZER
+                ops += ContentProviderOperation.newInsert(Attendees.CONTENT_URI)
+                    .withValue(Attendees.ATTENDEE_NAME, c.text(0))
+                    .withValue(Attendees.ATTENDEE_EMAIL, c.text(1))
+                    .withValue(Attendees.ATTENDEE_RELATIONSHIP, c.getInt(2))
+                    .withValue(Attendees.ATTENDEE_TYPE, c.getInt(3))
+                    // The guests answer the new series anew.
+                    .withValue(Attendees.ATTENDEE_STATUS, if (organizer) c.getInt(4) else Attendees.ATTENDEE_STATUS_INVITED)
+                    .withValueBackReference(Attendees.EVENT_ID, 0)
+                    .build()
+            }
+        }
+        return cr.applyBatch(CalendarContract.AUTHORITY, ops)[0].uri?.lastPathSegment?.toLongOrNull()
+    }
+
+    /** How many times a series had before `at`, counting those changed or
+     *  taken out alone, as the COUNT in its rule does. */
+    private fun gone(cr: ContentResolver, series: Long, first: Long, at: Long): Int {
+        val uri = Instances.CONTENT_URI.buildUpon().also {
+            ContentUris.appendId(it, first)
+            ContentUris.appendId(it, at - 1)
+        }.build()
+        val id = series.toString()
+        val shown = cr.query(uri, arrayOf(Instances.BEGIN), "${Instances.EVENT_ID} = ?", arrayOf(id), null)?.use { it.count } ?: 0
+        val alone = cr.query(
+            Events.CONTENT_URI, arrayOf(Events._ID),
+            "${Events.ORIGINAL_ID} = ? AND ${Events.ORIGINAL_INSTANCE_TIME} < ? AND ${Events.DELETED} = 0",
+            arrayOf(id, at.toString()), null,
+        )?.use { it.count } ?: 0
+        return shown + alone
     }
 
     /** Delete an event, every time of it when it repeats. */

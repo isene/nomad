@@ -227,15 +227,16 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Change an event. A repeating one is not offered here. */
-    fun edit(s: Showing, more: More) {
+    fun edit(s: Showing, more: More, later: Boolean = false) {
         val zone = ZoneId.systemDefault()
         val draft = Draft(
             id = s.eventId, calendarId = s.calendarId, title = s.title, allDay = s.allDay,
             start = if (s.allDay) s.firstDay(zone).atStartOfDay() else LocalDateTime.ofInstant(Instant.ofEpochMilli(s.begin), zone),
             end = if (s.allDay) s.lastDay(zone).atStartOfDay() else LocalDateTime.ofInstant(Instant.ofEpochMilli(s.end), zone),
             place = s.place, notes = more.notes, remind = more.reminders.minOrNull(),
-            // A repeating event is changed one time at a time.
-            instance = if (s.repeats) s.begin else null,
+            // A repeating event is changed from one time: that time alone,
+            // or with the later ones.
+            instance = if (s.repeats) s.begin else null, later = later,
         )
         _ui.update { it.copy(page = Page.Edit(draft)) }
     }

@@ -38,7 +38,12 @@ class AnswerOnAndroidTest {
 
         override fun query(uri: Uri, projection: Array<String>?, selection: String?, args: Array<String>?, order: String?): Cursor {
             val rows = when (uri.pathSegments.first()) {
-                "events" -> listOf(mapOf(Events.DESCRIPTION to "", Events.IS_ORGANIZER to 0, Events.OWNER_ACCOUNT to "me@example.com"))
+                "events" -> listOf(
+                    mapOf(
+                        Events.DESCRIPTION to "", Events.IS_ORGANIZER to 0, Events.OWNER_ACCOUNT to "me@example.com",
+                        Events.RRULE to "FREQ=WEEKLY;BYDAY=WE", Events.DTSTART to 1_700_000_000_000, Events.ALL_DAY to 0,
+                    ),
+                )
                 "attendees" -> listOf(
                     mapOf(
                         Attendees._ID to 7L, Attendees.ATTENDEE_NAME to "Alice", Attendees.ATTENDEE_EMAIL to "alice@example.com",
@@ -119,5 +124,31 @@ class AnswerOnAndroidTest {
         assertEquals(start.atZone(zone).toInstant().toEpochMilli(), values.getAsLong(Events.DTSTART))
         assertEquals(start.plusMinutes(45).atZone(zone).toInstant().toEpochMilli(), values.getAsLong(Events.DTEND))
         assertFalse("the series keeps its rule", values.containsKey(Events.RRULE))
+    }
+
+    @Test
+    fun this_and_later_times_go_to_a_new_series_with_the_same_guests() {
+        val zone = ZoneId.of("Europe/Oslo")
+        val at = meeting(repeats = true).begin
+        // A day later than that time was, an hour longer.
+        val start = LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(at), zone).plusDays(1)
+        val d = Draft(
+            id = 5, calendarId = 1, title = "Plans", start = start, end = start.plusHours(2),
+            remind = null, instance = at, later = true,
+        )
+        assertTrue(Phone.save(app, d, zone))
+        assertEquals(4, store.writes.size)
+        val (newUri, series) = store.writes[0]
+        assertEquals(Events.CONTENT_URI, newUri)
+        assertEquals("FREQ=WEEKLY;BYDAY=TH", series.getAsString(Events.RRULE))
+        assertEquals("P7200S", series.getAsString(Events.DURATION))
+        assertEquals(start.atZone(zone).toInstant().toEpochMilli(), series.getAsLong(Events.DTSTART))
+        val (oldUri, cut) = store.writes[1]
+        assertEquals(ContentUris.withAppendedId(Events.CONTENT_URI, 5), oldUri)
+        assertEquals(ruleUntil("FREQ=WEEKLY;BYDAY=WE", at, allDay = false), cut.getAsString(Events.RRULE))
+        val guests = store.writes.drop(2).map { it.second }
+        assertTrue(guests.all { it.getAsLong(Attendees.EVENT_ID) == 99L })
+        assertEquals(listOf("Alice", ""), guests.map { it.getAsString(Attendees.ATTENDEE_NAME) })
+        assertEquals(Attendees.ATTENDEE_STATUS_INVITED, guests[0].getAsInteger(Attendees.ATTENDEE_STATUS))
     }
 }

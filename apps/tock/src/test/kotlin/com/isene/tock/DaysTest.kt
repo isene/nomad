@@ -154,6 +154,30 @@ class DaysTest {
     }
 
     @Test
+    fun aRuleCutBeforeATimeEndsOneSecondEarlierInUtc() {
+        val at = LocalDateTime.of(2026, 10, 28, 10, 0).atZone(ZoneId.of("Europe/Oslo")).toInstant().toEpochMilli()
+        assertEquals("FREQ=WEEKLY;BYDAY=WE;UNTIL=20261028T085959Z", ruleUntil("FREQ=WEEKLY;BYDAY=WE;COUNT=20", at, allDay = false))
+        val day = LocalDate.of(2026, 10, 28).atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+        assertEquals("FREQ=YEARLY;UNTIL=20261027", ruleUntil("FREQ=YEARLY;UNTIL=20301028", day, allDay = true))
+    }
+
+    @Test
+    fun aMovedRuleTakesItsDaysAlong() {
+        val wed = LocalDate.of(2026, 10, 28)
+        assertEquals("FREQ=WEEKLY;BYDAY=TU,TH", ruleMoved("FREQ=WEEKLY;BYDAY=MO,WE", wed, wed.plusDays(1)))
+        assertEquals("FREQ=MONTHLY;BYDAY=2MO", ruleMoved("FREQ=MONTHLY;BYDAY=2SU", wed, wed.plusDays(1)))
+        assertEquals("FREQ=MONTHLY;BYMONTHDAY=2", ruleMoved("FREQ=MONTHLY;BYMONTHDAY=28", wed, wed.plusDays(5)))
+        assertEquals("FREQ=WEEKLY;BYDAY=WE", ruleMoved("FREQ=WEEKLY;BYDAY=WE", wed, wed.plusDays(7)))
+    }
+
+    @Test
+    fun aCountedRuleKeepsTheTimesLeft() {
+        assertTrue(counted("FREQ=DAILY;COUNT=10"))
+        assertFalse(counted("FREQ=DAILY;UNTIL=20261028"))
+        assertEquals("FREQ=DAILY;COUNT=7", ruleLeft("FREQ=DAILY;COUNT=10", 3))
+    }
+
+    @Test
     fun aWholeDayRepeatEndsOnADateAndLastsWholeDays() {
         val day = LocalDate.of(2026, 10, 15).atStartOfDay()
         val d = draft(day, day.plusDays(1), Repeat.YEARLY, LocalDate.of(2030, 10, 15), allDay = true)
