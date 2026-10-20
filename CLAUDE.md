@@ -487,7 +487,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `EVENT_REMINDER`. `Reminder` shows the notice and marks the alert as
   fired, or the store sends it again.
 - A repeating event is shown and can be deleted (one time through
-  `CONTENT_EXCEPTION_URI`, or all). Changing one is not built.
+  `CONTENT_EXCEPTION_URI`, or all). A change to one changes that time
+  alone: `Draft.instance` holds its start, and `Phone.save` writes an
+  exception. Changing every time is not built.
 - The phone can leave an account unfetched for hours: an Outlook
   invitation was missing for over three hours. So `resume()` asks the
   accounts to fetch (`Phone.sync`, the call "Sync now" makes), at most

@@ -72,6 +72,9 @@ data class Draft(
     val repeat: Repeat = Repeat.NEVER,
     /** The last day a repeating event happens, or null for no end. */
     val until: LocalDate? = null,
+    /** When this changes one time of a repeating event alone: the start
+     *  that time had, in ms. The other times stay as they are. */
+    val instance: Long? = null,
 )
 
 /** What the user has chosen in this app: which calendars to show, and a
@@ -230,9 +233,9 @@ object Phone {
         buildList { while (c.moveToNext()) c.getInt(0).takeIf { it >= 0 }?.let { add(it) } }
     } ?: emptyList()
 
-    /** Write a new event, or the changes to one that is not a repeating
-     *  event. Only a new event can be made to repeat. True when the phone
-     *  took it. */
+    /** Write a new event, the changes to one, or the changes to one time
+     *  of a repeating event (`instance`). Only a new event can be made to
+     *  repeat. True when the phone took it. */
     fun save(ctx: Context, d: Draft, zone: ZoneId): Boolean {
         val values = ContentValues().apply {
             put(Events.TITLE, d.title.trim())
@@ -260,6 +263,12 @@ object Phone {
         val id = if (d.id == null) {
             values.put(Events.CALENDAR_ID, d.calendarId)
             cr.insert(Events.CONTENT_URI, values)?.lastPathSegment?.toLongOrNull() ?: return false
+        } else if (d.instance != null) {
+            // The one time becomes an event of its own, as deleteOne does.
+            values.put(Events.ORIGINAL_INSTANCE_TIME, d.instance)
+            values.put(Events.STATUS, Events.STATUS_CONFIRMED)
+            cr.insert(ContentUris.withAppendedId(Events.CONTENT_EXCEPTION_URI, d.id), values)
+                ?.lastPathSegment?.toLongOrNull() ?: return false
         } else {
             if (cr.update(ContentUris.withAppendedId(Events.CONTENT_URI, d.id), values, null, null) == 0) return false
             d.id

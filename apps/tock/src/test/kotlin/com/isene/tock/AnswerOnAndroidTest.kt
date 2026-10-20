@@ -18,11 +18,14 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 /**
- * Answering an invitation, run on the laptop by Robolectric against a
- * calendar store made up for the test. What the phone's account does with
- * the answer is not here; only what tock writes into the store.
+ * Answering an invitation, and changing one time of a repeating event, run
+ * on the laptop by Robolectric against a calendar store made up for the
+ * test. What the phone's account does with it is not here; only what tock
+ * writes into the store.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
@@ -98,5 +101,23 @@ class AnswerOnAndroidTest {
         assertEquals(ContentUris.withAppendedId(Events.CONTENT_EXCEPTION_URI, 5), uri)
         assertEquals(m.begin, values.getAsLong(Events.ORIGINAL_INSTANCE_TIME))
         assertEquals(Attendees.ATTENDEE_STATUS_DECLINED, values.getAsInteger(Events.SELF_ATTENDEE_STATUS))
+    }
+
+    @Test
+    fun one_time_of_a_repeating_event_is_changed_alone() {
+        val zone = ZoneId.of("Europe/Oslo")
+        val start = LocalDateTime.of(2026, 10, 21, 11, 0)
+        val d = Draft(
+            id = 5, calendarId = 1, title = "Plans moved", start = start, end = start.plusMinutes(45),
+            remind = null, instance = meeting(repeats = true).begin,
+        )
+        assertTrue(Phone.save(app, d, zone))
+        val (uri, values) = store.writes.single()
+        assertEquals(ContentUris.withAppendedId(Events.CONTENT_EXCEPTION_URI, 5), uri)
+        assertEquals(d.instance, values.getAsLong(Events.ORIGINAL_INSTANCE_TIME))
+        assertEquals("Plans moved", values.getAsString(Events.TITLE))
+        assertEquals(start.atZone(zone).toInstant().toEpochMilli(), values.getAsLong(Events.DTSTART))
+        assertEquals(start.plusMinutes(45).atZone(zone).toInstant().toEpochMilli(), values.getAsLong(Events.DTEND))
+        assertFalse("the series keeps its rule", values.containsKey(Events.RRULE))
     }
 }

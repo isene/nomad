@@ -234,6 +234,8 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
             start = if (s.allDay) s.firstDay(zone).atStartOfDay() else LocalDateTime.ofInstant(Instant.ofEpochMilli(s.begin), zone),
             end = if (s.allDay) s.lastDay(zone).atStartOfDay() else LocalDateTime.ofInstant(Instant.ofEpochMilli(s.end), zone),
             place = s.place, notes = more.notes, remind = more.reminders.minOrNull(),
+            // A repeating event is changed one time at a time.
+            instance = if (s.repeats) s.begin else null,
         )
         _ui.update { it.copy(page = Page.Edit(draft)) }
     }
