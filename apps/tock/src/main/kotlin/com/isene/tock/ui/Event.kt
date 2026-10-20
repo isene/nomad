@@ -148,9 +148,11 @@ fun EventView(vm: TockViewModel, ui: Ui, page: Page.View) {
     var asking by remember { mutableStateOf(false) }
     // The answer waiting for "this time or every time" on a repeating event.
     var answering by remember { mutableStateOf<Int?>(null) }
+    // A change waiting for "this time or this and later".
+    var changing by remember { mutableStateOf(false) }
     val canDelete = cal?.writable == true
     // An event someone else made is theirs to change. Of one that repeats,
-    // this time alone is changed.
+    // this time is changed, alone or with the later ones.
     val canEdit = canDelete && more?.mine == true
 
     Scaffold(
@@ -162,7 +164,9 @@ fun EventView(vm: TockViewModel, ui: Ui, page: Page.View) {
                 },
                 actions = {
                     if (canEdit) {
-                        IconButton(onClick = { more?.let { vm.edit(s, it) } }) { Icon(Icons.Default.Edit, "Change") }
+                        IconButton(onClick = { if (s.repeats) changing = true else more?.let { vm.edit(s, it) } }) {
+                            Icon(Icons.Default.Edit, "Change")
+                        }
                     }
                     if (canDelete) IconButton(onClick = { asking = true }) { Icon(Icons.Default.Delete, "Delete") }
                 },
@@ -273,6 +277,28 @@ fun EventView(vm: TockViewModel, ui: Ui, page: Page.View) {
         )
     }
 
+    if (changing) {
+        AlertDialog(
+            onDismissRequest = { changing = false },
+            title = { Text("The event repeats") },
+            confirmButton = {
+                TextButton(onClick = {
+                    changing = false
+                    more?.let { vm.edit(s, it) }
+                }) { Text("Only this time") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        changing = false
+                        more?.let { vm.edit(s, it, later = true) }
+                    }) { Text("This and later") }
+                    TextButton(onClick = { changing = false }) { Text("Cancel") }
+                }
+            },
+        )
+    }
+
     if (asking) {
         AlertDialog(
             onDismissRequest = { asking = false },
@@ -343,7 +369,16 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (first.id == null) "New event" else if (first.instance != null) "Change this time" else "Change event") },
+                title = {
+                    Text(
+                        when {
+                            first.id == null -> "New event"
+                            first.instance == null -> "Change event"
+                            first.later -> "Change this and later"
+                            else -> "Change this time"
+                        },
+                    )
+                },
                 navigationIcon = { IconButton(onClick = { vm.back() }) { Icon(Icons.Default.Close, "Cancel") } },
                 actions = {
                     TextButton(onClick = {
