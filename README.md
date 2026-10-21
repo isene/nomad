@@ -45,6 +45,7 @@ and prompt the changes that fit *your* phone.
 | <img src="apps/pointer/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**pointer**](apps/pointer/) | File manager: tag items, walk to another folder, copy or move them there; a trash, undo for every step, tabs, archives that open as folders, search inside files, marked folders that other apps can save into, and no network permission | [pointer](https://github.com/isene/pointer) |
 | <img src="apps/tock/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**tock**](apps/tock/) | Calendar: the calendars the phone already syncs as a month and an agenda, with reminders, a home-screen agenda widget, and each calendar in the colour tock has for it on the laptop | [tock](https://github.com/isene/tock) |
 | <img src="apps/prism/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**prism**](apps/prism/) | Colour picker: a foreground and a background, R/G/B and H/S/V sliders, hex, sample text and the WCAG contrast of the pair, copy in four formats | [prism](https://github.com/isene/prism) |
+| <img src="apps/fleet/src/main/res/mipmap-xxxhdpi/ic_launcher.png" width="40"> | [**fleet**](apps/fleet/) | A buzz when a Claude Code session on the laptop finishes: work given an ETA, or every finished turn | [fleet](https://github.com/isene/fleet) |
 
 Each ships as its own signed APK with its own launcher icon. The newest
 build of each is one tap away on the
