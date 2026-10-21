@@ -518,6 +518,28 @@ when building the core. Same rule as the rest of Fe₂O₃.
   Android's own code at 360 by 700 dp with text at 130 % and fails when
   a slider or Copy falls off; it writes `build/screen.png` to look at.
 
+### fleet (com.isene.fleet)
+
+- Rings the phone when a Claude Code session on the laptop finishes.
+  Signed with the tasks key, Kotlin only. The server side is fleet's
+  `server/fleet-mcp.py`: `GET <address>?done=SINCE&wait=SECS` answers
+  `{"events": [{"tag", "t", "kind", "eta", "line"}]}`, the turns after
+  SINCE, and keeps the request open up to 80 s while there are none.
+- The address is outside's messages address, and the same secret: never
+  print it, log it or put it in a test. The app has `allowBackup=false`.
+- Two switches. kind "eta" rings with either on, kind "turn" only with
+  "Every finished turn". Both off: `Watch` is stopped, nothing runs.
+- `Watch` is a foreground service with one thread and one open request.
+  The first request is `done=0&wait=0` and only sets the cursor. On a
+  fault it waits 30 s, doubling to 10 min, or until a network comes.
+- Unlike outside's InboxWatch it asks with the screen off, on purpose,
+  and asks once for the battery-optimization exemption. Cost: one
+  request every 80 s, about 45 radio wakes an hour.
+- One notice per session tag, `setOnlyAlertOnce`, so a turn the style
+  hook sends back does not buzz twice.
+- Tests: `Done.kt` (answer, which turns ring, notices) and
+  `WatchOnAndroidTest`, the real loop against a socket on 127.0.0.1.
+
 ## Anti-patterns (don't drift into these)
 
 - Putting business logic in Kotlin because it's faster to prototype.
