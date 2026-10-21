@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.CalendarContract.Attendees
 import android.text.Html
+import android.text.style.URLSpan
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -115,20 +116,45 @@ private val ANSWERS = listOf(
 
 private val LINK = Regex("https?://[^\\s<>\"]+")
 
-/** A text with its web addresses made into links, so the link to a
- *  meeting can be tapped. */
+/** A link in the notes: where it sits in the text, and where it goes. */
+internal data class NoteLink(val start: Int, val end: Int, val url: String)
+
+/** The notes as text, with their links. Mail programs put web-page code in
+ *  the notes of an invitation, and the link to a Teams meeting hides behind
+ *  words such as "Click here to join the meeting". Plain web addresses in
+ *  the text are links too. */
+internal fun noteLinks(notes: String): Pair<String, List<NoteLink>> {
+    val page = if ("</" in notes || "<br" in notes) Html.fromHtml(notes, Html.FROM_HTML_MODE_COMPACT) else null
+    val all = page?.toString() ?: notes
+    val cut = all.length - all.trimStart().length
+    val text = all.trim()
+    val links = page?.getSpans(0, page.length, URLSpan::class.java).orEmpty().mapNotNull { span ->
+        val a = page!!.getSpanStart(span) - cut
+        val b = page.getSpanEnd(span) - cut
+        if (a < 0 || b > text.length || a >= b) null else NoteLink(a, b, span.url)
+    }.toMutableList()
+    for (found in LINK.findAll(text)) {
+        // A full stop or a bracket after an address is not part of it.
+        val url = found.value.trimEnd('.', ',', ';', ')')
+        val a = found.range.first
+        if (links.none { a < it.end && it.start < a + url.length }) links += NoteLink(a, a + url.length, url)
+    }
+    return text to links.sortedBy { it.start }
+}
+
+/** The notes with their links made tappable, so the link to a meeting can
+ *  be tapped. */
 @Composable
-private fun linked(text: String): AnnotatedString {
+private fun linked(notes: String): AnnotatedString {
     val look = TextLinkStyles(SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline))
-    return remember(text, look) {
+    return remember(notes, look) {
+        val (text, links) = noteLinks(notes)
         buildAnnotatedString {
             var at = 0
-            for (found in LINK.findAll(text)) {
-                // A full stop or a bracket after an address is not part of it.
-                val url = found.value.trimEnd('.', ',', ';', ')')
-                append(text.substring(at, found.range.first))
-                withLink(LinkAnnotation.Url(url, look)) { append(url) }
-                at = found.range.first + url.length
+            for (link in links) {
+                append(text.substring(at, link.start))
+                withLink(LinkAnnotation.Url(link.url, look)) { append(text.substring(link.start, link.end)) }
+                at = link.end
             }
             append(text.substring(at))
         }
@@ -227,15 +253,7 @@ fun EventView(vm: TockViewModel, ui: Ui, page: Page.View) {
                     Text("Reminder: ${remindText(minutes).lowercase()}", style = MaterialTheme.typography.bodyMedium, color = dim)
                 }
                 if (more.notes.isNotBlank()) {
-                    // Mail programs put web-page code in the notes of an invitation.
-                    val notes = remember(more.notes) {
-                        if ("</" in more.notes || "<br" in more.notes) {
-                            Html.fromHtml(more.notes, Html.FROM_HTML_MODE_COMPACT).toString().trim()
-                        } else {
-                            more.notes.trim()
-                        }
-                    }
-                    SelectionContainer { Text(linked(notes), style = MaterialTheme.typography.bodyMedium) }
+                    SelectionContainer { Text(linked(more.notes), style = MaterialTheme.typography.bodyMedium) }
                 }
                 if (more.guests.isNotEmpty()) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
