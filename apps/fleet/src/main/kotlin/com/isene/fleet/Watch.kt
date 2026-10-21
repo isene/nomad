@@ -11,6 +11,9 @@ import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
 import android.os.IBinder
+import androidx.compose.runtime.mutableStateOf
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.LinkedBlockingQueue
@@ -32,7 +35,10 @@ class Store(ctx: Context) {
         set(v) = p.edit().putBoolean("every", v).apply()
     var address: String
         get() = p.getString("address", "") ?: ""
-        set(v) = p.edit().putString("address", v).apply()
+        // On disk at once: it is pasted by hand, and costly to lose.
+        set(v) {
+            p.edit().putString("address", v).commit()
+        }
     var askedBattery: Boolean
         get() = p.getBoolean("askedBattery", false)
         set(v) = p.edit().putBoolean("askedBattery", v).apply()
@@ -92,6 +98,7 @@ class Watch : Service() {
     override fun onDestroy() {
         super.onDestroy()
         running = false
+        status.value = ""
         call?.disconnect()
         worker?.let {
             it.interrupt()
@@ -112,11 +119,14 @@ class Watch : Service() {
                 val events = ask(asking(store.address, since, if (cursor < 0) 0 else WAIT_S))
                 if (!running) break
                 if (events == null) {
+                    val again = LocalTime.now().plusSeconds(pause / 1000).format(DateTimeFormatter.ofPattern("HH:mm"))
+                    status.value = "No answer from the server. Trying again at $again."
                     back.poll(pause, TimeUnit.MILLISECONDS)
                     pause = minOf(pause * 2, MAX_PAUSE_MS)
                     continue
                 }
                 pause = PAUSE_MS
+                status.value = "Listening."
                 if (cursor >= 0) ringing(events, store.eta, store.every).forEach { ring(this, it) }
                 cursor = maxOf(since, events.maxOfOrNull { it.t } ?: 0)
             }
@@ -147,6 +157,10 @@ class Watch : Service() {
         private const val WAIT_S = 80
         private const val PAUSE_MS = 30_000L
         private const val MAX_PAUSE_MS = 600_000L
+
+        /** What the screen shows under the address. The loop sets it on a
+         *  change of state, never on a timer; Compose redraws on a change. */
+        val status = mutableStateOf("")
 
         fun channel(ctx: Context) = ctx.getSystemService(NotificationManager::class.java)
             .createNotificationChannel(NotificationChannel(DONE, "Finished sessions", NotificationManager.IMPORTANCE_DEFAULT))

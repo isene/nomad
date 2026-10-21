@@ -2,6 +2,7 @@ package com.isene.fleet
 
 import android.app.Notification
 import android.app.NotificationManager
+import android.content.pm.PackageManager
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -60,5 +61,16 @@ class DoneOnAndroidTest {
         assertEquals("The build is done, again.\nETA about 14:20", beta.extras.getCharSequence(Notification.EXTRA_BIG_TEXT).toString())
         assertTrue(beta.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0)
         assertEquals("alpha done", shown.first { it.tag == "alpha" }.notification.extras.getCharSequence(Notification.EXTRA_TITLE).toString())
+    }
+
+    // 0.1.0 crashed on Save: the watch asks for network changes, which
+    // needs ACCESS_NETWORK_STATE, and Robolectric does not check that.
+    @Test
+    fun the_app_lists_every_permission_the_watch_needs() {
+        val ctx = RuntimeEnvironment.getApplication()
+        val listed = ctx.packageManager.getPackageInfo(ctx.packageName, PackageManager.GET_PERMISSIONS).requestedPermissions!!.toSet()
+        for (p in listOf("INTERNET", "ACCESS_NETWORK_STATE", "POST_NOTIFICATIONS", "FOREGROUND_SERVICE", "FOREGROUND_SERVICE_SPECIAL_USE")) {
+            assertTrue(p, "android.permission.$p" in listed)
+        }
     }
 }

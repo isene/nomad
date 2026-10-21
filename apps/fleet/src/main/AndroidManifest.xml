@@ -3,6 +3,8 @@
 
     <!-- To ask the fleet server which sessions finished. -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- To ask again as soon as a network comes back after a fault. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- For the buzz. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- To keep asking with the screen off, while a switch is on. -->

@@ -537,6 +537,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
   request every 80 s, about 45 radio wakes an hour.
 - One notice per session tag, `setOnlyAlertOnce`, so a turn the style
   hook sends back does not buzz twice.
+- 0.1.0 crashed on Save: `registerDefaultNetworkCallback` needs
+  ACCESS_NETWORK_STATE, which Robolectric does not check. A test now
+  checks the manifest lists every permission the watch needs.
+- The screen shows "Address saved: <host>" (never the path) and
+  `Watch.status`, a Compose state the loop sets on a change.
 - Tests: `Done.kt` (answer, which turns ring, notices) and
   `WatchOnAndroidTest`, the real loop against a socket on 127.0.0.1.
 

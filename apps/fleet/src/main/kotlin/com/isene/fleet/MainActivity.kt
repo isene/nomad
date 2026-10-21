@@ -102,11 +102,15 @@ private fun Screen() {
                 store.every = it
                 changed()
             }
+            if (address.isEmpty()) {
+                if (eta || every) Text("Nothing is asked until the address is set.", color = MaterialTheme.colorScheme.error)
+            } else {
+                // The host alone: the secret part of the address is its path.
+                Text("Address saved: ${Uri.parse(address).host}", style = MaterialTheme.typography.titleMedium)
+                if (Watch.status.value.isNotEmpty()) Text(Watch.status.value)
+            }
             TextButton(onClick = { editing = true }) {
                 Text(if (address.isEmpty()) "Paste the fleet address" else "Change the fleet address")
-            }
-            if (address.isEmpty() && (eta || every)) {
-                Text("Nothing is asked until the address is set.", color = MaterialTheme.colorScheme.error)
             }
         }
     }
