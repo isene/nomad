@@ -15,6 +15,9 @@ phone twin of [fleet](https://github.com/isene/fleet).
   open to the fleet server, screen on or off: about 45 short radio wakes an
   hour. It asks once to be left out of Android's battery saving, or Android
   delays the requests while the screen is off.
+- Android shows a quiet "Listening" notice while the app asks. To hide it, turn
+  the "Listening" category off in the app's notification settings, then switch
+  a switch off and on. The buzzes have their own category and still ring.
 - On a network fault it waits 30 seconds, then twice as long each time, up to
   10 minutes, or until the phone has a network again.
 - No Rust core.
