@@ -11,7 +11,8 @@ import java.net.URL
 import kotlin.concurrent.thread
 
 /** One session in the laptop fleet's list, as fleet wrote it. `at` is the
- *  unix time of its last activity; `moves` are its open items. */
+ *  unix time of its last activity; `moves` are its open items; `auto` is
+ *  fleet's » mark, a session it wakes by itself for a message. */
 data class Session(
     val tag: String,
     val state: String,
@@ -22,6 +23,7 @@ data class Session(
     val at: Long,
     val ctx: Int?,
     val moves: List<Pair<Int, String>>,
+    val auto: Boolean = false,
 )
 
 /** The server's answer to ?sessions: the file time to ask from next, when
@@ -44,6 +46,7 @@ private fun session(e: JSONObject): Session {
         if (e.isNull("ws")) null else e.optInt("ws"), e.optString("model"), e.optString("prompt"),
         e.optLong("at"), if (e.isNull("ctx")) null else e.optInt("ctx"),
         List(moves?.length() ?: 0) { i -> moves!!.getJSONObject(i).let { it.optInt("num") to it.optString("text") } },
+        e.optBoolean("auto"),
     )
 }
 

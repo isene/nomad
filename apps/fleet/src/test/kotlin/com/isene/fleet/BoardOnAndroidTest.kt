@@ -22,7 +22,7 @@ import kotlin.concurrent.thread
 @Config(sdk = [35])
 class BoardOnAndroidTest {
     private val list = """{"stamp": 7, "t": 1000, "sessions": [
-        {"tag": "ci", "state": "YOURS", "eta": "14:20", "ws": 3, "model": "opus", "prompt": "Run the suite",
+        {"tag": "ci", "auto": true, "state": "YOURS", "eta": "14:20", "ws": 3, "model": "opus", "prompt": "Run the suite",
          "at": 990, "ctx": 120, "moves": [{"num": 2, "text": "Restart kastrup?"}]},
         {"tag": "DI", "state": "off", "eta": "", "ws": null, "model": "", "prompt": "", "at": 5, "ctx": null, "moves": []}
     ]}"""
@@ -32,10 +32,10 @@ class BoardOnAndroidTest {
         val a = parseBoard(list)!!
         assertEquals(7L to 1000L, a.stamp to a.t)
         assertEquals(
-            Session("ci", "YOURS", "14:20", 3, "opus", "Run the suite", 990, 120, listOf(2 to "Restart kastrup?")),
+            Session("ci", "YOURS", "14:20", 3, "opus", "Run the suite", 990, 120, listOf(2 to "Restart kastrup?"), auto = true),
             a.sessions!![0],
         )
-        assertEquals(null to null, a.sessions[1].ws to a.sessions[1].ctx)
+        assertEquals(Triple(null, null, false), Triple(a.sessions[1].ws, a.sessions[1].ctx, a.sessions[1].auto))
         assertNull("unchanged", parseBoard("""{"stamp": 7}""")!!.sessions)
         assertNull("a login page is no answer", parseBoard("<html>Sign in</html>"))
         assertEquals("https://example.com/x?k=1&sessions=-1&wait=0", board("https://example.com/x?k=1", -1, 0))
