@@ -11,7 +11,7 @@ phone twin of [fleet](https://github.com/isene/fleet).
   that gave the ETA.
 - The laptop fleet's session list: each session's state in fleet's
   colours, ETA, workspace, last activity, context size, model, last
-  prompt and open items. It is asked for only while the screen shows.
+  prompt and open items, and fleet's » after a session it wakes by itself. It is asked for only while the screen shows.
 - Hold a session to write it a message. It reaches the session on its
   next prompt, or at once when fleet wakes it.
 - Paste the address of your fleet connector once. It stays on the phone, and
