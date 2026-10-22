@@ -544,6 +544,16 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `Watch.status`, a Compose state the loop sets on a change.
 - Tests: `Done.kt` (answer, which turns ring, notices) and
   `WatchOnAndroidTest`, the real loop against a socket on 127.0.0.1.
+- 0.2.0 shows the laptop fleet's session list (`Board.kt`). The laptop
+  fleet writes `sessions.json` to the relay when a state changes;
+  `GET <address>?sessions=STAMP&wait=80` answers once its file time
+  differs from STAMP (-1 for the first ask). Asked only between
+  onResume and onPause, never with the screen off.
+- A long press on a session opens a message box. Send POSTs the
+  server's `message_session` tool (JSON-RPC `tools/call`) to the same
+  address; the server's reply shows in a toast.
+- Rows show the time of last activity, not an age, so nothing redraws
+  on a timer. `BoardOnAndroidTest` covers the list and the message.
 
 ## Anti-patterns (don't drift into these)
 
