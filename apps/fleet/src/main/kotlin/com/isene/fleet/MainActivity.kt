@@ -12,13 +12,18 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -34,9 +39,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -51,6 +63,17 @@ class MainActivity : ComponentActivity() {
         // is started again here.
         Watch.sync(this)
     }
+
+    // The list is asked for only while the screen shows.
+    override fun onResume() {
+        super.onResume()
+        Board.start(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        Board.stop()
+    }
 }
 
 /** The two switches and the address. */
@@ -62,6 +85,7 @@ private fun Screen() {
     var every by remember { mutableStateOf(store.every) }
     var address by remember { mutableStateOf(store.address) }
     var editing by remember { mutableStateOf(false) }
+    var writing by remember { mutableStateOf<String?>(null) }
 
     // Asked once, after leave to post notices: without the exemption Android
     // delays the requests while the screen is off.
@@ -87,10 +111,14 @@ private fun Screen() {
 
     Scaffold { pad ->
         Column(
-            Modifier.padding(pad).padding(20.dp),
+            Modifier.padding(pad).verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("fleet", style = MaterialTheme.typography.headlineMedium)
+            if (address.isNotEmpty()) {
+                Sessions { writing = it }
+                HorizontalDivider()
+            }
             Text("A buzz when a Claude Code session on the laptop finishes.")
             Choice("ETA work done", "Work that was given an ETA has ended.", eta) {
                 eta = it
@@ -114,6 +142,8 @@ private fun Screen() {
             }
         }
     }
+
+    writing?.let { Message(it) { writing = null } }
 
     if (editing) {
         var url by remember { mutableStateOf("") }
@@ -140,6 +170,8 @@ private fun Screen() {
                         store.address = url
                         address = url
                         Watch.restart(ctx)
+                        Board.stop()
+                        Board.start(ctx)
                         changed()
                     },
                 ) { Text("Save") }
@@ -148,6 +180,89 @@ private fun Screen() {
         )
     }
 }
+
+/** A message to one session, opened by a long press on its row. */
+@Composable
+private fun Message(tag: String, close: () -> Unit) {
+    val ctx = LocalContext.current
+    var text by remember(tag) { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = close,
+        title = { Text("Message to $tag") },
+        text = {
+            Column {
+                Text("It reaches the session on its next prompt, or at once when fleet wakes it.")
+                OutlinedTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = text.isNotBlank(), onClick = {
+                close()
+                Board.send(ctx, tag, text.trim())
+            }) { Text("Send") }
+        },
+        dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
+    )
+}
+
+/** The laptop fleet's session list: the same states and colours. */
+@Composable
+private fun Sessions(hold: (String) -> Unit) {
+    val list = Board.sessions.value
+    val dim = MaterialTheme.colorScheme.onSurfaceVariant
+    if (Board.fault.value) Text("No answer from the server.", color = MaterialTheme.colorScheme.error)
+    if (Board.written.value == 0L) {
+        if (!Board.fault.value) Text("Asking the laptop's fleet for its sessions.", color = dim)
+        return
+    }
+    Text("Hold a session to write to it. List from ${clock(Board.written.value)}.", style = MaterialTheme.typography.bodySmall, color = dim)
+    for (s in list) Seat(s) { hold(s.tag) }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Seat(s: Session, hold: () -> Unit) {
+    val dim = MaterialTheme.colorScheme.onSurfaceVariant
+    val small = MaterialTheme.typography.bodySmall
+    Column(Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = hold).padding(vertical = 4.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(s.tag, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (s.eta.isNotEmpty()) Text("ETA ${s.eta}", color = if (past(s.eta)) Color(0xFFFF0000) else dim)
+            Text(s.state, color = stateColor(s.state), fontWeight = FontWeight.Bold)
+        }
+        val about = listOfNotNull(s.ws?.let { "WS $it" }, clock(s.at), s.ctx?.let { "${it}k" }, s.model.ifEmpty { null })
+        Text(about.joinToString("   "), style = small, color = dim)
+        if (s.prompt.isNotEmpty()) Text(s.prompt, style = small, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        for ((n, t) in s.moves) Text("$n. $t", style = small, color = Color(0xFFFF8700))
+    }
+}
+
+/** fleet's colours: 196, 46, 208, 69, 60, 240 and 245 of the 256. */
+private fun stateColor(state: String) = when (state) {
+    "CAPPED" -> Color(0xFFFF0000)
+    "working" -> Color(0xFF00FF00)
+    "YOURS" -> Color(0xFFFF8700)
+    "idle" -> Color(0xFF5F87FF)
+    "off" -> Color(0xFF5F5F87)
+    "older" -> Color(0xFF585858)
+    else -> Color(0xFF8A8A8A)
+}
+
+/** The time of day for today, the day and time before that. The laptop
+ *  shows an age; a clock time needs no redraw while the screen is open. */
+private fun clock(t: Long): String {
+    val at = Instant.ofEpochSecond(t).atZone(ZoneId.systemDefault())
+    val today = at.toLocalDate() == java.time.LocalDate.now()
+    return at.format(DateTimeFormatter.ofPattern(if (today) "HH:mm" else "EEE HH:mm"))
+}
+
+/** An ETA clock time that has gone by, as the laptop shows it in red. */
+private fun past(eta: String) = runCatching { LocalTime.parse(eta).isBefore(LocalTime.now()) }.getOrDefault(false)
 
 @Composable
 private fun Choice(label: String, about: String, on: Boolean, flip: (Boolean) -> Unit) {
