@@ -131,21 +131,6 @@ class Store(ctx: Context) {
 
     fun setBack(argb: Int) = prefs.edit().putInt("back", argb).apply()
 
-    /** The address the widget asks whether messages wait: the one of the
-     *  fleet connector, pasted in once. Empty until then: the widget
-     *  shows no mark and asks nobody. Whoever has it can read and send
-     *  fleet messages, so it is never shown again, and the backup rules
-     *  keep these settings on the phone. */
-    fun relay(): String = prefs.getString("relay", "") ?: ""
-
-    fun setRelay(url: String) = prefs.edit().putString("relay", url).apply()
-
-    /** Whether messages waited when the server was last asked. Kept, so
-     *  that the widget is right when Android starts the app afresh. */
-    fun waits(): Boolean = prefs.getBoolean("waits", false)
-
-    fun setWaits(yes: Boolean) = prefs.edit().putBoolean("waits", yes).apply()
-
     /** When the widget last asked for a forecast of its own, epoch
      *  milliseconds; 0 when it never has. */
     fun asked(): Long = prefs.getLong("asked", 0)

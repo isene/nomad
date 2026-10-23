@@ -15,11 +15,8 @@
     <!-- For the widget: the clock app asks for this of whoever opens its
          list of alarms. -->
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
-    <!-- For the widget's dot: to ask the fleet server once a minute while
-         the dot is switched on and the screen is lit, and to start that
-         watch again with the phone. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- For the widget: to set the hourly run again after a start of the
+         phone. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- For the widget: to list the apps a tap on it can open. Only apps
@@ -87,15 +84,6 @@
             android:name=".RingFetch"
             android:exported="false"
             android:permission="android.permission.BIND_JOB_SERVICE" />
-        <!-- Up only while the dot is switched on in the app. -->
-        <service
-            android:name=".InboxWatch"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Asks one server whether messages wait and marks them on the home-screen widget" />
-        </service>
     </application>
 
 </manifest>

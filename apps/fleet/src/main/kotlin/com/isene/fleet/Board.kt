@@ -79,6 +79,10 @@ object Board {
     /** When fleet wrote the list, unix seconds; 0 before the first answer. */
     val written = mutableStateOf(0L)
     val fault = mutableStateOf(false)
+    /** The session a tapped notice named: the list scrolls to it once. */
+    val jump = mutableStateOf<String?>(null)
+    /** The same session, shown marked until the screen is left. */
+    val marked = mutableStateOf<String?>(null)
     @Volatile private var worker: Thread? = null
     @Volatile private var call: HttpURLConnection? = null
 

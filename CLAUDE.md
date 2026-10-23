@@ -268,30 +268,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
     `<queries>` entry in the manifest. `refresh` reads the three from
     the prefs it has open already. The widget takes a new choice in
     `MainActivity.onStop`, so nothing refreshes it from the sheet.
-  - A dot shows that a fleet message waits for Claude on the phone
-    (0.3.7; Geir asked for it on 2026-10-10). `marks` draws it 5 dp in
-    from the top right corner of the clock's square. That corner is
-    56 dp from the middle and the rim icons reach 46 dp, so nothing
-    meets it.
-  - `InboxWatch` asks the fleet server: a GET of the connector's
-    address with `?waiting` answers with a number, and consumes nothing
-    (`server/fleet-mcp.py` in the fleet repo). It is a foreground
-    service: one request a minute while the screen is on, one when the
-    screen comes on, none while it is off. `Store.waits` keeps the
-    answer, and the widget is drawn again only when it changes.
-    `refresh` starts the service when an address is set. Android allows
-    that start from the open app, from the hourly exact alarm, after an
-    update and after boot; at other moments it refuses, and `start`
-    swallows that. Its notice is never seen, since the app does not ask
-    for leave to post one.
-  - The address is a secret: whoever has it can read and send fleet
-    messages. It is in no code and in no APK. Geir pastes it once in
-    `InboxRow` at the bottom of the screen, and `Store.relay` keeps it
-    in the prefs, which the backup rules leave on the phone. Never
-    print it, log it or put it in a test.
-  - Two earlier tries are gone: a folder brought by Syncthing (0.3.5,
-    0.3.6) and a laptop script that fed it. Geir: "Keep it as simple as
-    possible."
+  - The dot for a waiting fleet message (0.3.7 to 0.3.23) is gone in
+    0.3.24: the fleet app's red notice took its place, and its
+    `InboxWatch` asked once a minute on its own.
   - `TextClock` has no week number, so `refresh` writes the week into
     the date pattern as quoted text.
   - A day with no rise reads "up all day" or "down all day" (0.3.18).
@@ -525,15 +504,22 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `server/fleet-mcp.py`: `GET <address>?done=SINCE&wait=SECS` answers
   `{"events": [{"tag", "t", "kind", "eta", "line"}]}`, the turns after
   SINCE, and keeps the request open up to 80 s while there are none.
-- The address is outside's messages address, and the same secret: never
-  print it, log it or put it in a test. The app has `allowBackup=false`.
-- Two switches. kind "eta" rings with either on, kind "turn" only with
-  "Every finished turn". Both off: `Watch` is stopped, nothing runs.
+- The address is the fleet connector's, a secret: never print it, log
+  it or put it in a test. The app has `allowBackup=false`.
+- Three switches. kind "eta" rings with "ETA work done" or "Every
+  finished turn", kind "turn" only with the second. All off: `Watch` is
+  stopped, nothing runs.
+- "Messages for the phone" (0.3.0) adds `&phone=N` to the same request,
+  N the count the red notice shows. The server answers early when its
+  count differs, with `waiting` and `line` (the newest message's first
+  line). The notice (id 2, colour 0xFFE8795A) buzzes when the count
+  grows, goes at 0, and a tap hands "Check" to the Claude app's share
+  target (`Watch.claude`; the `<queries>` entry lets it see the app).
 - `Watch` is a foreground service with one thread and one open request.
   The first request is `done=0&wait=0` and only sets the cursor. On a
   fault it waits 30 s, doubling to 10 min, or until a network comes.
-- Unlike outside's InboxWatch it asks with the screen off, on purpose,
-  and asks once for the battery-optimization exemption. Cost: one
+- It asks with the screen off, on purpose, and asks once for the
+  battery-optimization exemption. Cost: one
   request every 80 s, about 45 radio wakes an hour.
 - One notice per session tag, `setOnlyAlertOnce`, so a turn the style
   hook sends back does not buzz twice.
@@ -554,6 +540,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
   address; the server's reply shows in a toast.
 - Rows show the time of last activity, not an age, so nothing redraws
   on a timer. `BoardOnAndroidTest` covers the list and the message.
+- A tap on a turn's notice opens the list at that session: the intent
+  carries `Watch.SESSION`, `Board.jump` scrolls to the row once it is
+  laid out, and `Board.marked` tints it until the screen is left.
 
 ## Anti-patterns (don't drift into these)
 
