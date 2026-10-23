@@ -9,15 +9,23 @@ phone twin of [fleet](https://github.com/isene/fleet).
 - One notice per session, replaced by its next one. A session that finishes
   twice within a minute buzzes once.
 - The notice says which session, the first line of its answer, and the line
-  that gave the ETA. A tap opens the app at that session.
+  that gave the ETA. A tap opens that session's answer.
 - A message for the phone gets a red notice with its first line. It buzzes
   when another message comes and goes once they are read. A tap opens the
   Claude app with "Check" typed in.
 - The laptop fleet's session list: each session's state in fleet's
-  colours, ETA, workspace, last activity, context size, model, last
-  prompt and open items, and fleet's » after a session it wakes by itself. It is asked for only while the screen shows.
-- Hold a session to write it a message. It reaches the session on its
-  next prompt, or at once when fleet wakes it.
+  colours, ETA, the count of its open items, and fleet's » after a
+  session it wakes by itself. Sessions that are working or wait for you
+  also show workspace, context size, model and the start of their last
+  answer (your prompt while they work); the rest take one line. It is
+  asked for only while the screen shows.
+- Tap a session for its last answer in full, drawn as HyperList with
+  the laptop's colours. Each open item has a Yes and a No, with a line
+  for words to go with it, and a box below takes words of your own.
+  Send goes out as one message, as you would type it ("3 yes", "5 no:
+  not today").
+- Hold a session to write it a message. fleet on the laptop wakes the
+  session with it once the session waits at its prompt.
 - Paste the address of your fleet connector once. It stays on the phone, and
   the app keeps no backup of it.
 - With all switches off nothing runs. With one on, the app keeps one request
