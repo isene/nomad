@@ -6,7 +6,7 @@
 
 **[Download for Android (APK)](https://github.com/isene/nomad/releases/download/apk/mail.apk)** · [how to install](https://isene.org/nomad/#get)
 
-![version](https://img.shields.io/badge/version-0.16.1-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.17.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Your Gmail inboxes and RSS feeds on the phone, sharing their decoders
 with [kastrup](https://github.com/isene/kastrup) on the laptop and taking
@@ -241,9 +241,20 @@ Feeds served over plain `http` are fetched over `https` instead. Android
 forbids cleartext by default and a feed reader is not worth opting out
 for; everything worth subscribing to redirects there anyway.
 
+## Laptop drafts
+
+Menu, Laptop drafts lists the drafts kastrup on the laptop holds in its
+drop folder, where Claude sessions write theirs. The laptop's drop folder
+must be `drafts/` in the shared folder (kastrup's README says how). Tap
+one to read it as it will go out, then Send. The phone moves it to
+`send/`, and kastrup on the laptop sends it within a minute, as it sends
+a scheduled message. Mail goes from the laptop's own account, so a reply
+threads and its original gets the ← mark. Postponed and scheduled mail
+stay in the laptop's database and are not listed.
+
 ## Not yet
 
-No push (the fetch is periodic, not instant) and no compose. Dualog
+No push (the fetch is periodic, not instant) and no compose of new mail. Dualog
 Workspace is the obvious next channel, and the only one that needs
 something the phone cannot do alone — its OIDC login, or the laptop
 relaying into the shared folder.

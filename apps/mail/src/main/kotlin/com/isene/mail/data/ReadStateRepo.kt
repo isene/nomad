@@ -14,9 +14,10 @@ import uniffi.fe2o3_mobile_core.mergeReadMarks
  * timestamp per Message-ID wins, and the merge itself lives in the Rust
  * core so both ends resolve a disagreement identically.
  *
- * This phone only ever READS. It has no file of its own here and writes
- * nothing, so nothing done on the phone can reach the laptop. Its own
- * read decisions live in [Settings.localMarks]; see [ReadState].
+ * This phone only READS read state. It has no file of its own here, so
+ * nothing read on the phone reaches the laptop. Its own read decisions
+ * live in [Settings.localMarks]; see [ReadState]. The one thing it writes
+ * in this folder is a draft to send; see [DraftsRepo].
  */
 object ReadStateRepo {
     private fun tree(ctx: Context, treeUri: String): DocumentFile? =
