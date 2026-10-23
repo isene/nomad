@@ -543,6 +543,21 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - A tap on a turn's notice opens the list at that session: the intent
   carries `Watch.SESSION`, `Board.jump` scrolls to the row once it is
   laid out, and `Board.marked` tints it until the screen is left.
+- 0.4.0: the list is compact (`current()`: YOURS, working, CAPPED show
+  more), and a tap opens `Answer.kt`. The laptop's fleet hook writes
+  each finished answer through the HyperList display hook to
+  `relay/answer-<tag>.txt` (SGR colours, no wrapping); the server adds
+  its colourless start to each session as `answer` and serves it whole
+  at `GET <address>?answer=TAG`. `colours()` turns SGR into spans and
+  darkens them on a light screen. Yes/No make `reply()`, sent by
+  `message_session`. A notice tap now opens the answer, with the list
+  behind it scrolled to the session.
+- laptop fleet 0.3.62 wakes a session for any message from the phone
+  (`*-phone.msg`), » or not, even in the focused window.
+- To look at a screen without a phone: a Robolectric test with
+  `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
+  `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`
+  to a PNG.
 
 ## Anti-patterns (don't drift into these)
 

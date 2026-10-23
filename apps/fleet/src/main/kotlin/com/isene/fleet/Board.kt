@@ -12,7 +12,8 @@ import kotlin.concurrent.thread
 
 /** One session in the laptop fleet's list, as fleet wrote it. `at` is the
  *  unix time of its last activity; `moves` are its open items; `auto` is
- *  fleet's » mark, a session it wakes by itself for a message. */
+ *  fleet's » mark, a session it wakes by itself for a message; `answer` is
+ *  the start of its last answer, which the server adds. */
 data class Session(
     val tag: String,
     val state: String,
@@ -24,7 +25,11 @@ data class Session(
     val ctx: Int?,
     val moves: List<Pair<Int, String>>,
     val auto: Boolean = false,
+    val answer: String = "",
 )
+
+/** A session's last answer in full: HyperList with the laptop's colours. */
+data class Full(val tag: String, val t: Long, val text: String)
 
 /** The server's answer to ?sessions: the file time to ask from next, when
  *  fleet wrote the list, and the list itself, or null when unchanged. */
@@ -46,8 +51,30 @@ private fun session(e: JSONObject): Session {
         if (e.isNull("ws")) null else e.optInt("ws"), e.optString("model"), e.optString("prompt"),
         e.optLong("at"), if (e.isNull("ctx")) null else e.optInt("ctx"),
         List(moves?.length() ?: 0) { i -> moves!!.getJSONObject(i).let { it.optInt("num") to it.optString("text") } },
-        e.optBoolean("auto"),
+        e.optBoolean("auto"), e.optString("answer"),
     )
+}
+
+/** Null when the answer is not the server's, or it keeps none. */
+fun parseFull(body: String): Full? = try {
+    val o = JSONObject(body)
+    Full(o.getString("tag"), o.optLong("t"), o.getString("text"))
+} catch (_: Exception) {
+    null
+}
+
+fun answerAddress(address: String, tag: String): String =
+    address + (if ('?' in address) "&" else "?") + "answer=" + java.net.URLEncoder.encode(tag, "UTF-8")
+
+/** The message the answer screen sends, one line per answered item as you
+ *  would type it on the laptop ("3 yes", "5 no: not today"), then the
+ *  free text. Empty when nothing was chosen or written. */
+fun reply(choice: Map<Int, Boolean>, notes: Map<Int, String>, free: String): String {
+    val items = choice.keys.sorted().map { n ->
+        val note = notes[n].orEmpty().trim()
+        "$n ${if (choice[n] == true) "yes" else "no"}" + if (note.isEmpty()) "" else ": $note"
+    }
+    return (items + listOfNotNull(free.trim().ifEmpty { null })).joinToString("\n")
 }
 
 /** The address that asks for the list once it differs from `stamp`, held
@@ -83,6 +110,8 @@ object Board {
     val jump = mutableStateOf<String?>(null)
     /** The same session, shown marked until the screen is left. */
     val marked = mutableStateOf<String?>(null)
+    /** The session whose last answer fills the screen, or null for the list. */
+    val open = mutableStateOf<String?>(null)
     @Volatile private var worker: Thread? = null
     @Volatile private var call: HttpURLConnection? = null
 
@@ -127,18 +156,29 @@ object Board {
         }
     }
 
-    /** Nothing about a request is logged: the address would be in it. */
-    private fun get(url: String): String? = try {
+    /** A session's last answer, handed to `done` on the main thread: null
+     *  when the server keeps none or gives no answer. */
+    fun fetch(ctx: Context, tag: String, done: (Full?) -> Unit) {
+        val address = Store(ctx).address
+        thread(name = "answer") {
+            val got = get(answerAddress(address, tag), long = false)?.let(::parseFull)
+            Handler(Looper.getMainLooper()).post { done(got) }
+        }
+    }
+
+    /** Nothing about a request is logged: the address would be in it.
+     *  `long` is the list's held-open request, which `stop` cuts. */
+    private fun get(url: String, long: Boolean = true): String? = try {
         val c = URL(url).openConnection() as HttpURLConnection
-        call = c
+        if (long) call = c
         c.connectTimeout = 15_000
-        c.readTimeout = 100_000
+        c.readTimeout = if (long) 100_000 else 30_000
         c.useCaches = false
         if (c.responseCode != 200) null else c.inputStream.bufferedReader().use { it.readText() }
     } catch (_: Exception) {
         null
     } finally {
-        call = null
+        if (long) call = null
     }
 
     private fun post(url: String, body: String): String? = try {

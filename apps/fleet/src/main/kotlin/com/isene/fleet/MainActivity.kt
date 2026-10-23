@@ -79,9 +79,11 @@ class MainActivity : ComponentActivity() {
         jump(intent)
     }
 
-    /** A tap on a turn's notice: the list opens at that session. */
+    /** A tap on a turn's notice: that session's answer opens, and the list
+     *  behind it is scrolled to the session. */
     private fun jump(i: Intent) {
         i.getStringExtra(Watch.SESSION)?.let {
+            Board.open.value = it
             Board.jump.value = it
             Board.marked.value = it
         }
@@ -133,6 +135,11 @@ private fun Screen() {
         } else {
             battery()
         }
+    }
+
+    Board.open.value?.let {
+        Answer(it) { Board.open.value = null }
+        return
     }
 
     Scaffold { pad ->
@@ -222,7 +229,7 @@ private fun Message(tag: String, close: () -> Unit) {
         title = { Text("Message to $tag") },
         text = {
             Column {
-                Text("It reaches the session on its next prompt, or at once when fleet wakes it.")
+                Text("fleet on the laptop wakes the session with it once the session waits at its prompt.")
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },
@@ -251,15 +258,22 @@ private fun Sessions(scroll: ScrollState, hold: (String) -> Unit) {
         if (!Board.fault.value) Text("Asking the laptop's fleet for its sessions.", color = dim)
         return
     }
-    Text("Hold a session to write to it. List from ${clock(Board.written.value)}.", style = MaterialTheme.typography.bodySmall, color = dim)
-    for (s in list) Seat(s, scroll) { hold(s.tag) }
+    Text("Tap a session for its last answer, hold it to write to it. List from ${clock(Board.written.value)}.",
+        style = MaterialTheme.typography.bodySmall, color = dim)
+    for (s in list) Seat(s, scroll, open = { Board.open.value = s.tag }) { hold(s.tag) }
 }
 
+/** The sessions you or Claude are busy with now: they show more. */
+private fun current(s: Session) = s.state == "YOURS" || s.state == "working" || s.state == "CAPPED"
+
+/** One session. A current one shows the start of its last answer (or,
+ *  while it works, your prompt); the others take one line. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Seat(s: Session, scroll: ScrollState, hold: () -> Unit) {
+private fun Seat(s: Session, scroll: ScrollState, open: () -> Unit, hold: () -> Unit) {
     val dim = MaterialTheme.colorScheme.onSurfaceVariant
     val small = MaterialTheme.typography.bodySmall
+    val now = current(s)
     // Where the row sits in the list, once it is laid out, for a tapped
     // notice that names it.
     var top by remember { mutableStateOf(-1) }
@@ -270,26 +284,31 @@ private fun Seat(s: Session, scroll: ScrollState, hold: () -> Unit) {
     val mark = if (s.tag == Board.marked.value) Modifier.background(MaterialTheme.colorScheme.surfaceVariant) else Modifier
     Column(
         Modifier.fillMaxWidth().onGloballyPositioned { top = it.positionInParent().y.roundToInt() }
-            .then(mark).combinedClickable(onClick = {}, onLongClick = hold).padding(vertical = 4.dp),
+            .then(mark).combinedClickable(onClick = open, onLongClick = hold).padding(vertical = if (now) 4.dp else 1.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val tag = buildAnnotatedString {
                 append(s.tag)
                 if (s.auto) withStyle(SpanStyle(color = Color(0xFFFF8700))) { append(" »") }
             }
-            Text(tag, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text(tag, style = if (now) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (s.moves.isNotEmpty()) Text("${s.moves.size} open", style = small, color = Color(0xFFFF8700))
+            if (!now) Text(clock(s.at), style = small, color = dim)
             if (s.eta.isNotEmpty()) Text("ETA ${s.eta}", color = if (past(s.eta)) Color(0xFFFF0000) else dim)
             Text(s.state, color = stateColor(s.state), fontWeight = FontWeight.Bold)
         }
-        val about = listOfNotNull(s.ws?.let { "WS $it" }, clock(s.at), s.ctx?.let { "${it}k" }, s.model.ifEmpty { null })
-        Text(about.joinToString("   "), style = small, color = dim)
-        if (s.prompt.isNotEmpty()) Text(s.prompt, style = small, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        for ((n, t) in s.moves) Text("$n. $t", style = small, color = Color(0xFFFF8700))
+        if (now) {
+            val about = listOfNotNull(s.ws?.let { "WS $it" }, clock(s.at), s.ctx?.let { "${it}k" }, s.model.ifEmpty { null })
+            Text(about.joinToString("   "), style = small, color = dim)
+            val text = if (s.state == "working" || s.answer.isEmpty()) s.prompt else s.answer.lines().joinToString("\n") { it.trim() }
+            if (text.isNotEmpty()) Text(text, style = small, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
     }
 }
 
 /** fleet's colours: 196, 46, 208, 69, 60, 240 and 245 of the 256. */
-private fun stateColor(state: String) = when (state) {
+fun stateColor(state: String) = when (state) {
     "CAPPED" -> Color(0xFFFF0000)
     "working" -> Color(0xFF00FF00)
     "YOURS" -> Color(0xFFFF8700)
@@ -301,7 +320,7 @@ private fun stateColor(state: String) = when (state) {
 
 /** The time of day for today, the day and time before that. The laptop
  *  shows an age; a clock time needs no redraw while the screen is open. */
-private fun clock(t: Long): String {
+fun clock(t: Long): String {
     val at = Instant.ofEpochSecond(t).atZone(ZoneId.systemDefault())
     val today = at.toLocalDate() == java.time.LocalDate.now()
     return at.format(DateTimeFormatter.ofPattern(if (today) "HH:mm" else "EEE HH:mm"))
