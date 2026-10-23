@@ -3,12 +3,16 @@
 A buzz on the phone when a Claude Code session on the laptop finishes. The
 phone twin of [fleet](https://github.com/isene/fleet).
 
-- Two switches: "ETA work done" (work that was given an ETA has ended) and
-  "Every finished turn" (any answer a session finishes).
+- Three switches: "ETA work done" (work that was given an ETA has ended),
+  "Every finished turn" (any answer a session finishes) and "Messages for
+  the phone" (a laptop session wrote to the phone).
 - One notice per session, replaced by its next one. A session that finishes
   twice within a minute buzzes once.
 - The notice says which session, the first line of its answer, and the line
-  that gave the ETA.
+  that gave the ETA. A tap opens the app at that session.
+- A message for the phone gets a red notice with its first line. It buzzes
+  when another message comes and goes once they are read. A tap opens the
+  Claude app with "Check" typed in.
 - The laptop fleet's session list: each session's state in fleet's
   colours, ETA, workspace, last activity, context size, model, last
   prompt and open items, and fleet's » after a session it wakes by itself. It is asked for only while the screen shows.
@@ -16,7 +20,7 @@ phone twin of [fleet](https://github.com/isene/fleet).
   next prompt, or at once when fleet wakes it.
 - Paste the address of your fleet connector once. It stays on the phone, and
   the app keeps no backup of it.
-- With both switches off nothing runs. With one on, the app keeps one request
+- With all switches off nothing runs. With one on, the app keeps one request
   open to the fleet server, screen on or off: about 45 short radio wakes an
   hour. It asks once to be left out of Android's battery saving, or Android
   delays the requests while the screen is off.

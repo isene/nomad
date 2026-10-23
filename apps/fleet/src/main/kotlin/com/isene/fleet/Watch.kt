@@ -3,6 +3,7 @@ package com.isene.fleet
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -21,7 +22,7 @@ import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 /**
- * The two switches and the address, in the app's prefs. The address is a
+ * The three switches and the address, in the app's prefs. The address is a
  * secret: whoever has it can read and send fleet messages. It is never
  * logged, printed or put in a test, and the app has no backup.
  */
@@ -33,6 +34,9 @@ class Store(ctx: Context) {
     var every: Boolean
         get() = p.getBoolean("every", false)
         set(v) = p.edit().putBoolean("every", v).apply()
+    var phone: Boolean
+        get() = p.getBoolean("phone", false)
+        set(v) = p.edit().putBoolean("phone", v).apply()
     var address: String
         get() = p.getString("address", "") ?: ""
         // On disk at once: it is pasted by hand, and costly to lose.
@@ -43,8 +47,8 @@ class Store(ctx: Context) {
         get() = p.getBoolean("askedBattery", false)
         set(v) = p.edit().putBoolean("askedBattery", v).apply()
 
-    /** Whether the watch should be up. With both switches off nothing runs. */
-    val on get() = (eta || every) && address.isNotEmpty()
+    /** Whether the watch should be up. With all switches off nothing runs. */
+    val on get() = (eta || every || phone) && address.isNotEmpty()
 }
 
 /**
@@ -52,7 +56,10 @@ class Store(ctx: Context) {
  * server keeps each request open up to 80 seconds while nothing is new, so the
  * phone's radio wakes about 45 times an hour, screen on or off.
  *
- * The first answer only sets where to read from; it rings for nothing.
+ * With "Messages for the phone" on, the same request also ends when the
+ * number of messages for the phone changes, so they cost no extra wakes.
+ *
+ * The first answer only sets where to read from; it rings for no turn.
  * On a network fault it waits 30 seconds, doubling up to 10 minutes, or
  * until the phone has a network again.
  */
@@ -111,14 +118,18 @@ class Watch : Service() {
     private fun loop() {
         val store = Store(this)
         var cursor = -1L
+        // How many messages for the phone the notice shows; -1 before the
+        // first answer.
+        var known = -1
         var pause = PAUSE_MS
         try {
             while (running && store.on) {
                 back.clear()
                 val since = maxOf(cursor, 0)
-                val events = ask(asking(store.address, since, if (cursor < 0) 0 else WAIT_S))
+                val phone = if (store.phone) maxOf(known, 0) else null
+                val heard = ask(asking(store.address, since, if (cursor < 0) 0 else WAIT_S, phone))
                 if (!running) break
-                if (events == null) {
+                if (heard == null) {
                     val again = LocalTime.now().plusSeconds(pause / 1000).format(DateTimeFormatter.ofPattern("HH:mm"))
                     status.value = "No answer from the server. Trying again at $again."
                     back.poll(pause, TimeUnit.MILLISECONDS)
@@ -127,8 +138,12 @@ class Watch : Service() {
                 }
                 pause = PAUSE_MS
                 status.value = "Listening."
-                if (cursor >= 0) ringing(events, store.eta, store.every).forEach { ring(this, it) }
-                cursor = maxOf(since, events.maxOfOrNull { it.t } ?: 0)
+                if (cursor >= 0) ringing(heard.events, store.eta, store.every).forEach { ring(this, it) }
+                heard.waiting?.let { n ->
+                    if (n == 0) unnote(this) else if (n > known) note(this, n, heard.line)
+                    known = n
+                }
+                cursor = maxOf(since, heard.events.maxOfOrNull { it.t } ?: 0)
             }
         } catch (_: InterruptedException) {
         }
@@ -138,7 +153,7 @@ class Watch : Service() {
     /** One request. Null on any fault; nothing about it is logged, since
      *  the address would be in it. The connection is kept for the next
      *  request when the answer is read to the end. */
-    private fun ask(url: String): List<Done>? = try {
+    private fun ask(url: String): Heard? = try {
         val c = URL(url).openConnection() as HttpURLConnection
         call = c
         c.connectTimeout = 15_000
@@ -154,6 +169,13 @@ class Watch : Service() {
     companion object {
         private const val QUIET = "listening"
         private const val DONE = "done"
+        private const val NOTE = "phone"
+        private const val NOTE_ID = 2
+        /** The red of the messages dot outside's widget had. */
+        private const val NOTE_COLOR = 0xFFE8795A.toInt()
+        private const val CLAUDE = "com.anthropic.claude"
+        /** The session a tap on a turn's notice opens the list at. */
+        const val SESSION = "session"
         private const val WAIT_S = 80
         private const val PAUSE_MS = 30_000L
         private const val MAX_PAUSE_MS = 600_000L
@@ -162,8 +184,10 @@ class Watch : Service() {
          *  change of state, never on a timer; Compose redraws on a change. */
         val status = mutableStateOf("")
 
-        fun channel(ctx: Context) = ctx.getSystemService(NotificationManager::class.java)
-            .createNotificationChannel(NotificationChannel(DONE, "Finished sessions", NotificationManager.IMPORTANCE_DEFAULT))
+        fun channel(ctx: Context) = ctx.getSystemService(NotificationManager::class.java).apply {
+            createNotificationChannel(NotificationChannel(DONE, "Finished sessions", NotificationManager.IMPORTANCE_DEFAULT))
+            createNotificationChannel(NotificationChannel(NOTE, "Messages for the phone", NotificationManager.IMPORTANCE_DEFAULT))
+        }
 
         /** The buzz: one notice per session, replaced by its next one. A
          *  session can finish twice within a minute when the style hook
@@ -179,8 +203,45 @@ class Watch : Service() {
                 .setShowWhen(true)
                 .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
+                .setContentIntent(
+                    PendingIntent.getActivity(
+                        ctx, d.tag.hashCode(),
+                        Intent(ctx, MainActivity::class.java).putExtra(SESSION, d.tag).addFlags(
+                            Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP,
+                        ),
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+                    ),
+                )
                 .build()
             ctx.getSystemService(NotificationManager::class.java).notify(d.tag, 0, n)
+        }
+
+        /** The notice for messages the laptop sessions wrote to the phone,
+         *  in red. It buzzes when there are more than it showed, and goes
+         *  once they are read. A tap opens Claude with "Check". */
+        fun note(ctx: Context, n: Int, line: String) {
+            val note = Notification.Builder(ctx, NOTE)
+                .setSmallIcon(R.drawable.ic_notice)
+                .setColor(NOTE_COLOR)
+                .setContentTitle(if (n == 1) "A message for the phone" else "$n messages for the phone")
+                .setContentText(line)
+                .setStyle(Notification.BigTextStyle().bigText(line))
+                .setAutoCancel(true)
+                .setContentIntent(PendingIntent.getActivity(ctx, 0, claude(ctx), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT))
+                .build()
+            ctx.getSystemService(NotificationManager::class.java).notify(NOTE_ID, note)
+        }
+
+        fun unnote(ctx: Context) = ctx.getSystemService(NotificationManager::class.java).cancel(NOTE_ID)
+
+        /** "Check" handed to the Claude app's share target; without one, the
+         *  Claude app itself; without that, this app. */
+        fun claude(ctx: Context): Intent {
+            val pm = ctx.packageManager
+            val send = Intent(Intent.ACTION_SEND).setPackage(CLAUDE).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "Check")
+            val go = if (send.resolveActivity(pm) != null) send
+                else pm.getLaunchIntentForPackage(CLAUDE) ?: Intent(ctx, MainActivity::class.java)
+            return go.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
         /** Up when a switch is on and the address is set, down otherwise. */

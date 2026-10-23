@@ -54,7 +54,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -68,13 +67,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.isene.outside.ClockWidget
-import com.isene.outside.InboxWatch
 import com.isene.outside.OutsideViewModel
 import com.isene.outside.Tap
 import com.isene.outside.UiState
@@ -86,7 +82,6 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uniffi.fe2o3_mobile_core.Agreement
 import uniffi.fe2o3_mobile_core.Outside
@@ -214,7 +209,6 @@ fun OutsideScreen(vm: OutsideViewModel) {
                     }
                 }
                 item { BackRow() }
-                item { InboxRow() }
             }
         }
     }
@@ -283,78 +277,6 @@ private fun WidgetBackDialog(argb: Int, set: (Int) -> Unit, close: () -> Unit) {
         },
         dismissButton = { TextButton(onClick = close) { Text("Cancel") } },
     )
-}
-
-/** The dot for waiting fleet messages, switched on by pasting the address
- *  of the fleet connector. The address is in no code: it is a secret, and
- *  this is the one place it enters. It is asked once at once, so the row
- *  can say whether the server answered. A tap while it is on forgets it. */
-@Composable
-private fun InboxRow() {
-    val ctx = LocalContext.current
-    val store = remember { Store(ctx) }
-    val scope = rememberCoroutineScope()
-    var on by remember { mutableStateOf(store.relay().isNotEmpty()) }
-    var asking by remember { mutableStateOf(false) }
-    var said by remember { mutableStateOf("") }
-    TextButton(
-        onClick = {
-            if (!on) {
-                asking = true
-            } else {
-                store.setRelay("")
-                store.setWaits(false)
-                on = false
-                said = ""
-                InboxWatch.stop(ctx)
-                ClockWidget.refresh(ctx)
-            }
-        },
-        Modifier.padding(horizontal = 4.dp),
-    ) {
-        Text(
-            if (!on) "Widget: show a dot when messages wait"
-            else "Widget: the messages dot is on$said. Tap to turn it off",
-        )
-    }
-    if (asking) {
-        var url by remember { mutableStateOf("") }
-        AlertDialog(
-            onDismissRequest = { asking = false },
-            title = { Text("Messages dot") },
-            text = {
-                Column {
-                    Text("Paste the address of the fleet connector. It stays on this phone.")
-                    OutlinedTextField(
-                        value = url,
-                        onValueChange = { url = it.trim() },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = url.startsWith("https://"),
-                    onClick = {
-                        asking = false
-                        store.setRelay(url)
-                        on = true
-                        said = ""
-                        scope.launch {
-                            val n = withContext(Dispatchers.IO) { InboxWatch.ask(url) }
-                            said = if (n == null) " (no answer from the server)" else " ($n waiting)"
-                            if (n != null) store.setWaits(n > 0)
-                            // Draws the dot, and starts the watch.
-                            ClockWidget.refresh(ctx)
-                        }
-                    },
-                ) { Text("Save") }
-            },
-            dismissButton = { TextButton(onClick = { asking = false }) { Text("Cancel") } },
-        )
-    }
 }
 
 /** Shown while there is nothing to show: no place yet, or no forecast. */

@@ -14,6 +14,11 @@
     <!-- To start asking again with the phone. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
+    <!-- To hand "Check" to the Claude app from the notice for messages. -->
+    <queries>
+        <package android:name="com.anthropic.claude" />
+    </queries>
+
     <application
         android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
@@ -40,7 +45,7 @@
             android:foregroundServiceType="specialUse">
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Keeps one request open to the user's own server and posts a notice when a session on the user's laptop finishes" />
+                android:value="Keeps one request open to the user's own server and posts a notice when a session on the user's laptop finishes or writes to the phone" />
         </service>
 
         <!-- Starts the watch again after a restart or an update, if a switch is on. -->

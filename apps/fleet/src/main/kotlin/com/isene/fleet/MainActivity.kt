@@ -13,6 +13,8 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -33,6 +35,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,6 +43,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -52,6 +57,7 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,6 +71,20 @@ class MainActivity : ComponentActivity() {
         // Android lets the open app start the watch, so a watch it stopped
         // is started again here.
         Watch.sync(this)
+        if (savedInstanceState == null) jump(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        jump(intent)
+    }
+
+    /** A tap on a turn's notice: the list opens at that session. */
+    private fun jump(i: Intent) {
+        i.getStringExtra(Watch.SESSION)?.let {
+            Board.jump.value = it
+            Board.marked.value = it
+        }
     }
 
     // The list is asked for only while the screen shows.
@@ -76,16 +96,19 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         Board.stop()
+        Board.marked.value = null
     }
 }
 
-/** The two switches and the address. */
+/** The session list, the three switches and the address. */
 @Composable
 private fun Screen() {
     val ctx = LocalContext.current
     val store = remember { Store(ctx) }
     var eta by remember { mutableStateOf(store.eta) }
     var every by remember { mutableStateOf(store.every) }
+    var phone by remember { mutableStateOf(store.phone) }
+    val scroll = rememberScrollState()
     var address by remember { mutableStateOf(store.address) }
     var editing by remember { mutableStateOf(false) }
     var writing by remember { mutableStateOf<String?>(null) }
@@ -114,12 +137,12 @@ private fun Screen() {
 
     Scaffold { pad ->
         Column(
-            Modifier.padding(pad).verticalScroll(rememberScrollState()).padding(20.dp),
+            Modifier.padding(pad).verticalScroll(scroll).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("fleet", style = MaterialTheme.typography.headlineMedium)
             if (address.isNotEmpty()) {
-                Sessions { writing = it }
+                Sessions(scroll) { writing = it }
                 HorizontalDivider()
             }
             Text("A buzz when a Claude Code session on the laptop finishes.")
@@ -133,8 +156,13 @@ private fun Screen() {
                 store.every = it
                 changed()
             }
+            Choice("Messages for the phone", "A red notice while a session's message to the phone waits. A tap opens Claude with \"Check\".", phone) {
+                phone = it
+                store.phone = it
+                changed()
+            }
             if (address.isEmpty()) {
-                if (eta || every) Text("Nothing is asked until the address is set.", color = MaterialTheme.colorScheme.error)
+                if (eta || every || phone) Text("Nothing is asked until the address is set.", color = MaterialTheme.colorScheme.error)
             } else {
                 // The host alone: the secret part of the address is its path.
                 Text("Address saved: ${Uri.parse(address).host}", style = MaterialTheme.typography.titleMedium)
@@ -215,7 +243,7 @@ private fun Message(tag: String, close: () -> Unit) {
 
 /** The laptop fleet's session list: the same states and colours. */
 @Composable
-private fun Sessions(hold: (String) -> Unit) {
+private fun Sessions(scroll: ScrollState, hold: (String) -> Unit) {
     val list = Board.sessions.value
     val dim = MaterialTheme.colorScheme.onSurfaceVariant
     if (Board.fault.value) Text("No answer from the server.", color = MaterialTheme.colorScheme.error)
@@ -224,15 +252,26 @@ private fun Sessions(hold: (String) -> Unit) {
         return
     }
     Text("Hold a session to write to it. List from ${clock(Board.written.value)}.", style = MaterialTheme.typography.bodySmall, color = dim)
-    for (s in list) Seat(s) { hold(s.tag) }
+    for (s in list) Seat(s, scroll) { hold(s.tag) }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun Seat(s: Session, hold: () -> Unit) {
+private fun Seat(s: Session, scroll: ScrollState, hold: () -> Unit) {
     val dim = MaterialTheme.colorScheme.onSurfaceVariant
     val small = MaterialTheme.typography.bodySmall
-    Column(Modifier.fillMaxWidth().combinedClickable(onClick = {}, onLongClick = hold).padding(vertical = 4.dp)) {
+    // Where the row sits in the list, once it is laid out, for a tapped
+    // notice that names it.
+    var top by remember { mutableStateOf(-1) }
+    if (s.tag == Board.jump.value && top >= 0) LaunchedEffect(s.tag) {
+        scroll.animateScrollTo(top)
+        Board.jump.value = null
+    }
+    val mark = if (s.tag == Board.marked.value) Modifier.background(MaterialTheme.colorScheme.surfaceVariant) else Modifier
+    Column(
+        Modifier.fillMaxWidth().onGloballyPositioned { top = it.positionInParent().y.roundToInt() }
+            .then(mark).combinedClickable(onClick = {}, onLongClick = hold).padding(vertical = 4.dp),
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val tag = buildAnnotatedString {
                 append(s.tag)
