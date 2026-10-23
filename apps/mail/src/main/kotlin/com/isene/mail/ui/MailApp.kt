@@ -77,9 +77,15 @@ fun MailApp(vm: MailViewModel) {
     var showSearch by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
     var showBack by remember { mutableStateOf(false) }
+    var showDrafts by remember { mutableStateOf(false) }
     // Bulk actions confirm first: they touch everything on screen, and
     // marking read reaches the laptop.
     var confirmBulk by remember { mutableStateOf<String?>(null) }
+
+    if (showDrafts) {
+        DraftsScreen(vm.settingsObj().syncTreeUri) { showDrafts = false }
+        return
+    }
 
     compose?.let { req ->
         // Back drops the draft and returns to the message it answers.
@@ -142,6 +148,7 @@ fun MailApp(vm: MailViewModel) {
                                     onClick = { menuOpen = false; vm.restoreRemoved() },
                                 )
                             }
+                            DropdownMenuItem(text = { Text("Laptop drafts") }, onClick = { menuOpen = false; showDrafts = true })
                             DropdownMenuItem(text = { Text("Settings") }, onClick = { menuOpen = false; showSettings = true })
                             DropdownMenuItem(text = { Text("Widget colours") }, onClick = { menuOpen = false; showBack = true })
                             DropdownMenuItem(text = { Text("About") }, onClick = { menuOpen = false; showAbout = true })

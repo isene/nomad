@@ -497,6 +497,15 @@ when building the core. Same rule as the rest of Fe₂O₃.
   Android's own code at 360 by 700 dp with text at 130 % and fails when
   a slider or Copy falls off; it writes `build/screen.png` to look at.
 
+### mail (com.isene.mail, the kastrup app)
+
+- 0.17.0: Laptop drafts (menu). `DraftsRepo` reads `drafts/` of the
+  shared kastrup-read folder through the SAF tree. Send moves the file to
+  `send/`, created as `application/octet-stream` so the provider keeps
+  the name; laptop kastrup 0.3.90 queues it in `scheduled`, due now.
+- The laptop's `~/.kastrup/drafts` is a link to `~/.kastrup/sync/drafts`.
+- Tests are plain JUnit (`DraftsRepoTest`, the draft parser).
+
 ### fleet (com.isene.fleet)
 
 - Rings the phone when a Claude Code session on the laptop finishes.
