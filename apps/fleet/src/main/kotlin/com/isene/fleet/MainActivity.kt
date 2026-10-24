@@ -260,6 +260,11 @@ private fun Sessions(scroll: ScrollState, hold: (String) -> Unit) {
     }
     Text("Tap a session for its last answer, hold it to write to it. List from ${clock(Board.written.value)}.",
         style = MaterialTheme.typography.bodySmall, color = dim)
+    Board.week.value?.let { w ->
+        val parts = listOfNotNull("Weekly use ${w.pct}%", w.fable?.let { "Fable $it%" }, w.resets.takeIf { it > 0 }?.let { "resets ${clock(it)}" })
+        Text(parts.joinToString(", "), style = MaterialTheme.typography.bodySmall,
+            color = if (w.pct >= 80) Color(0xFFFF0000) else if (w.pct >= 50) Color(0xFFFF8700) else dim)
+    }
     for (s in list) Seat(s, scroll, open = { Board.open.value = s.tag }) { hold(s.tag) }
 }
 
