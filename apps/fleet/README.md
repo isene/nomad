@@ -15,7 +15,8 @@ phone twin of [fleet](https://github.com/isene/fleet).
   either of the first two switches on, even over that session's last notice.
   The list and the session's answer screen show what it waits for.
 - Above the list: the week's share of the Claude limit, as the laptop's
-  fleet header shows it, and when it resets. Orange from 50%, red from 80%.
+  fleet header shows it and in its colours (green, then yellow from 50%,
+  red from 80%), and when it resets.
 - ⋮ beside the title opens About, with the version.
 - A message for the phone gets a red notice with its first line. It buzzes
   when another message comes and goes once they are read. A tap opens the
