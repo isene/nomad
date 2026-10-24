@@ -281,9 +281,16 @@ private fun Sessions(scroll: ScrollState, hold: (String) -> Unit) {
     Text("Tap a session for its last answer, hold it to write to it. List from ${clock(Board.written.value)}.",
         style = MaterialTheme.typography.bodySmall, color = dim)
     Board.week.value?.let { w ->
-        val parts = listOfNotNull("Weekly use ${w.pct}%", w.fable?.let { "Fable $it%" }, w.resets.takeIf { it > 0 }?.let { "resets ${clock(it)}" })
-        Text(parts.joinToString(", "), style = MaterialTheme.typography.bodySmall,
-            color = if (w.pct >= 80) Color(0xFFFF0000) else if (w.pct >= 50) Color(0xFFFF8700) else dim)
+        // Each share in the laptop header's colour: 65 under 50 %, 136 under 80 %, else 124.
+        val dark = isSystemInDarkTheme()
+        val line = buildAnnotatedString {
+            fun share(p: Int) = withStyle(SpanStyle(color = xterm(if (p < 50) 65 else if (p < 80) 136 else 124, dark))) { append("$p%") }
+            append("Weekly use ")
+            share(w.pct)
+            w.fable?.let { append(", Fable "); share(it) }
+            if (w.resets > 0) append(", resets ${clock(w.resets)}")
+        }
+        Text(line, style = MaterialTheme.typography.bodySmall, color = dim)
     }
     for (s in list) Seat(s, scroll, open = { Board.open.value = s.tag }) { hold(s.tag) }
 }
