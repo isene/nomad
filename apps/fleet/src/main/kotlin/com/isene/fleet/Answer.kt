@@ -165,6 +165,9 @@ fun Answer(tag: String, close: () -> Unit) {
                 Text(tag, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                 s?.let { Text(it.state, color = stateColor(it.state), fontWeight = FontWeight.Bold) }
             }
+            s?.ask?.takeIf { it.isNotEmpty() }?.let {
+                Text("Waits for your yes on the laptop: $it", color = Color(0xFFFF8700), fontWeight = FontWeight.Bold)
+            }
             val shown = full
             when {
                 shown != null -> {

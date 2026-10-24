@@ -568,6 +568,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `done-<tag>.json` with the tool call read from the transcript tail.
   The phone rings it with either switch, orange, alerting over the
   session's last notice.
+- 0.4.3: `ask` in the session list (laptop fleet 0.3.64, from the
+  hook's mark in `~/.fleet/ask/`), shown in the row and the answer
+  screen. Answering the dialog from the phone was refused by the
+  auto-mode safety check (2026-10-24); it waits on his decision.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`

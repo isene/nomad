@@ -26,6 +26,8 @@ data class Session(
     val moves: List<Pair<Int, String>>,
     val auto: Boolean = false,
     val answer: String = "",
+    /** What the permission dialog it waits on wants to run, if one does. */
+    val ask: String = "",
 )
 
 /** A session's last answer in full: HyperList with the laptop's colours. */
@@ -52,6 +54,7 @@ private fun session(e: JSONObject): Session {
         e.optLong("at"), if (e.isNull("ctx")) null else e.optInt("ctx"),
         List(moves?.length() ?: 0) { i -> moves!!.getJSONObject(i).let { it.optInt("num") to it.optString("text") } },
         e.optBoolean("auto"), e.optString("answer"),
+        e.optJSONObject("ask")?.optString("line").orEmpty(),
     )
 }
 
