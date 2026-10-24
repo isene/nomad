@@ -18,6 +18,9 @@ class AnswerOnAndroidTest {
     fun the_answer_and_its_start_are_read() {
         val a = parseBoard("""{"stamp": 7, "t": 1, "sessions": [{"tag": "ci", "state": "YOURS", "answer": "Done; two wait."}]}""")!!
         assertEquals("Done; two wait.", a.sessions!![0].answer)
+        assertEquals("", a.sessions!![0].ask)
+        val b = parseBoard("""{"stamp": 8, "sessions": [{"tag": "ci", "ask": {"call": "toolu_1", "line": "Bash: git push"}}]}""")!!
+        assertEquals("Bash: git push", b.sessions!![0].ask)
         assertEquals(Full("ci", 9, "Done.\n"), parseFull("""{"tag": "ci", "t": 9, "text": "Done.\n"}"""))
         assertNull("a 404 page is no answer", parseFull("<html>Not found</html>"))
         assertEquals("https://example.com/x?k=1&answer=ci", answerAddress("https://example.com/x?k=1", "ci"))
