@@ -563,6 +563,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
   behind it scrolled to the session.
 - laptop fleet 0.3.62 wakes a session for any message from the phone
   (`*-phone.msg`), » or not, even in the focused window.
+- 0.4.1: kind `ask` (laptop fleet 0.3.63): Claude Code's Notification
+  hook, matcher `permission_prompt`, runs `fleet --hook`, which writes
+  `done-<tag>.json` with the tool call read from the transcript tail.
+  The phone rings it with either switch, orange, alerting over the
+  session's last notice.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`

@@ -6,7 +6,8 @@ import org.json.JSONObject
  * One finished turn of a Claude Code session on the laptop, as the fleet
  * server tells it. `kind` is "eta" when the turn ended work that had an
  * ETA, and then `eta` is the line that gave it. Any other finished answer
- * is "turn". `line` is the first line of the answer.
+ * is "turn". `line` is the first line of the answer. "ask" is a session
+ * held by a permission dialog, and `line` says what it wants to run.
  */
 data class Done(val tag: String, val t: Long, val kind: String, val eta: String, val line: String)
 
@@ -32,10 +33,10 @@ fun parse(body: String): Heard? = try {
     null
 }
 
-/** The turns that buzz. ETA work buzzes with either switch on; any other
- *  turn only with "Every finished turn". */
+/** The turns that buzz. ETA work and a session waiting for your yes buzz
+ *  with either switch on; any other turn only with "Every finished turn". */
 fun ringing(events: List<Done>, eta: Boolean, every: Boolean): List<Done> =
-    events.filter { if (it.kind == "eta") eta || every else every }
+    events.filter { if (it.kind == "eta" || it.kind == "ask") eta || every else every }
 
 /** The address that asks for the turns after `since`, held open by the
  *  server up to `wait` seconds while there are none. With `phone`, the
@@ -44,6 +45,10 @@ fun ringing(events: List<Done>, eta: Boolean, every: Boolean): List<Done> =
 fun asking(address: String, since: Long, wait: Int, phone: Int? = null): String =
     address + (if ('?' in address) "&" else "?") + "done=$since&wait=$wait" + (phone?.let { "&phone=$it" } ?: "")
 
-fun title(d: Done) = if (d.kind == "eta") "${d.tag}: ETA work done" else "${d.tag} done"
+fun title(d: Done) = when (d.kind) {
+    "eta" -> "${d.tag}: ETA work done"
+    "ask" -> "${d.tag} waits for your yes"
+    else -> "${d.tag} done"
+}
 
 fun text(d: Done) = if (d.eta.isEmpty()) d.line else "${d.line}\n${d.eta}"

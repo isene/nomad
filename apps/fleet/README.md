@@ -10,6 +10,9 @@ phone twin of [fleet](https://github.com/isene/fleet).
   twice within a minute buzzes once.
 - The notice says which session, the first line of its answer, and the line
   that gave the ETA. A tap opens that session's answer.
+- A session held by a permission dialog for a few seconds gets an orange
+  notice, "waits for your yes", with what it wants to run. It buzzes with
+  either of the first two switches on, even over that session's last notice.
 - A message for the phone gets a red notice with its first line. It buzzes
   when another message comes and goes once they are read. A tap opens the
   Claude app with "Check" typed in.
