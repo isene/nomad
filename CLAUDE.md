@@ -574,7 +574,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
   auto-mode safety check (2026-10-24); he chose allow rules instead.
 - 0.4.4: the weekly use above the list (`usage` in sessions.json, laptop
   fleet 0.3.66, from the statusline's usage cache). The answer screen's
-  column takes `imePadding()`, so the keyboard no longer hides a field.
+  column takes `imePadding()`, which alone did not keep a field in sight.
+- 0.4.5: `Modifier.inSight(text)` in Answer.kt brings a field (and the
+  Send button) into view on focus, on each keyboard height and on each
+  text change. No Robolectric test reaches the keyboard; he checks it on
+  the phone. ⋮ beside the title has About with the version.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`

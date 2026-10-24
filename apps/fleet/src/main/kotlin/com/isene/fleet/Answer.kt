@@ -3,7 +3,14 @@ package com.isene.fleet
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Row
@@ -189,20 +196,22 @@ fun Answer(tag: String, close: () -> Unit) {
                 choose = { if (it == null) choice.remove(n) else choice[n] = it },
                 write = { notes[n] = it })
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
-            OutlinedTextField(
-                value = free,
-                onValueChange = { free = it },
-                label = { Text("Words to $tag") },
-                minLines = 2,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            val msg = reply(choice, notes, free)
-            Button(enabled = msg.isNotEmpty(), onClick = {
-                Board.send(ctx, tag, msg)
-                choice.clear()
-                notes.clear()
-                free = ""
-            }) { Text("Send") }
+            Column(Modifier.inSight(free), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedTextField(
+                    value = free,
+                    onValueChange = { free = it },
+                    label = { Text("Words to $tag") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                val msg = reply(choice, notes, free)
+                Button(enabled = msg.isNotEmpty(), onClick = {
+                    Board.send(ctx, tag, msg)
+                    choice.clear()
+                    notes.clear()
+                    free = ""
+                }) { Text("Send") }
+            }
         }
     }
 }
@@ -225,7 +234,20 @@ private fun Item(num: Int, text: String, pick: String?, note: String, choose: (S
             value = note,
             onValueChange = write,
             placeholder = { Text("Words to go with it") },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().inSight(note),
         )
     }
+}
+
+/** Keeps a field, and the button under it, in sight above the keyboard:
+ *  when it gets focus, while the keyboard opens, and as the text grows a
+ *  line. The column's imePadding alone left a growing field under it. */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun Modifier.inSight(text: String): Modifier {
+    val bring = remember { BringIntoViewRequester() }
+    var focused by remember { mutableStateOf(false) }
+    val keyboard = WindowInsets.ime.getBottom(LocalDensity.current)
+    LaunchedEffect(focused, keyboard, text) { if (focused) bring.bringIntoView() }
+    return bringIntoViewRequester(bring).onFocusChanged { focused = it.hasFocus }
 }

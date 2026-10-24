@@ -18,6 +18,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,6 +26,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -142,12 +145,22 @@ private fun Screen() {
         return
     }
 
+    var menu by remember { mutableStateOf(false) }
+    var about by remember { mutableStateOf(false) }
     Scaffold { pad ->
         Column(
             Modifier.padding(pad).verticalScroll(scroll).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("fleet", style = MaterialTheme.typography.headlineMedium)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("fleet", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.weight(1f))
+                Box {
+                    TextButton(onClick = { menu = true }) { Text("⋮", style = MaterialTheme.typography.headlineSmall) }
+                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                        DropdownMenuItem(text = { Text("About") }, onClick = { menu = false; about = true })
+                    }
+                }
+            }
             if (address.isNotEmpty()) {
                 Sessions(scroll) { writing = it }
                 HorizontalDivider()
@@ -182,6 +195,13 @@ private fun Screen() {
     }
 
     writing?.let { Message(it) { writing = null } }
+    if (about) AlertDialog(
+        onDismissRequest = { about = false },
+        confirmButton = { TextButton(onClick = { about = false }) { Text("Close") } },
+        title = { Text("fleet ${BuildConfig.VERSION_NAME}") },
+        text = { Text("The Claude Code sessions on your laptop, on your phone: a buzz when one finishes, " +
+            "its last answer, and words back to it. Public domain, github.com/isene/nomad.") },
+    )
 
     if (editing) {
         var url by remember { mutableStateOf("") }

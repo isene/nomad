@@ -16,6 +16,7 @@ phone twin of [fleet](https://github.com/isene/fleet).
   The list and the session's answer screen show what it waits for.
 - Above the list: the week's share of the Claude limit, as the laptop's
   fleet header shows it, and when it resets. Orange from 50%, red from 80%.
+- ⋮ beside the title opens About, with the version.
 - A message for the phone gets a red notice with its first line. It buzzes
   when another message comes and goes once they are read. A tap opens the
   Claude app with "Check" typed in.
