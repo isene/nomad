@@ -21,6 +21,9 @@ class AnswerOnAndroidTest {
         assertEquals("", a.sessions!![0].ask)
         val b = parseBoard("""{"stamp": 8, "sessions": [{"tag": "ci", "ask": {"call": "toolu_1", "line": "Bash: git push"}}]}""")!!
         assertEquals("Bash: git push", b.sessions!![0].ask)
+        assertNull("no usage sent, none shown", a.week)
+        val c = parseBoard("""{"stamp": 9, "sessions": [], "usage": {"week": 6, "fable": null, "resets": 1793386800}}""")!!
+        assertEquals(Week(6, null, 1793386800), c.week)
         assertEquals(Full("ci", 9, "Done.\n"), parseFull("""{"tag": "ci", "t": 9, "text": "Done.\n"}"""))
         assertNull("a 404 page is no answer", parseFull("<html>Not found</html>"))
         assertEquals("https://example.com/x?k=1&answer=ci", answerAddress("https://example.com/x?k=1", "ci"))

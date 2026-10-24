@@ -35,13 +35,21 @@ data class Full(val tag: String, val t: Long, val text: String)
 
 /** The server's answer to ?sessions: the file time to ask from next, when
  *  fleet wrote the list, and the list itself, or null when unchanged. */
-data class Answer(val stamp: Long, val t: Long, val sessions: List<Session>?)
+/** The weekly limit as the laptop's fleet header shows it: percent used,
+ *  the Fable share, and when it resets (unix seconds, 0 when unknown). */
+data class Week(val pct: Int, val fable: Int?, val resets: Long)
+
+data class Answer(val stamp: Long, val t: Long, val sessions: List<Session>?, val week: Week? = null)
+
+private fun week(o: JSONObject?): Week? = o?.takeUnless { it.isNull("week") }?.let {
+    Week(it.optInt("week"), if (it.isNull("fable")) null else it.optInt("fable"), it.optLong("resets"))
+}
 
 /** Null when the answer is not the server's, such as a login page. */
 fun parseBoard(body: String): Answer? = try {
     val o = JSONObject(body)
     val list = o.optJSONArray("sessions")?.let { a -> List(a.length()) { session(a.getJSONObject(it)) } }
-    Answer(o.getLong("stamp"), o.optLong("t"), list)
+    Answer(o.getLong("stamp"), o.optLong("t"), list, week(o.optJSONObject("usage")))
 } catch (_: Exception) {
     null
 }
@@ -109,6 +117,7 @@ object Board {
     /** When fleet wrote the list, unix seconds; 0 before the first answer. */
     val written = mutableStateOf(0L)
     val fault = mutableStateOf(false)
+    val week = mutableStateOf<Week?>(null)
     /** The session a tapped notice named: the list scrolls to it once. */
     val jump = mutableStateOf<String?>(null)
     /** The same session, shown marked until the screen is left. */
@@ -136,6 +145,7 @@ object Board {
                     got.sessions?.let {
                         sessions.value = it
                         written.value = got.t
+                        week.value = got.week
                     }
                 }
             } catch (_: InterruptedException) {

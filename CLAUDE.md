@@ -571,7 +571,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - 0.4.3: `ask` in the session list (laptop fleet 0.3.64, from the
   hook's mark in `~/.fleet/ask/`), shown in the row and the answer
   screen. Answering the dialog from the phone was refused by the
-  auto-mode safety check (2026-10-24); it waits on his decision.
+  auto-mode safety check (2026-10-24); he chose allow rules instead.
+- 0.4.4: the weekly use above the list (`usage` in sessions.json, laptop
+  fleet 0.3.65, from the statusline's usage cache). The answer screen's
+  column takes `imePadding()`, so the keyboard no longer hides a field.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`
