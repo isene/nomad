@@ -558,7 +558,7 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `relay/answer-<tag>.txt` (SGR colours, no wrapping); the server adds
   its colourless start to each session as `answer` and serves it whole
   at `GET <address>?answer=TAG`. `colours()` turns SGR into spans and
-  darkens them on a light screen. Yes/No make `reply()`, sent by
+  darkens them on a light screen. Yes/No/Done/Rec (0.4.2) make `reply()`, sent by
   `message_session`. A notice tap now opens the answer, with the list
   behind it scrolled to the session.
 - laptop fleet 0.3.62 wakes a session for any message from the phone

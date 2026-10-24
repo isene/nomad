@@ -134,8 +134,8 @@ private fun shade(rgb: Int, dark: Boolean): Color {
     return Color((rgb shr 16 and 255) * f / 255f, (rgb shr 8 and 255) * f / 255f, (rgb and 255) * f / 255f)
 }
 
-/** A session's last answer in full, drawn as the laptop draws it, then a
- *  Yes and a No for each open item and a box for words of your own. */
+/** A session's last answer in full, drawn as the laptop draws it, then
+ *  Yes, No, Done and Rec for each open item and a box for words of your own. */
 @Composable
 fun Answer(tag: String, close: () -> Unit) {
     val ctx = LocalContext.current
@@ -150,7 +150,7 @@ fun Answer(tag: String, close: () -> Unit) {
             if (got != null) full = got
         }
     }
-    val choice = remember(tag) { mutableStateMapOf<Int, Boolean>() }
+    val choice = remember(tag) { mutableStateMapOf<Int, String>() }
     val notes = remember(tag) { mutableStateMapOf<Int, String>() }
     var free by remember(tag) { mutableStateOf("") }
     val dark = isSystemInDarkTheme()
@@ -200,15 +200,19 @@ fun Answer(tag: String, close: () -> Unit) {
     }
 }
 
-/** One open item: Yes or No, a second tap takes it back, and once one is
- *  picked a line for words to go with it. */
+/** Each chip and the words it sends. Rec is "as recommended". */
+private val CHOICES = listOf("Yes" to "yes", "No" to "no", "Done" to "done", "Rec" to "as recommended")
+
+/** One open item: a chip for the answer, a second tap takes it back, and
+ *  once one is picked a line for words to go with it. */
 @Composable
-private fun Item(num: Int, text: String, pick: Boolean?, note: String, choose: (Boolean?) -> Unit, write: (String) -> Unit) {
+private fun Item(num: Int, text: String, pick: String?, note: String, choose: (String?) -> Unit, write: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text("$num. $text", color = Color(0xFFFF8700))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(selected = pick == true, onClick = { choose(if (pick == true) null else true) }, label = { Text("Yes") })
-            FilterChip(selected = pick == false, onClick = { choose(if (pick == false) null else false) }, label = { Text("No") })
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for ((label, word) in CHOICES) {
+                FilterChip(selected = pick == word, onClick = { choose(if (pick == word) null else word) }, label = { Text(label) })
+            }
         }
         if (pick != null) OutlinedTextField(
             value = note,
