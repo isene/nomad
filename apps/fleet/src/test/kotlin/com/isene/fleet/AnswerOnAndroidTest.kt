@@ -44,7 +44,8 @@ class AnswerOnAndroidTest {
 
     @Test
     fun yes_and_no_go_out_as_you_would_type_them() {
-        assertEquals("3 yes\n5 no: not today\nGo on.", reply(mapOf(5 to false, 3 to true), mapOf(5 to " not today "), "Go on. "))
+        assertEquals("3 yes\n5 no: not today\nGo on.", reply(mapOf(5 to "no", 3 to "yes"), mapOf(5 to " not today "), "Go on. "))
+        assertEquals("2 done\n4 as recommended", reply(mapOf(4 to "as recommended", 2 to "done"), emptyMap(), ""))
         assertEquals("", reply(emptyMap(), mapOf(2 to "a note alone"), "  "))
     }
 }

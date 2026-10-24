@@ -67,12 +67,12 @@ fun answerAddress(address: String, tag: String): String =
     address + (if ('?' in address) "&" else "?") + "answer=" + java.net.URLEncoder.encode(tag, "UTF-8")
 
 /** The message the answer screen sends, one line per answered item as you
- *  would type it on the laptop ("3 yes", "5 no: not today"), then the
- *  free text. Empty when nothing was chosen or written. */
-fun reply(choice: Map<Int, Boolean>, notes: Map<Int, String>, free: String): String {
+ *  would type it on the laptop ("3 yes", "5 no: not today", "7 done"),
+ *  then the free text. Empty when nothing was chosen or written. */
+fun reply(choice: Map<Int, String>, notes: Map<Int, String>, free: String): String {
     val items = choice.keys.sorted().map { n ->
         val note = notes[n].orEmpty().trim()
-        "$n ${if (choice[n] == true) "yes" else "no"}" + if (note.isEmpty()) "" else ": $note"
+        "$n ${choice[n]}" + if (note.isEmpty()) "" else ": $note"
     }
     return (items + listOfNotNull(free.trim().ifEmpty { null })).joinToString("\n")
 }
