@@ -201,7 +201,10 @@ class Watch : Service() {
                 .setStyle(Notification.BigTextStyle().bigText(text(d)))
                 .setWhen(d.t * 1000)
                 .setShowWhen(true)
-                .setOnlyAlertOnce(true)
+                // A dialog that waits buzzes even over the session's
+                // last notice, and is orange like an open item.
+                .setOnlyAlertOnce(d.kind != "ask")
+                .apply { if (d.kind == "ask") setColor(0xFFFF8700.toInt()) }
                 .setAutoCancel(true)
                 .setContentIntent(
                     PendingIntent.getActivity(

@@ -43,6 +43,9 @@ class DoneOnAndroidTest {
         assertEquals(listOf("beta"), ringing(events, eta = true, every = false).map { it.tag })
         assertEquals(listOf("alpha", "beta"), ringing(events, eta = false, every = true).map { it.tag })
         assertEquals(emptyList<Done>(), ringing(events, eta = false, every = false))
+        val ask = Done("gamma", 170, "ask", "", "Bash: git push")
+        assertEquals(listOf(ask), ringing(listOf(ask), eta = true, every = false))
+        assertEquals("gamma waits for your yes", title(ask))
     }
 
     @Test
