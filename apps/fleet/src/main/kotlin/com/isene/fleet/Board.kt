@@ -154,6 +154,14 @@ fun messageBody(tag: String, text: String): String = JSONObject()
         .put("arguments", JSONObject().put("tag", tag).put("text", text)))
     .toString()
 
+/** Takes one open item off a session's list: the server's drop_item tool.
+ *  The text lets the laptop check the number still names that item. */
+fun dropBody(tag: String, num: Int, text: String): String = JSONObject()
+    .put("jsonrpc", "2.0").put("id", 1).put("method", "tools/call")
+    .put("params", JSONObject().put("name", "drop_item")
+        .put("arguments", JSONObject().put("tag", tag).put("num", num).put("text", text)))
+    .toString()
+
 /** The server's words on a sent message, or null when it gave none. */
 fun messageReply(body: String): String? = try {
     JSONObject(body).getJSONObject("result").getJSONArray("content").getJSONObject(0).getString("text")
@@ -235,6 +243,27 @@ object Board {
                     sessions.value = answered.shown(raw)
                 }
                 Toast.makeText(app, said ?: "Not sent: no answer from the server.", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /** Takes item `num` off the list of `tag`, for one answered on the
+     *  laptop: it leaves the screen at once, and the session is not woken. */
+    fun drop(ctx: Context, tag: String, num: Int, text: String) {
+        val address = Store(ctx).address
+        val app = ctx.applicationContext
+        raw.find { it.tag == tag }?.let {
+            answered.sent(it, setOf(num))
+            sessions.value = answered.shown(raw)
+        }
+        thread(name = "drop") {
+            val said = post(address, dropBody(tag, num, text))?.let(::messageReply)
+            Handler(Looper.getMainLooper()).post {
+                if (said?.startsWith("Dropped") != true) {
+                    answered.failed(tag, setOf(num))
+                    sessions.value = answered.shown(raw)
+                }
+                Toast.makeText(app, said ?: "Not dropped: no answer from the server.", Toast.LENGTH_LONG).show()
             }
         }
     }

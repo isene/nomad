@@ -591,6 +591,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
   the session ends a turn after the message, or the list drops them.
   The laptop hides nothing for a phone message: its hook sees only the
   wake prompt "Check fleet messages".
+- 0.4.8: Drop beside an item calls the server's `drop_item` tool (laptop
+  fleet 0.3.68), which writes `relay/.drop/<tag>.<num>` with the item's
+  text. fleet deletes it while the number still names that text.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`
