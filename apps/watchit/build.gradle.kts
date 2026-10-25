@@ -122,8 +122,8 @@ android {
         applicationId = "com.isene.watchit"
         minSdk = 33
         targetSdk = 35
-        versionCode = 18
-        versionName = "0.5.0"
+        versionCode = 19
+        versionName = "0.6.0"
         ndk { abiFilters += androidAbis.keys }
     }
 

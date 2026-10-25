@@ -176,9 +176,24 @@ pub fn rating_for(ratings: Vec<Rating>, id: String, title: String, year: i32) ->
     score_of(&ratings, &id, &title, year)
 }
 
+/// A typed name made safe as the folder for that person's ratings:
+/// letters, digits, space and dash. Desktop watchit uses the same rule,
+/// so both ends make the same folder from the same name.
+#[uniffi::export]
+pub fn person_name(raw: String) -> String {
+    raw.chars().filter(|c| c.is_alphanumeric() || *c == ' ' || *c == '-').collect::<String>()
+        .trim().to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_name_becomes_a_safe_folder() {
+        assert_eq!(person_name(" Al/ice. ".into()), "Alice");
+        assert_eq!(person_name("Anne-Marie Ø".into()), "Anne-Marie Ø");
+    }
 
     fn r(id: &str, score: i32, ts: i64, title: &str, year: i32) -> Rating {
         Rating { id: id.into(), score, ts, title: title.into(), year }

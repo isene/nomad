@@ -21,6 +21,7 @@ import uniffi.fe2o3_mobile_core.Rating
 import uniffi.fe2o3_mobile_core.WishMark
 import uniffi.fe2o3_mobile_core.chartKind
 import uniffi.fe2o3_mobile_core.markWish
+import uniffi.fe2o3_mobile_core.personName
 import uniffi.fe2o3_mobile_core.syncWish
 import uniffi.fe2o3_mobile_core.filterSort
 import uniffi.fe2o3_mobile_core.genresOf
@@ -88,6 +89,13 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
      *  folder. Empty until a folder is picked in Settings. */
     private val _ratings = MutableStateFlow<List<Rating>>(emptyList())
     val ratings: StateFlow<List<Rating>> = _ratings.asStateFlow()
+    /** Whose ratings are on screen: "" is me, anyone else has a folder
+     *  under `people/` in the sync folder. Every start is as me. */
+    private val _person = MutableStateFlow("")
+    val person: StateFlow<String> = _person.asStateFlow()
+    /** Everyone else, read when the picker opens rather than on every resume. */
+    private val _people = MutableStateFlow<List<String>>(emptyList())
+    val people: StateFlow<List<String>> = _people.asStateFlow()
     /** Who put what on a wish list, and when, across every device. */
     private var wishMarks: List<WishMark> = emptyList()
     /** Until the folder has been read, a toggle must not publish: this
@@ -114,7 +122,8 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
         if (uri.isEmpty()) { _ratings.value = emptyList(); return }
         viewModelScope.launch {
             val ctx = getApplication<Application>()
-            val loaded = withContext(Dispatchers.IO) { RatingsRepo.loadAll(ctx, uri) }
+            val who = _person.value
+            val loaded = withContext(Dispatchers.IO) { RatingsRepo.loadAll(ctx, uri, who) }
             _ratings.value = loaded
             // The list is ordered by these when sort is "mine", so it has
             // to be rebuilt now that they have landed.
@@ -180,6 +189,7 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
         // Merged, not appended: the entry may fold into one the desktop
         // wrote under a different id for the same film.
         val merged = mergeRatings(listOf(_ratings.value, listOf(entry)))
+        val who = _person.value
         _ratings.value = merged
         if (settings.sort == "mine") recompute()
         val uri = settings.syncTreeUri
@@ -188,7 +198,7 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         viewModelScope.launch {
-            withContext(Dispatchers.IO) { RatingsRepo.saveMine(getApplication(), uri, merged) }
+            withContext(Dispatchers.IO) { RatingsRepo.saveMine(getApplication(), uri, merged, who) }
         }
     }
 
@@ -270,6 +280,41 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
         id in (if (settings.view == "movies") settings.wishMovies else settings.wishSeries)
     fun isDumped(id: String): Boolean =
         id in (if (settings.view == "movies") settings.dumpMovies else settings.dumpSeries)
+
+    fun refreshPeople() {
+        val uri = settings.syncTreeUri
+        if (uri.isEmpty()) return
+        viewModelScope.launch {
+            _people.value = withContext(Dispatchers.IO) { RatingsRepo.people(getApplication(), uri) }
+        }
+    }
+
+    fun choosePerson(p: String) {
+        _person.value = p
+        val uri = settings.syncTreeUri
+        viewModelScope.launch {
+            _ratings.value = withContext(Dispatchers.IO) { RatingsRepo.loadAll(getApplication(), uri, p) }
+            recompute(status = "Rating as ${p.ifEmpty { "Me" }}")
+        }
+    }
+
+    /** A new person starts as a copy of whoever is chosen now. */
+    fun addPerson(raw: String) {
+        val name = personName(raw)
+        if (name.isEmpty() || name.equals("me", ignoreCase = true)) return
+        val uri = settings.syncTreeUri
+        if (uri.isEmpty()) { recompute(status = "Pick a sync folder in Settings first"); return }
+        val copy = _ratings.value
+        viewModelScope.launch {
+            val ctx = getApplication<Application>()
+            val ok = withContext(Dispatchers.IO) {
+                name !in RatingsRepo.people(ctx, uri) && RatingsRepo.saveMine(ctx, uri, copy, name)
+            }
+            if (!ok) { recompute(status = "Could not add $name: the name is taken, or the folder is read-only"); return@launch }
+            _people.value = (_people.value + name).sorted()
+            choosePerson(name)
+        }
+    }
 
     fun toggleWish(id: String) {
         if (settings.view == "movies") settings.wishMovies = toggle(settings.wishMovies, id)

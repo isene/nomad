@@ -4,9 +4,9 @@ import android.content.Context
 
 private const val PREFS = "watchit_prefs"
 
-/** All persisted config + the user's curated lists. The catalog, key and
- *  wish/dump are the phone's own — only MY RATINGS cross over, through the
- *  Syncthing folder named by `syncTreeUri`. Ordered lists are stored
+/** All persisted config + the user's curated lists. The ratings, the wish
+ *  lists, the catalog and the key also cross over, through the Syncthing
+ *  folder named by `syncTreeUri`; dump stays here. Ordered lists are stored
  *  newline-joined (SharedPreferences StringSet loses order, which wish/dump
  *  care about). */
 class Settings(ctx: Context) {
