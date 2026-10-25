@@ -31,7 +31,8 @@ phone twin of [fleet](https://github.com/isene/fleet).
   the laptop's colours. Each open item has Yes, No, Done and Rec (sent
   as "as recommended"), with a line for words to go with it, and a box below takes words of your own.
   Send goes out as one message, as you would type it ("3 yes", "5 no:
-  not today").
+  not today"). The items it answers leave the screen at once. One comes
+  back only if the session's answer to it leaves it open.
 - Hold a session to write it a message. fleet on the laptop wakes the
   session with it once the session waits at its prompt.
 - Paste the address of your fleet connector once. It stays on the phone, and

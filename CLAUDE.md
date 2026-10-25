@@ -579,6 +579,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
   Send button) into view on focus, on each keyboard height and on each
   text change. No Robolectric test reaches the keyboard; he checks it on
   the phone. ⋮ beside the title has About with the version.
+- 0.4.7: a sent message's answered items (`answers()`, the laptop
+  hook's rule) leave the list at once. `Answered` keeps them out until
+  the session ends a turn after the message, or the list drops them.
+  The laptop hides nothing for a phone message: its hook sees only the
+  wake prompt "Check fleet messages".
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`

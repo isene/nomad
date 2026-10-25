@@ -88,6 +88,60 @@ fun reply(choice: Map<Int, String>, notes: Map<Int, String>, free: String): Stri
     return (items + listOfNotNull(free.trim().ifEmpty { null })).joinToString("\n")
 }
 
+/** The items a message answers, read as fleet on the laptop reads a
+ *  prompt: each line that starts with a number, as in "3 yes", "3: the
+ *  second" or a bare "3". "3rd" and "3.5" start a sentence. */
+fun answers(text: String): Set<Int> = text.lines().mapNotNull { line ->
+    val l = line.trimStart()
+    val num = l.takeWhile { it in '0'..'9' }
+    val next = l.getOrNull(num.length)
+    val sentence = next != null && (next.isLetterOrDigit() ||
+        (next == '.' || next == ',') && l.getOrNull(num.length + 1)?.let { it in '0'..'9' } == true)
+    if (sentence) null else num.toIntOrNull()
+}.toSet()
+
+/** Items answered from the phone leave the list at once. They stay out of
+ *  it until the session has ended a turn on the answer: by then it has
+ *  closed them, or they show again, as on the laptop. */
+class Answered {
+    /** By session: the numbers, and the session's last activity when it
+     *  waited after the answer went (null while it works on the turn it
+     *  was on, since the answer comes after that turn). */
+    private val hidden = mutableMapOf<String, Pair<Set<Int>, Long?>>()
+
+    @Synchronized
+    fun sent(s: Session, nums: Set<Int>) {
+        hidden[s.tag] = (hidden[s.tag]?.first.orEmpty() + nums) to (if (s.state == "working") null else s.at)
+    }
+
+    /** The message did not reach the server, so its items show again. */
+    @Synchronized
+    fun failed(tag: String, nums: Set<Int>) {
+        val (left, at) = hidden[tag] ?: return
+        if ((left - nums).isEmpty()) hidden.remove(tag) else hidden[tag] = (left - nums) to at
+    }
+
+    @Synchronized
+    fun shown(list: List<Session>): List<Session> = list.map { s ->
+        val (nums, at) = hidden[s.tag] ?: return@map s
+        // A number the list no longer has is closed, and free for a new item.
+        val open = nums.filter { n -> s.moves.any { it.first == n } }.toSet()
+        val now = when {
+            s.state == "working" -> open to at
+            at == null -> open to s.at
+            s.at > at -> emptySet<Int>() to at
+            else -> open to at
+        }
+        if (now.first.isEmpty()) {
+            hidden.remove(s.tag)
+            s
+        } else {
+            hidden[s.tag] = now
+            s.copy(moves = s.moves.filter { it.first !in now.first })
+        }
+    }
+}
+
 /** The address that asks for the list once it differs from `stamp`, held
  *  open by the server up to `wait` seconds while it does not. */
 fun board(address: String, stamp: Long, wait: Int): String =
@@ -124,6 +178,9 @@ object Board {
     val marked = mutableStateOf<String?>(null)
     /** The session whose last answer fills the screen, or null for the list. */
     val open = mutableStateOf<String?>(null)
+    /** The list as the server last gave it, before `answered` takes from it. */
+    @Volatile private var raw: List<Session> = emptyList()
+    private val answered = Answered()
     @Volatile private var worker: Thread? = null
     @Volatile private var call: HttpURLConnection? = null
 
@@ -143,7 +200,8 @@ object Board {
                     }
                     stamp = got.stamp
                     got.sessions?.let {
-                        sessions.value = it
+                        raw = it
+                        sessions.value = answered.shown(it)
                         written.value = got.t
                         week.value = got.week
                     }
@@ -159,13 +217,25 @@ object Board {
         worker = null
     }
 
-    /** Sends `text` to the session `tag`, and says in a toast how it went. */
+    /** Sends `text` to the session `tag`, and says in a toast how it went.
+     *  The items it answers leave the list at once. */
     fun send(ctx: Context, tag: String, text: String) {
         val address = Store(ctx).address
         val app = ctx.applicationContext
+        val nums = answers(text)
+        raw.find { it.tag == tag }?.takeIf { nums.isNotEmpty() }?.let {
+            answered.sent(it, nums)
+            sessions.value = answered.shown(raw)
+        }
         thread(name = "send") {
-            val said = post(address, messageBody(tag, text))?.let(::messageReply) ?: "Not sent: no answer from the server."
-            Handler(Looper.getMainLooper()).post { Toast.makeText(app, said, Toast.LENGTH_LONG).show() }
+            val said = post(address, messageBody(tag, text))?.let(::messageReply)
+            Handler(Looper.getMainLooper()).post {
+                if (said?.startsWith("Delivered") != true && nums.isNotEmpty()) {
+                    answered.failed(tag, nums)
+                    sessions.value = answered.shown(raw)
+                }
+                Toast.makeText(app, said ?: "Not sent: no answer from the server.", Toast.LENGTH_LONG).show()
+            }
         }
     }
 
