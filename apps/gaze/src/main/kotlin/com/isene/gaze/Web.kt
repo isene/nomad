@@ -22,6 +22,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
@@ -163,6 +164,9 @@ private fun WebView.setUp(a: MainActivity, tab: Tab) {
         setSupportMultipleWindows(false)
     }
     addJavascriptInterface(Bridge(a, tab), "gazeBridge")
+    if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+        WebViewCompat.addDocumentStartJavaScript(this, DESKTOP_SCRIPT, setOf("*"))
+    }
 
     // Holding a link or a picture asks what to do with it. Holding anything
     // else keeps WebView's own answer: marking text.
@@ -198,7 +202,19 @@ private fun WebView.setUp(a: MainActivity, tab: Tab) {
 
         override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean =
             when (req.url.scheme) {
-                "http", "https", "about", "data", "blob", "javascript" -> {
+                "http", "https" -> {
+                    // A site set to the other kind of page is asked again
+                    // under the other browser name. A form sent there keeps
+                    // its data, and the name counts from its next page on.
+                    val url = req.url.toString()
+                    if (req.isForMainFrame && a.fit(view, url) && req.method == "GET") {
+                        view.loadUrl(url)
+                        true
+                    } else {
+                        false
+                    }
+                }
+                "about", "data", "blob", "javascript" -> {
                     if (req.isForMainFrame) a.darken(view, req.url.toString())
                     false
                 }
@@ -210,7 +226,9 @@ private fun WebView.setUp(a: MainActivity, tab: Tab) {
 
         override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
             tab.url = url
-            a.darken(view, url)
+            // The back key reaches a page with no ask above, under the
+            // browser name of the site it came from.
+            if (a.fit(view, url) && url.startsWith("http")) view.reload()
         }
 
         override fun onPageFinished(view: WebView, url: String) {

@@ -44,6 +44,14 @@ class Prefs(context: Context) {
         p.edit().putStringSet("dark_on", onSet).putStringSet("dark_off", offSet).apply()
     }
 
+    /** Sites shown as a desktop computer gets them. */
+    fun desktopFor(site: String): Boolean = site in sites("desktop")
+
+    fun setDesktop(site: String, on: Boolean) {
+        val set = sites("desktop").apply { if (on) add(site) else remove(site) }
+        p.edit().putStringSet("desktop", set).apply()
+    }
+
     companion object {
         const val DEFAULT_SYNC = "/storage/emulated/0/Documents/gaze"
         const val DEFAULT_SEARCH = "https://duckduckgo.com/?q=%s"

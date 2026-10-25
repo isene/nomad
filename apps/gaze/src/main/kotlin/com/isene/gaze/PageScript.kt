@@ -1,6 +1,23 @@
 package com.isene.gaze
 
 /**
+ * Put into every page before its own code runs. Under the desktop
+ * browser name it gives the page a desktop's width, 1024 pixels, which
+ * the phone then shows whole. A page that sets its width to the phone's
+ * would otherwise keep the phone layout.
+ */
+const val DESKTOP_SCRIPT = """
+(function () {
+  if (window.top !== window || /Android/.test(navigator.userAgent)) return;
+  const wide = () => document.querySelectorAll('meta[name=viewport]')
+    .forEach(m => m.setAttribute('content', 'width=1024'));
+  const watch = new MutationObserver(wide);
+  watch.observe(document, { childList: true, subtree: true });
+  document.addEventListener('DOMContentLoaded', () => { watch.disconnect(); wide(); });
+})();
+"""
+
+/**
  * The script put into every page: it notices a login being sent, and
  * fills one in. The laptop's gaze runs the same code. Pages talk back
  * through `gazeBridge.post` with one JSON object per message.

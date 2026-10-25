@@ -24,6 +24,7 @@ import android.webkit.CookieManager
 import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
@@ -278,7 +279,7 @@ class MainActivity : ComponentActivity() {
         val tab = tabs[current]
         val web = tab.web ?: (newWebView(this, tab) ?: return dropTab(tab)).also { w ->
             tab.web = w
-            darken(w, tab.url)
+            fit(w, tab.url)
             // The pages the tab came through in the last run come back with
             // it, so the back key walks them. Without them it opens its page.
             val kept = tab.kept
@@ -404,7 +405,7 @@ class MainActivity : ComponentActivity() {
         val tab = current() ?: return newTab(url)
         tab.url = url
         val web = tab.web ?: return show(current)
-        darken(web, url)
+        fit(web, url)
         web.loadUrl(url)
     }
 
@@ -497,6 +498,37 @@ class MainActivity : ComponentActivity() {
     fun darken(web: WebView, url: String) {
         val on = prefs.darkFor(gazeSiteKey(url))
         if (web.settings.isAlgorithmicDarkeningAllowed != on) web.settings.isAlgorithmicDarkeningAllowed = on
+    }
+
+    /** The phone's own browser name, and the same browser as a desktop
+     *  computer names it. */
+    private val phoneAgent by lazy { WebSettings.getDefaultUserAgent(this) }
+    private val desktopAgent by lazy {
+        val chrome = Regex("Chrome/[0-9.]+").find(phoneAgent)?.value ?: "Chrome/141.0.0.0"
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) $chrome Safari/537.36"
+    }
+
+    /** Dark pages, and the desktop or phone site, as the site's choices
+     *  say. True when the browser name changed: the page must load again
+     *  to be sent as the other kind. */
+    fun fit(web: WebView, url: String): Boolean {
+        darken(web, url)
+        val agent = if (prefs.desktopFor(gazeSiteKey(url))) desktopAgent else phoneAgent
+        if (web.settings.userAgentString == agent) return false
+        web.settings.userAgentString = agent
+        return true
+    }
+
+    fun toggleDesktop() {
+        val tab = current() ?: return
+        val site = gazeSiteKey(tab.url)
+        val on = !prefs.desktopFor(site)
+        prefs.setDesktop(site, on)
+        tab.web?.let {
+            fit(it, tab.url)
+            it.reload()
+        }
+        say(if (on) "Desktop site here" else "Phone site here")
     }
 
     fun toggleDark() {
