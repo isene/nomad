@@ -42,6 +42,39 @@ class BoardOnAndroidTest {
     }
 
     @Test
+    fun a_message_answers_the_items_its_lines_start_with() {
+        assertEquals(setOf(3, 5, 7), answers("3 yes\n5 no: not today\n  7\nGo on."))
+        assertEquals(setOf(4), answers("4: the second\n3rd time\n3.5 is more"))
+    }
+
+    private fun yours(at: Long, vararg nums: Int, state: String = "YOURS") =
+        Session("ci", state, "", null, "", "", at, null, nums.map { it to "Item $it?" })
+
+    @Test
+    fun an_answered_item_is_hidden_until_the_session_ends_a_turn_on_it() {
+        val a = Answered()
+        a.sent(yours(100, 2, 3), setOf(2))
+        assertEquals(listOf(3), a.shown(listOf(yours(100, 2, 3)))[0].moves.map { it.first })
+        assertEquals("while it works", listOf(3), a.shown(listOf(yours(150, 2, 3, state = "working")))[0].moves.map { it.first })
+        assertEquals("not closed: as on the laptop", listOf(2, 3), a.shown(listOf(yours(200, 2, 3)))[0].moves.map { it.first })
+
+        // Sent while the session worked on the turn before: that turn's end is not the answer's.
+        a.sent(yours(300, 2, state = "working"), setOf(2))
+        assertEquals(emptyList<Int>(), a.shown(listOf(yours(320, 2)))[0].moves.map { it.first })
+        assertEquals(emptyList<Int>(), a.shown(listOf(yours(330, 2, state = "working")))[0].moves.map { it.first })
+        assertEquals(listOf(2), a.shown(listOf(yours(360, 2)))[0].moves.map { it.first })
+
+        // Closed: the number is free, and a new item 2 shows at once.
+        a.sent(yours(400, 2), setOf(2))
+        a.shown(listOf(yours(400)))
+        assertEquals(listOf(2), a.shown(listOf(yours(400, 2)))[0].moves.map { it.first })
+
+        a.sent(yours(500, 2), setOf(2))
+        a.failed("ci", setOf(2))
+        assertEquals("not sent", listOf(2), a.shown(listOf(yours(500, 2)))[0].moves.map { it.first })
+    }
+
+    @Test
     fun the_screen_asks_from_the_stamp_and_a_message_goes_to_its_session() {
         val asked = Collections.synchronizedList(mutableListOf<String>())
         val server = ServerSocket(0, 5, InetAddress.getLoopbackAddress())
@@ -96,6 +129,9 @@ class BoardOnAndroidTest {
             shadowOf(Looper.getMainLooper()).idle()
         }
         assertEquals("Delivered to 'ci'.", ShadowToast.getTextOfLatestToast())
+
+        Board.send(ctx, "ci", "2 yes")
+        assertEquals("gone at Send", emptyList<Pair<Int, String>>(), Board.sessions.value[0].moves)
         server.close()
     }
 }
