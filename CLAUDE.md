@@ -594,6 +594,8 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - 0.4.8: Drop beside an item calls the server's `drop_item` tool (laptop
   fleet 0.3.68), which writes `relay/.drop/<tag>.<num>` with the item's
   text. fleet deletes it while the number still names that text.
+- 0.4.9: About links to isene.org/nomad. The first version on the
+  download page (published 2026-10-26).
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`
