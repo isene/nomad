@@ -663,6 +663,13 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.clickable { uri.openUri("https://isene.org/hyperlist/") },
                 )
+                Spacer(Modifier.size(8.dp))
+                Text(
+                    "All nomad apps: isene.org/nomad",
+                    Modifier.clickable { uri.openUri("https://isene.org/nomad/") },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         },
     )

@@ -53,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -379,6 +380,13 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 Text("How to use", style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
                 Text("• Settings: paste a free TMDB v3 key, then fetch the lists (⋮ menu).\n• Toggle Movies / Series. Tap a poster for full detail.\n• Add to Wish; Dump hides a title from Browse.\n• Filter sheet: rating, year, genre, sort. Search to add titles not in the charts.\n• Me \u25be at the top: whose ratings you see and give. Add a person there.")
                 Text("Data by The Movie Database (TMDB). Mobile port of the Fe₂O₃ watchit TUI. Created by Geir Isene.")
+                val uri = LocalUriHandler.current
+                Text(
+                    "All nomad apps: isene.org/nomad",
+                    Modifier.clickable { uri.openUri("https://isene.org/nomad/") },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         },
     )

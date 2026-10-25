@@ -3,6 +3,7 @@ package com.isene.astro.ui
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -21,6 +22,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
@@ -37,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.isene.astro.viewmodel.AstroViewModel
@@ -200,7 +203,13 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 Text("• Grant location, or set it manually in Settings, for ephemeris and weather.\n• Sky tab: scroll through the ephemeris table, observing conditions, events, APOD, and the starchart.\n• Gear tab: your telescope/eyepiece catalog with live optics — pick the synced gear.json in Settings.")
                 Text("Sky data: orbit ephemeris, met.no weather, in-the-sky.org events, NASA APOD.")
                 Text("Mobile port of the Fe₂O₃ astro TUI. Created by Geir Isene.")
-                Text("isene.org", style = androidx.compose.material3.MaterialTheme.typography.labelMedium)
+                val uri = LocalUriHandler.current
+                Text(
+                    "All nomad apps: isene.org/nomad",
+                    Modifier.clickable { uri.openUri("https://isene.org/nomad/") },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         },
     )

@@ -312,8 +312,8 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 )
                 Spacer(Modifier.size(16.dp))
                 Text(
-                    "tock for the terminal",
-                    Modifier.clickable { uri.openUri("https://github.com/isene/tock") },
+                    "All nomad apps: isene.org/nomad",
+                    Modifier.clickable { uri.openUri("https://isene.org/nomad/") },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.primary,
                 )
