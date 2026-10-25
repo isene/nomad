@@ -194,7 +194,12 @@ fun Answer(tag: String, close: () -> Unit) {
             if (moves.isNotEmpty()) HorizontalDivider(Modifier.padding(vertical = 6.dp))
             for ((n, t) in moves) Item(n, t, choice[n], notes[n].orEmpty(),
                 choose = { if (it == null) choice.remove(n) else choice[n] = it },
-                write = { notes[n] = it })
+                write = { notes[n] = it },
+                drop = {
+                    choice.remove(n)
+                    notes.remove(n)
+                    Board.drop(ctx, tag, n, t)
+                })
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
             Column(Modifier.inSight(free), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedTextField(
@@ -220,11 +225,15 @@ fun Answer(tag: String, close: () -> Unit) {
 private val CHOICES = listOf("Yes" to "yes", "No" to "no", "Done" to "done", "Rec" to "as recommended")
 
 /** One open item: a chip for the answer, a second tap takes it back, and
- *  once one is picked a line for words to go with it. */
+ *  once one is picked a line for words to go with it. Drop takes it off
+ *  the list without a word to the session, for one answered on the laptop. */
 @Composable
-private fun Item(num: Int, text: String, pick: String?, note: String, choose: (String?) -> Unit, write: (String) -> Unit) {
+private fun Item(num: Int, text: String, pick: String?, note: String, choose: (String?) -> Unit, write: (String) -> Unit, drop: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text("$num. $text", color = Color(0xFFFF8700))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("$num. $text", color = Color(0xFFFF8700), modifier = Modifier.weight(1f))
+            TextButton(onClick = drop) { Text("Drop") }
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for ((label, word) in CHOICES) {
                 FilterChip(selected = pick == word, onClick = { choose(if (pick == word) null else word) }, label = { Text(label) })

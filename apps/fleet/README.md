@@ -33,6 +33,8 @@ phone twin of [fleet](https://github.com/isene/fleet).
   Send goes out as one message, as you would type it ("3 yes", "5 no:
   not today"). The items it answers leave the screen at once. One comes
   back only if the session's answer to it leaves it open.
+- Drop beside an item takes it off the list without waking the session,
+  for one you answered on the laptop.
 - Hold a session to write it a message. fleet on the laptop wakes the
   session with it once the session waits at its prompt.
 - Paste the address of your fleet connector once. It stays on the phone, and

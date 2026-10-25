@@ -94,6 +94,7 @@ class BoardOnAndroidTest {
                     val sent = CharArray(length).also { r.read(it) }.concatToString()
                     asked += if (first[0] == "POST") sent else first[1].substringAfter('?')
                     val body = when {
+                        first[0] == "POST" && "drop_item" in sent -> """{"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": "Dropped 2 from 'ci'."}]}}"""
                         first[0] == "POST" -> """{"jsonrpc": "2.0", "id": 1, "result": {"content": [{"type": "text", "text": "Delivered to 'ci'."}]}}"""
                         first[1].endsWith("sessions=-1&wait=0") -> list
                         else -> { Thread.sleep(300); """{"stamp": 7}""" }
@@ -132,6 +133,19 @@ class BoardOnAndroidTest {
 
         Board.send(ctx, "ci", "2 yes")
         assertEquals("gone at Send", emptyList<Pair<Int, String>>(), Board.sessions.value[0].moves)
+
+        asked.clear()
+        Board.drop(ctx, "ci", 2, "Restart kastrup?")
+        while (ShadowToast.getTextOfLatestToast()?.startsWith("Dropped") != true && System.currentTimeMillis() < end) {
+            Thread.sleep(50)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        val drop = JSONObject(asked.last { "drop_item" in it }).getJSONObject("params")
+        assertEquals("drop_item", drop.getString("name"))
+        val what = drop.getJSONObject("arguments")
+        assertEquals(Triple("ci", 2, "Restart kastrup?"), Triple(what.getString("tag"), what.getInt("num"), what.getString("text")))
+        assertEquals("Dropped 2 from 'ci'.", ShadowToast.getTextOfLatestToast())
+        assertEquals("still gone", emptyList<Pair<Int, String>>(), Board.sessions.value[0].moves)
         server.close()
     }
 }

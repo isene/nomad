@@ -23,8 +23,8 @@ android {
         applicationId = "com.isene.fleet"
         minSdk = 33
         targetSdk = 35
-        versionCode = 13
-        versionName = "0.4.7"
+        versionCode = 14
+        versionName = "0.4.8"
     }
 
     signingConfigs {
