@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Row
@@ -82,6 +83,10 @@ fun WatchitApp(vm: WatchitViewModel) {
     var showSearch by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var showAbout by remember { mutableStateOf(false) }
+    var personOpen by remember { mutableStateOf(false) }
+    var showAddPerson by remember { mutableStateOf(false) }
+    val person by vm.person.collectAsState()
+    val people by vm.people.collectAsState()
 
     detail?.let { item ->
         DetailScreen(vm, item, onBack = { detail = null })
@@ -95,6 +100,30 @@ fun WatchitApp(vm: WatchitViewModel) {
                     title = { Text("watchit", fontWeight = FontWeight.Bold) },
                     actions = {
                         if (ui.busy) CircularProgressIndicator(Modifier.width(20.dp).padding(end = 8.dp), strokeWidth = 2.dp)
+                        // Whose ratings are on screen. Anyone but me stands out, so a
+                        // score never lands on the wrong person.
+                        Box {
+                            TextButton(onClick = { vm.refreshPeople(); personOpen = true }) {
+                                Text(
+                                    "${person.ifEmpty { "Me" }} \u25be",
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (person.isEmpty()) MaterialTheme.colorScheme.onSurface
+                                    else MaterialTheme.colorScheme.tertiary,
+                                )
+                            }
+                            DropdownMenu(expanded = personOpen, onDismissRequest = { personOpen = false }) {
+                                (listOf("") + people).forEach { p ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(p.ifEmpty { "Me" },
+                                                fontWeight = if (p == person) FontWeight.Bold else FontWeight.Normal)
+                                        },
+                                        onClick = { personOpen = false; vm.choosePerson(p) },
+                                    )
+                                }
+                                DropdownMenuItem(text = { Text("Add person\u2026") }, onClick = { personOpen = false; showAddPerson = true })
+                            }
+                        }
                         IconButton(onClick = { showSearch = true }) { Icon(Icons.Filled.Search, "Search") }
                         IconButton(onClick = { menuOpen = true }) { Icon(Icons.Filled.MoreVert, "Menu") }
                         DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
@@ -161,6 +190,11 @@ fun WatchitApp(vm: WatchitViewModel) {
     }
     if (showSettings) SettingsDialog(vm) { showSettings = false }
     if (showAbout) AboutDialog { showAbout = false }
+    if (showAddPerson) AddPersonDialog(
+        from = person.ifEmpty { "you" },
+        onAdd = { vm.addPerson(it); showAddPerson = false },
+        onDismiss = { showAddPerson = false },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -306,6 +340,27 @@ private fun SettingsDialog(vm: WatchitViewModel, onDismiss: () -> Unit) {
 }
 
 @Composable
+private fun AddPersonDialog(from: String, onAdd: (String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = { TextButton(onClick = { onAdd(name) }, enabled = name.isNotBlank()) { Text("Add") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+        title = { Text("Add a person") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                Text(
+                    "Starts with the same ratings as $from, and changes from there. Wish and dump lists are shared.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+            }
+        },
+    )
+}
+
+@Composable
 private fun AboutDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -322,7 +377,7 @@ private fun AboutDialog(onDismiss: () -> Unit) {
             ) {
                 Text("Discover and track movies & series. Top-rated and popular lists from TMDB, your own wish and dump lists, posters and full details.")
                 Text("How to use", style = androidx.compose.material3.MaterialTheme.typography.titleSmall)
-                Text("• Settings: paste a free TMDB v3 key, then fetch the lists (⋮ menu).\n• Toggle Movies / Series. Tap a poster for full detail.\n• Add to Wish; Dump hides a title from Browse.\n• Filter sheet: rating, year, genre, sort. Search to add titles not in the charts.")
+                Text("• Settings: paste a free TMDB v3 key, then fetch the lists (⋮ menu).\n• Toggle Movies / Series. Tap a poster for full detail.\n• Add to Wish; Dump hides a title from Browse.\n• Filter sheet: rating, year, genre, sort. Search to add titles not in the charts.\n• Me \u25be at the top: whose ratings you see and give. Add a person there.")
                 Text("Data by The Movie Database (TMDB). Mobile port of the Fe₂O₃ watchit TUI. Created by Geir Isene.")
             }
         },

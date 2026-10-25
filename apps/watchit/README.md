@@ -6,7 +6,7 @@
 
 **[Download for Android (APK)](https://github.com/isene/nomad/releases/download/apk/watchit.apk)** · [how to install](https://isene.org/nomad/#get)
 
-![version](https://img.shields.io/badge/version-0.5.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.6.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 A TMDB movie & series browser — mobile companion to the Fe₂O₃ [watchit](https://github.com/isene/watchit) TUI. Part of the [nomad](../../) mobile suite.
 
@@ -37,6 +37,12 @@ the **wish lists**, the **catalog** itself, and the **TMDB key** (so there
 is nothing to type in here; a key already set on this phone is left alone).
 Taking a title off the wish list on one device takes it off the other. The
 dump lists stay local.
+
+Several people can rate. **Me ▾** at the top right shows whose ratings are
+on screen; pick another name there, or **Add person…**, who starts with the
+same ratings as whoever is chosen. Each person's files live in
+`people/<name>/` in the same folder, and the desktop sees them too. Wish and
+dump lists are shared by everyone.
 
 One file per device (`ratings-phone.json` and `catalog-phone.json` here),
 because two writers on one file is what makes Syncthing leave

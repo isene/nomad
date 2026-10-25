@@ -21,12 +21,38 @@ import uniffi.fe2o3_mobile_core.serializeRatings
  */
 object RatingsRepo {
     private const val MINE = "ratings-phone.json"
+    private const val PEOPLE = "people"
 
-    /** Everything every device knows, merged. Empty when no folder is set. */
-    fun loadAll(ctx: Context, treeUri: String): List<Rating> {
+    /**
+     * The folder holding one person's ratings. "" is me, at the top where
+     * my files always were; anyone else has `people/<name>/` with the same
+     * files. `create` makes the folders when they are missing.
+     */
+    private fun dir(ctx: Context, treeUri: String, person: String, create: Boolean): DocumentFile? {
+        if (treeUri.isEmpty()) return null
+        val tree = runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri)) }.getOrNull()
+            ?: return null
+        if (person.isEmpty()) return tree
+        val people = tree.findFile(PEOPLE)?.takeIf { it.isDirectory }
+            ?: (if (create) tree.createDirectory(PEOPLE) else null)
+            ?: return null
+        return people.findFile(person)?.takeIf { it.isDirectory }
+            ?: if (create) people.createDirectory(person) else null
+    }
+
+    /** Everyone besides me with ratings of their own, A to Z. */
+    fun people(ctx: Context, treeUri: String): List<String> {
         if (treeUri.isEmpty()) return emptyList()
         val tree = runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri)) }.getOrNull()
             ?: return emptyList()
+        val people = tree.findFile(PEOPLE)?.takeIf { it.isDirectory } ?: return emptyList()
+        return people.listFiles().filter { it.isDirectory }.mapNotNull { it.name }
+            .filter { !it.startsWith(".") }.sorted()
+    }
+
+    /** Everything every device knows about one person, merged. Empty when no folder is set. */
+    fun loadAll(ctx: Context, treeUri: String, person: String = ""): List<Rating> {
+        val tree = dir(ctx, treeUri, person, create = false) ?: return emptyList()
         val sets = tree.listFiles().mapNotNull { f ->
             val name = f.name ?: return@mapNotNull null
             if (!f.isFile || !name.startsWith("ratings-") || !name.endsWith(".json")) {
@@ -46,10 +72,8 @@ object RatingsRepo {
      * and it means a device that has been away comes back with
      * everything rather than only its own edits.
      */
-    fun saveMine(ctx: Context, treeUri: String, ratings: List<Rating>): Boolean {
-        if (treeUri.isEmpty()) return false
-        val tree = runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri)) }.getOrNull()
-            ?: return false
+    fun saveMine(ctx: Context, treeUri: String, ratings: List<Rating>, person: String = ""): Boolean {
+        val tree = dir(ctx, treeUri, person, create = true) ?: return false
         val file = tree.findFile(MINE)?.takeIf { it.isFile }
             ?: tree.createFile("application/json", MINE)
             ?: return false
