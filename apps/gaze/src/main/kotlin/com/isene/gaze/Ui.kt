@@ -208,11 +208,23 @@ private fun AddressBar(a: MainActivity, tab: Tab?) {
     }
 }
 
+private const val PAGE_MENU = "This page ›"
+
 @Composable
 private fun Menu(a: MainActivity) {
     var open by remember { mutableStateOf(false) }
+    // The second level: what is done to this page and how its site is shown.
+    var page by remember { mutableStateOf(false) }
     val tab = a.tabs.getOrNull(a.current)
-    val dark = tab?.let { a.prefs.darkFor(uniffi.fe2o3_mobile_core.gazeSiteKey(it.url)) } ?: a.prefs.dark
+    val site = tab?.let { uniffi.fe2o3_mobile_core.gazeSiteKey(it.url) }
+    val dark = site?.let { a.prefs.darkFor(it) } ?: a.prefs.dark
+    val desktop = site?.let { a.prefs.desktopFor(it) } ?: false
+    val pageItems: List<Pair<String, () -> Unit>> = listOf(
+        (if (desktop) "Phone here" else "Desktop here") to { a.toggleDesktop() },
+        (if (dark) "Light here" else "Dark here") to { a.toggleDark() },
+        "Fill password" to { a.fillLogin() },
+        "Download page" to { a.downloadUrl(tab?.web?.url) },
+    )
     val items: List<Pair<String, () -> Unit>> = listOf(
         "New tab" to { a.newBlankTab() },
         "New private tab" to { a.newPrivateTab() },
@@ -222,19 +234,21 @@ private fun Menu(a: MainActivity) {
         "Bookmarks" to { a.screen = Screen.Bookmarks },
         "Send to laptop" to { a.sendToLaptop() },
         "Share" to { a.share() },
-        "Download page" to { a.downloadUrl(tab?.web?.url) },
         "Ask Claude" to { a.askClaude() },
-        "Fill password" to { a.fillLogin() },
-        (if (dark) "Light here" else "Dark here") to { a.toggleDark() },
+        PAGE_MENU to { page = true },
         "Passwords" to { a.screen = Screen.Passwords },
         "Settings" to { a.screen = Screen.Settings },
     )
     Box {
         TextButton(onClick = { open = true }) { Text("⋮", fontSize = 22.sp, color = Color.White) }
-        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            items.forEach { (label, act) ->
+        DropdownMenu(expanded = open, onDismissRequest = { open = false; page = false }) {
+            if (page) DropdownMenuItem(text = { Text("‹ This page", color = Accent) }, onClick = { page = false })
+            (if (page) pageItems else items).forEach { (label, act) ->
                 DropdownMenuItem(text = { Text(label) }, onClick = {
-                    open = false
+                    if (label != PAGE_MENU) {
+                        open = false
+                        page = false
+                    }
                     act()
                 })
             }

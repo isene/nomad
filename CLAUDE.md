@@ -175,6 +175,13 @@ when building the core. Same rule as the rest of Fe₂O₃.
   the list, a held tab is drawn `shift` pixels from its row, and
   `moveTab` keeps `current` on the tab that is on screen. Each `Tab` has
   an `id` as its list key. Not tried on a phone by Claude.
+- Desktop sites (0.4.5): `fit()` sets a site's browser name before each
+  main-frame load: the phone's own, or a desktop Linux Chrome with the
+  same Chrome version. A GET whose name changed is loaded again under
+  the new one; `onPageStarted` reloads a page the back key reached.
+  `DESKTOP_SCRIPT` (document start) sets the viewport to 1024 wide when
+  the name has no "Android"; checked in headless Chromium as a phone.
+  The menu's site items sit under "This page ›".
 
 ### outside (com.isene.outside)
 
