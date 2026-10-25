@@ -18,7 +18,10 @@ import uniffi.fe2o3_mobile_core.Catalog
 import uniffi.fe2o3_mobile_core.Details
 import uniffi.fe2o3_mobile_core.ListItem
 import uniffi.fe2o3_mobile_core.Rating
+import uniffi.fe2o3_mobile_core.WishMark
 import uniffi.fe2o3_mobile_core.chartKind
+import uniffi.fe2o3_mobile_core.markWish
+import uniffi.fe2o3_mobile_core.syncWish
 import uniffi.fe2o3_mobile_core.filterSort
 import uniffi.fe2o3_mobile_core.genresOf
 import uniffi.fe2o3_mobile_core.mergeCatalogs
@@ -85,6 +88,11 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
      *  folder. Empty until a folder is picked in Settings. */
     private val _ratings = MutableStateFlow<List<Rating>>(emptyList())
     val ratings: StateFlow<List<Rating>> = _ratings.asStateFlow()
+    /** Who put what on a wish list, and when, across every device. */
+    private var wishMarks: List<WishMark> = emptyList()
+    /** Until the folder has been read, a toggle must not publish: this
+     *  phone's file would hold that one mark and lose the rest. */
+    private var wishLoaded = false
 
     init {
         movies = Repo.loadItems(app, "movies.json")
@@ -134,6 +142,21 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
             // Publish ours back, so the desktop sees what was added here.
             withContext(Dispatchers.IO) {
                 ShareRepo.saveMine(ctx, uri, Catalog(movies, series))
+            }
+            // The wish lists: what the desktop put on or took off.
+            val marks = withContext(Dispatchers.IO) { ShareRepo.loadWish(ctx, uri) }
+            val now = System.currentTimeMillis() / 1000
+            val m = syncWish(marks, "movies", settings.wishMovies, now)
+            val s = syncWish(m.marks, "series", settings.wishSeries, now)
+            wishMarks = s.marks
+            wishLoaded = true
+            if (m.changed || s.changed) {
+                withContext(Dispatchers.IO) { ShareRepo.saveWish(ctx, uri, wishMarks) }
+            }
+            if (m.list != settings.wishMovies || s.list != settings.wishSeries) {
+                settings.wishMovies = m.list
+                settings.wishSeries = s.list
+                recompute()
             }
         }
     }
@@ -252,6 +275,13 @@ class WatchitViewModel(app: Application) : AndroidViewModel(app) {
         if (settings.view == "movies") settings.wishMovies = toggle(settings.wishMovies, id)
         else settings.wishSeries = toggle(settings.wishSeries, id)
         recompute()
+        val uri = settings.syncTreeUri
+        if (uri.isEmpty() || !wishLoaded) return
+        wishMarks = markWish(wishMarks, settings.view, id, isWished(id), System.currentTimeMillis() / 1000)
+        val marks = wishMarks
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { ShareRepo.saveWish(getApplication(), uri, marks) }
+        }
     }
     fun toggleDump(id: String) {
         if (settings.view == "movies") settings.dumpMovies = toggle(settings.dumpMovies, id)
