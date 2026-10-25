@@ -15,13 +15,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -49,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -199,8 +203,20 @@ private fun Screen() {
         onDismissRequest = { about = false },
         confirmButton = { TextButton(onClick = { about = false }) { Text("Close") } },
         title = { Text("fleet ${BuildConfig.VERSION_NAME}") },
-        text = { Text("The Claude Code sessions on your laptop, on your phone: a buzz when one finishes, " +
-            "its last answer, and words back to it. Public domain, github.com/isene/nomad.") },
+        text = {
+            Column {
+                Text("The Claude Code sessions on your laptop, on your phone: a buzz when one finishes, " +
+                    "its last answer, and words back to it. Public domain.")
+                Spacer(Modifier.height(8.dp))
+                val uri = LocalUriHandler.current
+                Text(
+                    "All nomad apps: isene.org/nomad",
+                    Modifier.clickable { uri.openUri("https://isene.org/nomad/") },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        },
     )
 
     if (editing) {

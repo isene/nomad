@@ -14,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.core.content.ContextCompat
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -373,6 +374,14 @@ private fun RelayScreen() {
                     Text(
                         "Built on the Fe2O3 tools by Geir Isene.",
                         style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(Modifier.size(12.dp))
+                    val uri = LocalUriHandler.current
+                    Text(
+                        "All nomad apps: isene.org/nomad",
+                        Modifier.clickable { uri.openUri("https://isene.org/nomad/") },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             },

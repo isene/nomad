@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -163,6 +165,14 @@ private fun AboutDialog(onClose: () -> Unit) {
                         "4. Edit the transcript if needed, then tap → Tasks or → Notes.\n\n" +
                         "Tasks captures land under an \"Inbox\" category in todo.hl.",
                     style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.size(12.dp))
+                val uri = LocalUriHandler.current
+                Text(
+                    "All nomad apps: isene.org/nomad",
+                    Modifier.clickable { uri.openUri("https://isene.org/nomad/") },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         },

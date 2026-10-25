@@ -10,6 +10,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.platform.LocalUriHandler
 import com.isene.scribe.data.CARD_COLOURS
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -833,6 +834,14 @@ private fun AboutDialog(onClose: () -> Unit) {
                 Text(
                     "Built on the Fe2O3 tools by Geir Isene.",
                     style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.size(12.dp))
+                val uri = LocalUriHandler.current
+                Text(
+                    "All nomad apps: isene.org/nomad",
+                    Modifier.clickable { uri.openUri("https://isene.org/nomad/") },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         },

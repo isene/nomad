@@ -46,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -643,6 +644,13 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 Text("How to use", style = MaterialTheme.typography.titleSmall)
                 Text("• Settings: paste the accounts JSON and pick the shared folder.\n• ↻ fetches the last N days of every inbox.\n• Tap a message to read it; bodies download on demand.\n• Unread / account chips filter the list.")
                 Text("Bodies are decoded by fe2o3-mail, the same crate kastrup uses. Created by Geir Isene.")
+                val uri = LocalUriHandler.current
+                Text(
+                    "All nomad apps: isene.org/nomad",
+                    Modifier.clickable { uri.openUri("https://isene.org/nomad/") },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
             }
         },
     )

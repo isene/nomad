@@ -47,6 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -262,6 +263,14 @@ fun CalcScreen(vm: CalcViewModel) {
                             "Built on the Fe2O3 tools by Geir Isene.",
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.secondary,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    val uri = LocalUriHandler.current
+                    Text(
+                        "All nomad apps: isene.org/nomad",
+                        Modifier.clickable { uri.openUri("https://isene.org/nomad/") },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             },
