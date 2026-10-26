@@ -117,6 +117,12 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
             render()
         }
     }
+    private val gapLine = line(LINK).apply {
+        setOnClickListener {
+            Prefs.setPanelGap(context, !Prefs.panelGap(context))
+            render()
+        }
+    }
     private val anyApp = line(LINK).apply {
         text = "To open the panel from any app: tap here, then switch OnePage on under Accessibility."
         setOnClickListener { openAccessibility() }
@@ -130,6 +136,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         addView(hint)
         addView(grid)
         addView(placeLine)
+        addView(gapLine)
         addView(anyApp)
         // A tap on the card itself goes nowhere, so it does not close it.
         setOnClickListener { if (folder != null) back() }
@@ -233,7 +240,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
                 else -> Gravity.END or Gravity.CENTER_VERTICAL
             },
         )
-        for (v in listOf(hint, placeLine, anyApp)) v.layoutParams = LinearLayout.LayoutParams(cellW * cols, wrap)
+        for (v in listOf(hint, placeLine, gapLine, anyApp)) v.layoutParams = LinearLayout.LayoutParams(cellW * cols, wrap)
         val at = when (place) {
             BOTTOM -> "at the bottom"
             LEFT -> "at the left"
@@ -285,14 +292,18 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
     private fun render() {
         val panel = now()
         val used = panelRows(panel, cols.toUInt()).toInt()
+        val gap = Prefs.panelGap(context)
         // While editing there is room below for a new group after a gap.
-        val rows = if (edit) used + SPARE else used
+        val rows = if (edit) used + SPARE else if (gap) used + 1 else used
         val wanted = ArrayList<Target>()
 
         hint.visibility = if (edit) View.VISIBLE else View.GONE
         hint.text = if (moving != null) "Tap where it should go."
         else "Drag an icon to move it. Tap + to add, tap an icon for more. Back when done."
         placeLine.visibility = if (edit) View.VISIBLE else View.GONE
+        gapLine.visibility = if (edit) View.VISIBLE else View.GONE
+        gapLine.text = if (gap) "The panel ends with an empty row. Tap here to take it away."
+        else "The panel ends at its last icons. Tap here to add an empty row below them."
         anyApp.visibility = if (edit && !EdgeService.on) View.VISIBLE else View.GONE
 
         over = null

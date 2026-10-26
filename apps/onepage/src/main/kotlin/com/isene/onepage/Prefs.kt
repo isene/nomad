@@ -7,6 +7,7 @@ object Prefs {
     private const val KEY_SETUP_DONE = "setup_done"
     private const val KEY_HOME_BUTTON = "home_button"
     private const val KEY_PANEL_PLACE = "panel_place"
+    private const val KEY_PANEL_GAP = "panel_gap"
     private const val KEY_QUIET = "quiet_apps"
     private const val KEY_EDGE_PAUSED = "edge_paused"
 
@@ -37,6 +38,15 @@ object Prefs {
     fun setPanelPlace(c: Context, v: String) {
         c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putString(KEY_PANEL_PLACE, v).apply()
+    }
+
+    /** Whether the panel ends with an empty row below its last icon. */
+    fun panelGap(c: Context): Boolean =
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_PANEL_GAP, false)
+
+    fun setPanelGap(c: Context, v: Boolean) {
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_PANEL_GAP, v).apply()
     }
 
     /** The apps, by package, that start with the swipe strip's service

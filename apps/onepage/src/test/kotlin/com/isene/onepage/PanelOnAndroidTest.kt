@@ -16,6 +16,7 @@ import android.view.ViewGroup
 import android.widget.CheckedTextView
 import android.widget.GridLayout
 import android.widget.ListView
+import android.widget.TextView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -153,6 +154,17 @@ class PanelOnAndroidTest {
         assertEquals(cells, grid.childCount)
         assertTrue("a slot of the panel is gone", (0 until cells).all { grid.getChildAt(it)?.parent === grid })
         assertEquals("the panel closed", 0, closed)
+    }
+
+    @Test fun the_empty_row_at_the_bottom_stays_after_editing() {
+        val (a) = apps(1).map { it.second }
+        val (_, panel) = panelOn(true, Slot.One(a))
+        val grid = all(panel, GridLayout::class.java)[0]
+        all(panel, TextView::class.java).first { it.text.startsWith("The panel ends at") }.performClick()
+        panel.back()
+
+        assertEquals("rows of the panel", 2, grid.childCount / grid.columnCount)
+        assertTrue(Prefs.panelGap(app))
     }
 
     @Test fun an_icon_dragged_inside_a_folder_takes_its_new_place() {

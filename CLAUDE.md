@@ -369,6 +369,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
   along the bottom above the button bar (the default), or at the right or the
   left edge. The line that changes it is the last one in the panel's edit mode.
   The number of columns follows from the place, so the file stores slots only.
+- An empty row below the last icons is a setting too (`Prefs.panelGap`), switched by
+  the line under that one. Geir asked for it on 2026-10-26, so no unused icon
+  has to pad the bottom row.
 - The panel is a window of its own (`PanelWindow`,
   `TYPE_APPLICATION_OVERLAY`), so it comes up over any app, and the app
   below keeps running. It is built on open and dropped on close. Keep it
