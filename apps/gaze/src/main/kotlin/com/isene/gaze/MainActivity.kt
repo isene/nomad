@@ -301,9 +301,10 @@ class MainActivity : ComponentActivity() {
         show(tabs.lastIndex)
     }
 
+    /** A new tab opens the user's own home page, or shows the start page. */
     fun newBlankTab() {
-        newTab("about:blank")
-        editing = true
+        val home = prefs.home
+        newTab(if (home.isEmpty()) "about:blank" else gazeToUri(home, prefs.search))
     }
 
     // ---------- private tabs ----------

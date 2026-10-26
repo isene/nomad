@@ -182,6 +182,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `DESKTOP_SCRIPT` (document start) sets the viewport to 1024 wide when
   the name has no "Android"; checked in headless Chromium as a phone.
   The menu's site items sit under "This page ›".
+- Start page (0.5.0): a tab on `about:blank` shows `StartPage` over the
+  WebView, from `Places.top` and `Places.mostUsed`. The laptop's twin
+  is `gaze://home`. A home page set in the settings opens instead.
 
 ### outside (com.isene.outside)
 

@@ -110,6 +110,7 @@ private fun Browser(a: MainActivity) {
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             AndroidView(factory = { a.webHostView() }, modifier = Modifier.fillMaxSize())
+            if (tab != null && tab.url == "about:blank") StartPage(a, tab)
             PullMark(a)
         }
         if (a.unlockOffer) Offer("This page has a login.", "Unlock passwords", { a.unlockOffer = false }) { a.askMaster = true }
@@ -126,6 +127,30 @@ private fun Browser(a: MainActivity) {
                 modifier = Modifier.fillMaxWidth().height(2.dp))
         }
         AddressBar(a, tab)
+    }
+}
+
+/** How many pages each list of the start page shows. */
+private const val START_LIST = 8u
+
+private const val HELP = "https://github.com/isene/nomad/tree/master/apps/gaze#readme"
+
+/** What a blank tab shows: the pages visited most of late, the bookmarks
+ *  used most, and the way to the help. */
+@Composable
+private fun StartPage(a: MainActivity, tab: Tab) {
+    val top = remember(tab) { a.places.top(START_LIST) }
+    val marks = remember(tab) { a.places.mostUsed(START_LIST) }
+    val head = Modifier.padding(start = 12.dp, top = 16.dp, bottom = 4.dp)
+    val note = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+    LazyColumn(Modifier.fillMaxSize().background(Color.Black)) {
+        item { Text("Most visited", color = Accent, fontSize = 18.sp, modifier = head) }
+        if (top.isEmpty()) item { Text("The pages you visit most show here.", color = Dim, fontSize = 13.sp, modifier = note) }
+        items(top) { p -> Row2(p.title.ifEmpty { shown(p.url) }, shown(p.url), false, { a.open(p.url) }, null) }
+        item { Text("Bookmarks", color = Accent, fontSize = 18.sp, modifier = head) }
+        if (marks.isEmpty()) item { Text("Bookmark a page from the menu.", color = Dim, fontSize = 13.sp, modifier = note) }
+        items(marks) { p -> Row2(p.title.ifEmpty { shown(p.url) }, shown(p.url), false, { a.open(p.url) }, null) }
+        item { TextButton(onClick = { a.open(HELP) }, modifier = Modifier.padding(4.dp)) { Text("Help", color = Accent) } }
     }
 }
 
@@ -399,6 +424,7 @@ private fun SettingsScreen(a: MainActivity) {
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(12.dp)) {
             Field("Synced folder", p.syncDir) { p.syncDir = it }
             Field("Search (%s is what you type)", p.search) { p.search = it }
+            Field("Home page (empty: the start page)", p.home) { p.home = it }
             Toggle("Dark pages by default", p.dark) { p.dark = it }
             Toggle("Block ads", p.adblock) {
                 p.adblock = it

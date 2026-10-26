@@ -4,6 +4,7 @@
 
 The laptop browser's best parts on the phone, around Android's own WebView.
 
+- **Start page:** a new tab lists the pages you visit most and the bookmarks you use most. It links to this help. A home page of your own goes in the settings. The start page was Aleksander's idea.
 - **Tabs** that come back after a restart, each with the pages it came through. Only the tab you look at loads. Hold a tab in the list and drag it to move it.
 - **Back** walks the pages of the tab, one at a time, to the first. One more press leaves gaze.
 - **Hold a link** to open it in a new tab behind this one, to download it, or to copy its address. **Hold a picture** to download it.
