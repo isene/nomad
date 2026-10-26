@@ -159,13 +159,10 @@ fn hl_line(body: &str) -> Vec<HlSpan> {
 
     let mut sb = SpanBuf::new();
 
-    // Starter `+ ` or `- ` at start of body. HyperList 2.8 made `-` a
-    // neutral Starter alongside the multi-line `+`; both are magenta.
+    // Starter `+ ` at start of body, magenta. A leading `- ` is plain
+    // text (HyperList 2.9).
     let body = if let Some(rest) = body.strip_prefix("+ ") {
         sb.push("+ ".into(), TokenRole::MultiMarker);
-        rest
-    } else if let Some(rest) = body.strip_prefix("- ") {
-        sb.push("- ".into(), TokenRole::MultiMarker);
         rest
     } else {
         body
@@ -714,6 +711,7 @@ mod tests {
     #[test]
     fn multimarker_and_semicolon_and_state() {
         assert_eq!(role_of("+ continues", "+ "), Some(TokenRole::MultiMarker));
+        assert_ne!(role_of("- plain", "- "), Some(TokenRole::MultiMarker));
         assert_eq!(role_of("a; b", ";"), Some(TokenRole::Semicolon));
         // `S: ` / `T: ` are caught by the Property/Operator header detector
         // first (prefix is all-caps -> Operator), matching the canonical
