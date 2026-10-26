@@ -268,6 +268,7 @@ pub struct Place {
 
 const KEEP: usize = 5000;
 const REWRITE_AT: usize = 10_000;
+const MONTH: u64 = 30 * 24 * 3600;
 
 struct Visit {
     url: String,
@@ -432,6 +433,33 @@ impl Places {
         text
     }
 
+    /// For the start page: the pages visited most among those seen in the
+    /// last month. Bookmarks are left out, as they have a list of their own.
+    pub fn top(&self, limit: u32) -> Vec<Place> {
+        let p = self.inner.lock().unwrap();
+        let since = now().saturating_sub(MONTH);
+        let mut out: Vec<&Visit> =
+            p.visits.iter().filter(|v| v.last >= since && !p.bookmarks.iter().any(|(u, _)| *u == v.url)).collect();
+        out.sort_by(|a, b| b.count.cmp(&a.count).then(b.last.cmp(&a.last)));
+        out.into_iter()
+            .take(limit as usize)
+            .map(|v| Place { url: v.url.clone(), title: v.title.clone(), bookmark: false })
+            .collect()
+    }
+
+    /// The bookmarks visited most, most first. Those never visited keep
+    /// the order of the file.
+    pub fn most_used(&self, limit: u32) -> Vec<Place> {
+        let p = self.inner.lock().unwrap();
+        let counts: HashMap<&str, u32> = p.visits.iter().map(|v| (v.url.as_str(), v.count)).collect();
+        let mut out: Vec<&(String, String)> = p.bookmarks.iter().collect();
+        out.sort_by_key(|b| std::cmp::Reverse(counts.get(b.0.as_str()).copied().unwrap_or(0)));
+        out.into_iter()
+            .take(limit as usize)
+            .map(|(u, t)| Place { url: u.clone(), title: t.clone(), bookmark: true })
+            .collect()
+    }
+
     /// What to offer for `query`: every word must appear in the URL or the
     /// title. Bookmarks come first, then the most visited. An empty query
     /// gives the latest pages.
@@ -553,6 +581,21 @@ mod tests {
         assert_eq!(places.visit("about:blank".into(), "".into()), "");
         assert!(places.visit("https://d.no/".into(), "D\tpage".into()).ends_with("\thttps://d.no/\tD page\n"));
         assert_eq!(places.suggest("".into(), 1)[0].url, "https://d.no/");
+    }
+
+    #[test]
+    fn the_start_page_lists_the_most_visited_and_the_most_used_bookmarks() {
+        let t = now();
+        let history = format!(
+            "{t}\thttps://b.no/\tB\n{t}\thttps://c.no/\tC\n{t}\thttps://c.no/\tC\n{t}\thttps://a.no/\tA\n100\thttps://old.no/\tOld\n"
+        );
+        let places = Places::new("https://never.no/\tNever\nhttps://a.no/\tA\n".into(), history);
+        let top: Vec<String> = places.top(10).into_iter().map(|p| p.url).collect();
+        assert_eq!(top, ["https://c.no/", "https://b.no/"], "most visited first, no bookmark, nothing old");
+        let marks = places.most_used(10);
+        assert_eq!(marks[0].url, "https://a.no/");
+        assert!(marks.iter().all(|p| p.bookmark));
+        assert_eq!(places.most_used(1).len(), 1);
     }
 
     #[test]

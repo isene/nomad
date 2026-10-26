@@ -19,6 +19,11 @@ class Prefs(context: Context) {
         get() = p.getString("search", DEFAULT_SEARCH) ?: DEFAULT_SEARCH
         set(v) = p.edit().putString("search", v.trim().ifEmpty { DEFAULT_SEARCH }).apply()
 
+    /** The page a new tab opens; empty shows the start page. */
+    var home: String
+        get() = p.getString("home", "") ?: ""
+        set(v) = p.edit().putString("home", v.trim()).apply()
+
     var dark: Boolean
         get() = p.getBoolean("dark", true)
         set(v) = p.edit().putBoolean("dark", v).apply()
