@@ -379,10 +379,12 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `TYPE_APPLICATION_OVERLAY`), so it comes up over any app, and the app
   below keeps running. It is built on open and dropped on close. Keep it
   that way: no view, receiver or thread may outlive a closed panel.
-- Two things open it. A swipe up on the empty home page
-  (`HomeSurface.onSwipeUp`), and a swipe up on a 14 dp strip along the
-  left half of the bottom edge (`EdgeService`; Geir's ask on 2026-10-27,
-  so the right half stays the app's). Only a window from an accessibility
+- Two things open it, both only from the bottom of the left half of the
+  screen (Geir's ask on 2026-10-27; a swipe from the right half must do
+  nothing). A swipe up on the empty home page that starts within 64 dp of
+  the button bar (`HomeSurface.onSwipeUp`, `opensPanel` in `Rules.kt`), and
+  a swipe up on a 14 dp strip along the left half of the bottom edge
+  (`EdgeService`). Only a window from an accessibility
   service may lie over the button bar, and that is the one reason
   `EdgeService` is one. It must go on asking for no events and no window
   content (`res/xml/edge_service.xml`).

@@ -8,6 +8,10 @@ import kotlin.math.hypot
  *  `dx` and `dy` are counted from where it came down; up is negative. */
 fun swipedUp(dx: Float, dy: Float, min: Float): Boolean = -dy >= min && -dy > abs(dx)
 
+/** True when a finger comes down where a swipe up may open the panel:
+ *  in the left half of a `w` by `h` page, and within `band` of its bottom. */
+fun opensPanel(x: Float, y: Float, w: Int, h: Int, band: Float): Boolean = x < w / 2f && y >= h - band
+
 /** What a folder shows in the panel: the first letter of its name, or the
  *  emoji it starts with. */
 fun face(name: String): String {
