@@ -36,11 +36,6 @@ fun nextPlace(place: String): String = when (place) {
 fun columns(place: String, room: Int, pitch: Int): Int =
     if (place == BOTTOM && pitch > 0) maxOf(3, room / pitch) else 3
 
-/** How tall one slot is so that `rows` rows fit in `high`: `pitch`, or
- *  less on a panel too tall for the screen. */
-fun slotHeight(pitch: Int, high: Int, rows: Int): Int =
-    if (rows <= 0 || high <= 0) pitch else minOf(pitch, high / rows)
-
 /** The slot under a point of the panel's grid, counted from the grid's top
  *  left corner. Null outside the grid. */
 fun slotAt(x: Float, y: Float, cellW: Int, cellH: Int, cols: Int, rows: Int): Int? {

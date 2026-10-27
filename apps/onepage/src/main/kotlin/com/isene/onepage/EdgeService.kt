@@ -16,10 +16,11 @@ import android.view.accessibility.AccessibilityEvent
 import kotlin.math.roundToInt
 
 /**
- * Opens the app panel from any app, on a swipe up from the bottom edge.
+ * Opens the app panel from any app, on a swipe up from the left half of
+ * the bottom edge.
  *
  * The swipe is caught by a strip a few millimetres tall along the bottom of
- * the screen. It lies over the button bar, and only a window from an
+ * the left half of the screen, so the right half is the app's own. It lies over the button bar, and only a window from an
  * accessibility service may lie there, which is the one reason this is one.
  * It asks Android for no events and cannot read the screen (see
  * res/xml/edge_service.xml), so onAccessibilityEvent is never called.
@@ -59,13 +60,16 @@ class EdgeService : AccessibilityService() {
             }
             true
         }
+        // Half the screen as it is now; turned on its side later, the strip
+        // keeps that width.
+        val wide = getSystemService(WindowManager::class.java).currentWindowMetrics.bounds.width()
         val lp = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT, (STRIP_DP * density).roundToInt(),
+            wide / 2, (STRIP_DP * density).roundToInt(),
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT,
         ).apply {
-            gravity = Gravity.BOTTOM
+            gravity = Gravity.BOTTOM or Gravity.START
             // Down to the very edge, over the button bar.
             fitInsetsTypes = 0
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS

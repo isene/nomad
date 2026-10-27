@@ -369,13 +369,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - The home screen: one page of widgets, and since 0.5.0 an app panel.
   Plain Views and no Compose, except the setup wizard.
 - Where the panel comes up is a setting the user asked for (`Prefs.panelPlace`):
-  at the bottom of the left half of the screen, above the button bar (the
-  default, Geir's ask on 2026-10-27), or at the right or the left edge. The
-  line that changes it is the last one in the panel's edit mode. The number
-  of columns follows from the place, so the file stores slots only.
-- Outside editing the whole panel fits on the screen: when its rows are
-  taller than the room between the bars, every slot gets lower and its icon
-  smaller (`slotHeight` in `Rules.kt`). Editing may scroll.
+  along the bottom above the button bar (the default), or at the right or the
+  left edge. The line that changes it is the last one in the panel's edit mode.
+  The number of columns follows from the place, so the file stores slots only.
 - An empty row below the last icons is a setting too (`Prefs.panelGap`), switched by
   the line under that one. Geir asked for it on 2026-10-26, so no unused icon
   has to pad the bottom row.
@@ -385,7 +381,8 @@ when building the core. Same rule as the rest of Fe₂O₃.
   that way: no view, receiver or thread may outlive a closed panel.
 - Two things open it. A swipe up on the empty home page
   (`HomeSurface.onSwipeUp`), and a swipe up on a 14 dp strip along the
-  bottom edge (`EdgeService`). Only a window from an accessibility
+  left half of the bottom edge (`EdgeService`; Geir's ask on 2026-10-27,
+  so the right half stays the app's). Only a window from an accessibility
   service may lie over the button bar, and that is the one reason
   `EdgeService` is one. It must go on asking for no events and no window
   content (`res/xml/edge_service.xml`).
