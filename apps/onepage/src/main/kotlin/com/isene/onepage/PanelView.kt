@@ -27,7 +27,6 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
-import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.EditText
 import android.widget.FrameLayout
@@ -91,10 +90,6 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
      *  follow from where the panel is (see [settle]). */
     private var cols = 3
     private var cellW = pitch
-
-    /** How tall one slot is: `pitch`, or less when the rows would not fit
-     *  the screen (see [render]). */
-    private var cellH = pitch
 
     private var edit = false
 
@@ -216,15 +211,14 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         box.animate().alpha(1f).translationY(0f).setDuration(120).start()
     }
 
-    /** Put the card where the user wants it: at the bottom of the left
-     *  half of the screen, or three icons wide at a side. */
+    /** Put the card where the user wants it: along the bottom of the
+     *  screen and as wide as it, or three icons wide at a side. */
     private fun settle() {
         val place = Prefs.panelPlace(context)
         val r = dp(RADIUS).toFloat()
         // The short side of the screen, so the card also fits a phone on its side.
         val metrics = resources.displayMetrics
-        val short = min(metrics.widthPixels, metrics.heightPixels)
-        val room = (if (place == BOTTOM) short / 2 else short) - 2 * dp(PAD)
+        val room = min(metrics.widthPixels, metrics.heightPixels) - 2 * dp(PAD)
         cols = columns(place, room, pitch)
         cellW = if (place == BOTTOM) room / cols else pitch
         grid.removeAllViews()
@@ -233,7 +227,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         box.background = GradientDrawable().apply {
             setColor(CARD)
             cornerRadii = when (place) {
-                BOTTOM -> floatArrayOf(0f, 0f, r, r, 0f, 0f, 0f, 0f)
+                BOTTOM -> floatArrayOf(r, r, r, r, 0f, 0f, 0f, 0f)
                 LEFT -> floatArrayOf(0f, 0f, r, r, r, r, 0f, 0f)
                 else -> floatArrayOf(r, r, 0f, 0f, 0f, 0f, r, r)
             }
@@ -241,14 +235,14 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         scroll.layoutParams = LayoutParams(
             wrap, wrap,
             when (place) {
-                BOTTOM -> Gravity.BOTTOM or Gravity.START
+                BOTTOM -> Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
                 LEFT -> Gravity.START or Gravity.CENTER_VERTICAL
                 else -> Gravity.END or Gravity.CENTER_VERTICAL
             },
         )
         for (v in listOf(hint, placeLine, gapLine, anyApp)) v.layoutParams = LinearLayout.LayoutParams(cellW * cols, wrap)
         val at = when (place) {
-            BOTTOM -> "at the bottom left"
+            BOTTOM -> "at the bottom"
             LEFT -> "at the left"
             else -> "at the right"
         }
@@ -301,9 +295,6 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         val gap = Prefs.panelGap(context)
         // While editing there is room below for a new group after a gap.
         val rows = if (edit) used + SPARE else if (gap) used + 1 else used
-        // All of the panel fits on the screen. Editing may scroll, with
-        // its spare rows and lines of help.
-        cellH = slotHeight(pitch, roomHigh() - 2 * dp(PAD), if (gap) used + 1 else used)
         val wanted = ArrayList<Target>()
 
         hint.visibility = if (edit) View.VISIBLE else View.GONE
@@ -318,7 +309,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         over = null
         grid.removeAllViews()
         for (i in 0 until rows * cols) {
-            grid.addView(cell(panel.slots.getOrNull(i) ?: Slot.Empty, i, wanted), cellW, cellH)
+            grid.addView(cell(panel.slots.getOrNull(i) ?: Slot.Empty, i, wanted), cellW, pitch)
         }
 
         val at = folder
@@ -331,7 +322,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
             folderTitle.text = open.name
             folderHint.visibility = if (edit) View.VISIBLE else View.GONE
             open.items.forEachIndexed { n, target ->
-                val v = icon(target, pitch, pitch, wanted)
+                val v = icon(target, pitch, wanted)
                 v.background = ripple()
                 // As in the panel: a tap starts it and holding switches
                 // editing on. While editing, a drag moves it and a tap
@@ -366,7 +357,7 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
     private fun cell(slot: Slot, i: Int, wanted: MutableList<Target>): View {
         val v: View = when (slot) {
             is Slot.Empty -> if (edit) sign("+", FAINT, 20f) else View(context)
-            is Slot.One -> icon(slot.target, cellW, cellH, wanted)
+            is Slot.One -> icon(slot.target, cellW, wanted)
             is Slot.Folder -> folderSign(slot)
         }
         // A free slot outside editing takes no touch: it is part of the card.
@@ -385,9 +376,8 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         return v
     }
 
-    private fun icon(target: Target, width: Int, height: Int, wanted: MutableList<Target>): ImageView = ImageView(context).apply {
-        val side = iconPx * height / pitch
-        setPadding((width - side) / 2, (height - side) / 2, (width - side) / 2, (height - side) / 2)
+    private fun icon(target: Target, width: Int, wanted: MutableList<Target>): ImageView = ImageView(context).apply {
+        setPadding((width - iconPx) / 2, (pitch - iconPx) / 2, (width - iconPx) / 2, (pitch - iconPx) / 2)
         val bitmap = Icons.cached(target)
         if (bitmap != null) {
             setImageBitmap(bitmap)
@@ -409,8 +399,8 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         val drawn = if (slot.icon.isEmpty()) null else Signs.drawable(context, slot.icon, Color.WHITE)
         if (drawn == null) return sign(face(slot.name), Color.WHITE, 22f)
         return ImageView(context).apply {
-            val side = dp(SIGN) * cellH / pitch
-            setPadding((cellW - side) / 2, (cellH - side) / 2, (cellW - side) / 2, (cellH - side) / 2)
+            val side = dp(SIGN)
+            setPadding((cellW - side) / 2, (pitch - side) / 2, (cellW - side) / 2, (pitch - side) / 2)
             setImageDrawable(drawn)
             contentDescription = slot.name
         }
@@ -429,14 +419,6 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
         val side = (pitch - iconPx) / 2
         setPadding(side, dp(2), side, dp(6))
-    }
-
-    /** The height of the screen between the bars at top and bottom, where
-     *  the panel's window is. */
-    private fun roomHigh(): Int {
-        val m = context.getSystemService(WindowManager::class.java).currentWindowMetrics
-        val bars = m.windowInsets.getInsetsIgnoringVisibility(WindowInsets.Type.systemBars())
-        return m.bounds.height() - bars.top - bars.bottom
     }
 
     private fun ripple(): Drawable = RippleDrawable(ColorStateList.valueOf(0x33FFFFFF), null, null)
@@ -505,8 +487,8 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
     private fun slotUnder(ev: MotionEvent, on: GridLayout): Int? {
         on.getLocationOnScreen(spot)
         val n = on.columnCount
-        val (width, height) = if (on === grid) cellW to cellH else pitch to pitch
-        return slotAt(ev.rawX - spot[0], ev.rawY - spot[1], width, height, n, (on.childCount + n - 1) / n)
+        val width = if (on === grid) cellW else pitch
+        return slotAt(ev.rawX - spot[0], ev.rawY - spot[1], width, pitch, n, (on.childCount + n - 1) / n)
     }
 
     /** Frame the slot the dragged icon would land in. */
