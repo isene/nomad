@@ -168,6 +168,17 @@ object SyncEngine {
         Store.save(ctx, out)
         GatewayRepo.clear(files)
 
+        // Keep the home screen in step with what was just fetched.
+        val (unread, _) = summarize(ctx, out, settings)
+        return Result(out, failedAccounts, failedFeeds, feeds.size, failedChannels, channels.size, unread)
+    }
+
+    /**
+     * The widget's summary of the store `out`: the unread count and the
+     * newest rows, with the laptop's read marks folded in. Returns the
+     * count, and whether the summary moved, so the caller knows to redraw.
+     */
+    fun summarize(ctx: Context, out: List<Message>, settings: Settings = Settings(ctx)): Pair<Int, Boolean> {
         val readIds = ReadState.effective(ctx, settings)
         val gone = settings.dismissed
         // Through the same scope the list uses: the widget is meant to be
@@ -177,9 +188,7 @@ object SyncEngine {
             .filter { it.messageId !in gone }
             .filter { Scope.matches(it, scope, settings) }
             .filter { it.messageId !in readIds }
-
-        // Keep the home screen in step with what was just fetched.
-        WidgetStore.save(
+        val moved = WidgetStore.save(
             ctx,
             unread.size,
             unread.map {
@@ -191,6 +200,6 @@ object SyncEngine {
             },
             Scope.label(scope, settings),
         )
-        return Result(out, failedAccounts, failedFeeds, feeds.size, failedChannels, channels.size, unread.size)
+        return unread.size to moved
     }
 }

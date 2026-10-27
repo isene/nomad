@@ -43,6 +43,12 @@
                 android:resource="@xml/tasks_widget_info" />
         </receiver>
 
+        <!-- Reads todo.hl again every ten minutes while the screen is on
+             and a widget is placed. -->
+        <receiver
+            android:name=".widget.WidgetTick"
+            android:exported="false" />
+
         <!-- Fires when a stamped item comes due. -->
         <receiver
             android:name=".reminder.ReminderReceiver"

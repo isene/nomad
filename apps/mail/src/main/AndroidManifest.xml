@@ -2,6 +2,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The widget's ten-minute tick, as the outside clock widget does. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <application
         android:allowBackup="true"
@@ -36,8 +38,9 @@
         </provider>
 
         <!-- Home-screen widget. The provider XML sets no update period:
-             the app pushes a redraw when the unread count moves, so an
-             idle widget wakes nothing. -->
+             the app pushes a redraw when the unread count moves, and
+             WidgetTick reads the synced files every ten minutes while
+             the screen is on. -->
         <receiver
             android:name=".widget.MailWidgetReceiver"
             android:exported="false"
@@ -49,6 +52,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/mail_widget_info" />
         </receiver>
+        <receiver
+            android:name=".widget.WidgetTick"
+            android:exported="false" />
     </application>
 
 </manifest>

@@ -3,6 +3,7 @@ package com.isene.tasks.widget
 import android.content.Context
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
+import com.isene.tasks.data.TaskRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,6 +23,15 @@ object WidgetPush {
     fun now(context: Context) {
         val app = context.applicationContext
         scope.launch { push(app) }
+    }
+
+    /** Read todo.hl again. True when it changed since the widget's copy,
+     *  which it now replaces. */
+    fun reread(context: Context): Boolean {
+        val app = context.applicationContext
+        val old = TaskRepository.widgetCache(app)
+        val now = TasksWidget().loadText(app, fresh = true) ?: return false
+        return now != old
     }
 
     /** Into the widget's own state first, then redraw. The redraw

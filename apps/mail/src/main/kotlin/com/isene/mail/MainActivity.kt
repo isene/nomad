@@ -9,6 +9,7 @@ import com.isene.mail.ui.MailApp
 import com.isene.mail.ui.theme.MailTheme
 import com.isene.mail.viewmodel.MailViewModel
 import com.isene.mail.widget.WidgetPush
+import com.isene.mail.widget.WidgetTick
 import com.isene.mail.work.MailSyncWorker
 
 class MainActivity : ComponentActivity() {
@@ -22,6 +23,7 @@ class MainActivity : ComponentActivity() {
         }
         // Idempotent, and cheap when already scheduled.
         MailSyncWorker.schedule(this)
+        WidgetTick.arm(this)
     }
 
     /** Two things change behind this screen's back: Syncthing drops in a
