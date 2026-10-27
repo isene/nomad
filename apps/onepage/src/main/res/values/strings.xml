@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">OnePage</string>
-    <string name="edge_description">Opens your app panel when you swipe up from the bottom edge of the screen, in any app. OnePage asks for no events and cannot read the screen.</string>
+    <string name="edge_description">Opens your app panel when you swipe up from the left half of the bottom edge of the screen, in any app. OnePage asks for no events and cannot read the screen.</string>
 </resources>

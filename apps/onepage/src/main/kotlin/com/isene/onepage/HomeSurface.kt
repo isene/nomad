@@ -25,7 +25,7 @@ import kotlin.math.roundToInt
  *
  * VIEW mode (default): widgets receive their own touches; the surface only
  * sees empty-space events, where a long-press enters EDIT and a swipe up
- * opens the app panel. Zero drawing, zero
+ * from the bottom of the left half opens the app panel. Zero drawing, zero
  * layout work when idle — widgets invalidate themselves on RemoteViews pushes
  * and Android composites the wallpaper without involving us.
  *
@@ -47,7 +47,7 @@ class HomeSurface(context: Context) : FrameLayout(context) {
      *  poke KeepAliveService to add/remove the overlay live. */
     var onToggleHomeButton: (() -> Unit)? = null
 
-    /** Fired when a finger moves up over the empty page. */
+    /** Fired when a finger moves up from the bottom of the left half. */
     var onSwipeUp: (() -> Unit)? = null
 
     val entries = mutableListOf<Entry>()
@@ -57,9 +57,11 @@ class HomeSurface(context: Context) : FrameLayout(context) {
     private val minSizePx = (48 * density).roundToInt()
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
 
-    // ---- VIEW-mode swipe: up over the empty page opens the app panel ----
+    // ---- VIEW-mode swipe: up from the bottom of the left half opens the
+    // app panel, as the strip of EdgeService does in other apps ----
 
     private val swipeMin = 56 * density
+    private val swipeBand = 64 * density
     private var swipeX = 0f
     private var swipeY = 0f
     private var swiped = false
@@ -264,7 +266,8 @@ class HomeSurface(context: Context) : FrameLayout(context) {
                 MotionEvent.ACTION_DOWN -> {
                     swipeX = ev.x
                     swipeY = ev.y
-                    swiped = false
+                    // Anywhere else, the swipe is spent before it starts.
+                    swiped = !opensPanel(ev.x, ev.y, width, height, bottomInset + swipeBand)
                 }
                 // Once per touch: the finger is still down when the panel is up.
                 MotionEvent.ACTION_MOVE -> if (!swiped && swipedUp(ev.x - swipeX, ev.y - swipeY, swipeMin)) {

@@ -38,6 +38,14 @@ class RulesTest {
         assertEquals(3, columns(BOTTOM, 1020, 0))
     }
 
+    @Test fun only_the_bottom_of_the_left_half_opens_the_panel() {
+        // A page 1080 by 2376, with 300 at its bottom for the bar and the band.
+        assertTrue(opensPanel(100f, 2300f, 1080, 2376, 300f))
+        assertFalse(opensPanel(900f, 2300f, 1080, 2376, 300f))
+        assertFalse(opensPanel(100f, 1000f, 1080, 2376, 300f))
+        assertFalse(opensPanel(540f, 2300f, 1080, 2376, 300f))
+    }
+
     @Test fun the_places_come_round_and_an_unknown_one_goes_to_the_bottom() {
         assertEquals(RIGHT, nextPlace(BOTTOM))
         assertEquals(LEFT, nextPlace(RIGHT))
