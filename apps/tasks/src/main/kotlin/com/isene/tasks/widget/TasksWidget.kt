@@ -133,9 +133,10 @@ class TasksWidget : GlanceAppWidget() {
         }
     }
 
-    /** The hyperlist itself, for the state to be filled from. */
-    internal fun loadText(context: Context): String? {
-        TaskRepository.widgetCache(context)?.let { return it }
+    /** The hyperlist itself, for the state to be filled from. `fresh`
+     *  reads the file even when a copy is kept. */
+    internal fun loadText(context: Context, fresh: Boolean = false): String? {
+        if (!fresh) TaskRepository.widgetCache(context)?.let { return it }
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val uriStr = prefs.getString(KEY_URI, null) ?: return null
         val uri = Uri.parse(uriStr)

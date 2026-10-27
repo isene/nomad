@@ -135,6 +135,12 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - Glance widget: shows the first ~10 items across categories, tap
   opens the app. No editing from the widget in v1 (keeps the widget
   side trivial; widgets that edit need a hosted Activity hop anyway).
+- 0.10.0 (asked 2026-10-27): the widget reads todo.hl again by itself.
+  `WidgetTick` is an `RTC` alarm (never `RTC_WAKEUP`) every 10 minutes,
+  armed only while a widget is placed: from the receiver's `onUpdate`
+  (after a reboot or an update) and from `MainActivity`, cancelled in
+  `onDisabled`. It redraws only when the text changed. A sleeping phone
+  is left alone; the tick waits until the screen is on.
 - The old standalone repo at `/home/geir/Main/G/GIT-isene/tasks/`
   stays untouched until this app reaches parity and ships. Then we
   archive it.
@@ -521,6 +527,12 @@ when building the core. Same rule as the rest of Fe₂O₃.
   the name; laptop kastrup 0.3.90 queues it in `scheduled`, due now.
 - The laptop's `~/.kastrup/drafts` is a link to `~/.kastrup/sync/drafts`.
 - Tests are plain JUnit (`DraftsRepoTest`, the draft parser).
+- 0.18.0 (asked 2026-10-27): the widget takes in the relay chats and the
+  laptop's read marks by itself, as opening the app does, through
+  `WidgetTick` (the same 10-minute `RTC` alarm as tasks) and
+  `SyncEngine.summarize`. It fetches nothing; new mail still comes with
+  the fetch. Build mail and tasks in separate Gradle runs: one run
+  with both fails on the shared Rust core's outputs.
 
 ### fleet (com.isene.fleet)
 

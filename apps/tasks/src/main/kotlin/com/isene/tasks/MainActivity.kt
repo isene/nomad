@@ -13,6 +13,7 @@ import com.isene.tasks.reminder.ReminderReceiver
 import com.isene.tasks.ui.TasksScreen
 import com.isene.tasks.ui.theme.TasksTheme
 import com.isene.tasks.viewmodel.TasksViewModel
+import com.isene.tasks.widget.WidgetTick
 
 class MainActivity : ComponentActivity() {
     private val vm: TasksViewModel by viewModels()
@@ -26,6 +27,7 @@ class MainActivity : ComponentActivity() {
         // A stamped item is useless without the right to post its
         // notification, and minSdk 33 always requires asking.
         ReminderReceiver.ensureChannel(this)
+        WidgetTick.arm(this)
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
             != PackageManager.PERMISSION_GRANTED
         ) {
