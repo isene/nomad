@@ -36,6 +36,16 @@ class RulesTest {
         // Never narrower than three, whatever the screen.
         assertEquals(3, columns(BOTTOM, 200, 138))
         assertEquals(3, columns(BOTTOM, 1020, 0))
+        // The left half of that phone at the bottom: 540 less the rim.
+        assertEquals(3, columns(BOTTOM, 480, 138))
+    }
+
+    @Test fun a_panel_too_tall_for_the_screen_gets_lower_slots() {
+        // 2160 between the bars, 138 from icon to icon: 15 rows fit.
+        assertEquals(138, slotHeight(138, 2160, 15))
+        assertEquals(120, slotHeight(138, 2160, 18))
+        assertEquals(138, slotHeight(138, 2160, 0))
+        assertEquals(138, slotHeight(138, 0, 18))
     }
 
     @Test fun the_places_come_round_and_an_unknown_one_goes_to_the_bottom() {
