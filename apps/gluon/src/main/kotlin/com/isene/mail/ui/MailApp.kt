@@ -35,6 +35,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -61,6 +62,7 @@ import com.isene.mail.data.readDiscordFile
 import com.isene.mail.data.readFeedsFile
 import com.isene.mail.viewmodel.ComposeRequest
 import com.isene.mail.viewmodel.MailViewModel
+import com.isene.mail.work.MailPush
 import com.isene.mail.work.MailSyncWorker
 import uniffi.fe2o3_mobile_core.Message
 import androidx.compose.foundation.background
@@ -390,6 +392,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
     var accounts by remember { mutableStateOf(s.accountsJson) }
     var days by remember { mutableStateOf(s.days.toString()) }
     var every by remember { mutableStateOf(s.syncMinutes.toString()) }
+    var instant by remember { mutableStateOf(s.instant) }
     var feeds by remember { mutableStateOf(s.feedsText) }
     var views by remember { mutableStateOf(s.viewsText) }
     var gwUri by remember { mutableStateOf(s.gatewayTreeUri) }
@@ -574,6 +577,32 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                     "Background fetch: 0 turns it off, 15 minutes is Android's " +
                         "floor. Each tick is a radio wake and a login per account, " +
                         "so this is the setting with a real battery cost.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Instant mail", Modifier.weight(1f), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                    Switch(instant, { on ->
+                        instant = on
+                        s.instant = on
+                        if (on && !s.askedBattery) {
+                            s.askedBattery = true
+                            // Without it Android cuts the line while the phone sleeps.
+                            runCatching {
+                                ctx.startActivity(
+                                    Intent(
+                                        android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                                        android.net.Uri.parse("package:${ctx.packageName}"),
+                                    ),
+                                )
+                            }
+                        }
+                        MailPush.sync(ctx)
+                    })
+                }
+                Text(
+                    "Keeps a line open to Gmail, so new mail lands at once. " +
+                        "About 12 radio wakes an hour, and a quiet notice while on.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.secondary,
                 )

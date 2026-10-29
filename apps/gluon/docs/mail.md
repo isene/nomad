@@ -99,6 +99,8 @@ grow without bound.
    `Title | https://…/feed.xml` per line, or a bare URL.
 5. **Fetch every (min)** in Settings runs the same fetch in the
    background. 15 minutes by default, 0 turns it off.
+6. **Instant mail** in Settings, off by default, brings new mail the
+   moment it lands, with a notice per mail. See below.
 
 ## Attachments
 
@@ -162,8 +164,29 @@ is a handful of messages over three parallel sessions rather than a
 month of envelopes over three sequential ones. If the server renumbers
 (UIDVALIDITY changes) it falls back to the full window by itself.
 
-Fifteen minutes is Android's floor for periodic work. Real push would
-mean holding a socket open all day — a different trade, and not this one.
+Fifteen minutes is Android's floor for periodic work. For mail at once,
+turn on Instant mail.
+
+## Instant mail
+
+Off by default. When on, a service keeps one line open to Gmail per
+account, waiting in IMAP IDLE on the INBOX. Gmail tells the phone the
+moment a mail lands, and the phone runs the same fetch as above.
+
+- Each new inbox mail that is unread and in scope gets a notice: the
+  sender, the subject and the account. Several stack under one summary,
+  as in the Gmail app. A tap opens that mail; opening gluon clears them.
+- A quiet notice, "Waiting for new mail", stays while the service runs.
+  Android requires it.
+- Turning it on asks once to leave gluon out of battery saving, since
+  Android cuts the line of an app it puts to sleep.
+- Every 15 minutes an alarm checks each line and opens a dead one
+  again. A line that fails waits 30 seconds, doubling up to 10 minutes,
+  or until the phone has a network again.
+
+The cost is about 12 radio wakes an hour, plus one per new mail. The
+15-minute fetch keeps running beside it, so nothing is lost if the line
+is down.
 
 ## Views
 

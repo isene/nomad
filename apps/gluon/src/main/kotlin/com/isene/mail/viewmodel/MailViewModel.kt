@@ -124,6 +124,11 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     val pick: StateFlow<Message?> = _pick.asStateFlow()
     fun pick(m: Message?) { _pick.value = m }
 
+    /** A tapped notice names its mail by id; it may have arrived after
+     *  this list was read, so it is looked for after a fresh read. */
+    private var wanted: String? = null
+    fun pickId(id: String) { wanted = id; refresh() }
+
     // ---------- read state ----------
 
     /**
@@ -454,6 +459,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         // offending pair was in the store and every start read it back.
         // Newest wins: the list is sorted newest first.
         all = all.distinctBy { it.messageId }
+        wanted?.let { id -> wanted = null; all.firstOrNull { it.messageId == id }?.let { _pick.value = it } }
         val filter = settings.filter
         // The laptop's view, with this phone's own overrides on top.
         val readIds = ReadState.merge(laptopRead, settings.localMarks)

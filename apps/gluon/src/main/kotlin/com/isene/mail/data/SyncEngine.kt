@@ -1,6 +1,7 @@
 package com.isene.mail.data
 
 import android.content.Context
+import com.isene.mail.work.MailNotices
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -55,6 +56,9 @@ object SyncEngine {
      * are not touched: they download when a message is opened, and a
      * background fetch has no reader to download them for.
      */
+    // One at a time: the worker, the app and instant mail all call this,
+    // and two at once would each save the store over the other's.
+    @Synchronized
     fun fetch(ctx: Context): Result? {
         val settings = Settings(ctx)
         val accounts = settings.accounts()
@@ -90,8 +94,10 @@ object SyncEngine {
             }.awaitAll()
         }
 
+        val arrived = mutableListOf<Message>()
         for ((a, got) in results) {
             if (got == null) { failedAccounts++; continue }
+            arrived += MailNotices.arrivals(kept.keys, got.mails, got.incremental)
             // A body already downloaded stays downloaded.
             val withBodies = got.mails.map { m ->
                 val old = kept[m.messageId]
@@ -167,6 +173,15 @@ object SyncEngine {
         }
         Store.save(ctx, out)
         GatewayRepo.clear(files)
+
+        // With instant mail on, a buzz for each new inbox mail that is still
+        // unread and in view. Not while gluon is open: the list shows it.
+        if (settings.instant && !MailNotices.inFront) {
+            val readIds = ReadState.effective(ctx, settings)
+            MailNotices.post(ctx, arrived.filter {
+                it.messageId !in readIds && it.messageId !in settings.dismissed && Scope.matches(it, settings.scope, settings)
+            })
+        }
 
         // Keep the home screen in step with what was just fetched.
         val (unread, _) = summarize(ctx, out, settings)

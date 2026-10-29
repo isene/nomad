@@ -82,6 +82,17 @@ class Settings(ctx: Context) {
         get() = p.getInt("sync_minutes", 15)
         set(v) = p.edit().putInt("sync_minutes", v).apply()
 
+    /** Instant mail: an open line per account, see MailPush. Off by
+     *  default, since it keeps the radio waking about 12 times an hour. */
+    var instant: Boolean
+        get() = p.getBoolean("instant", false)
+        set(v) = p.edit().putBoolean("instant", v).apply()
+
+    /** Whether the battery-saving exemption was asked for once. */
+    var askedBattery: Boolean
+        get() = p.getBoolean("asked_battery", false)
+        set(v) = p.edit().putBoolean("asked_battery", v).apply()
+
     /**
      * Per-account IMAP cursor: `address -> "<uidvalidity>:<lastuid>"`.
      * With it, a fetch asks only for what arrived since — the difference

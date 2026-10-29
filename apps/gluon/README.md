@@ -25,7 +25,8 @@ Four tabs at the bottom:
 - **Home**: the unread mail, the coming week's events and the tasks, on
   one screen. Tap a mail or an event to open it in its tab.
 - **Mail**: your Gmail inboxes, feeds and chats, with a search over all
-  of Gmail. See [docs/mail.md](docs/mail.md).
+  of Gmail, and instant mail with a notice per mail when you turn it
+  on. See [docs/mail.md](docs/mail.md).
 - **Calendar**: the phone's calendars as a month and an agenda, with
   reminders. See [docs/tock.md](docs/tock.md).
 - **Tasks**: `~/.tasks/todo.hl` over Syncthing, with reminders for
