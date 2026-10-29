@@ -474,7 +474,7 @@ mod tests {
     fn a_mail_round_trips() {
         let m = Message {
             message_id: "a@x".into(), source: "mail".into(), link: String::new(), uid: 0,
-            account: "geir@isene.com".into(),
+            account: "alice@example.com".into(),
             folder: "INBOX".into(), from: "Someone <s@x>".into(), to: "me@x".into(),
             subject: "Hei".into(), date: 100, raw: "Hei\n".into(),
             html: String::new(), has_attachments: false,
