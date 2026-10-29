@@ -88,7 +88,7 @@ class MailWidget : GlanceAppWidget() {
             val state = WidgetStore.parse(prefs[SUMMARY] ?: WidgetStore.text(ctx))
             val back = prefs[BACK] ?: Settings(ctx).widgetBack
             val head = prefs[HEAD] ?: Settings(ctx).widgetHead
-            GlanceTheme { WidgetContent(state.unread, state.rows, state.scope, back, head) }
+            GlanceTheme { WidgetContent(state.unread, state.rows, back, head) }
         }
     }
 }
@@ -97,14 +97,11 @@ class MailWidget : GlanceAppWidget() {
 private fun WidgetContent(
     unread: Int,
     rows: List<com.isene.mail.data.WidgetRow>,
-    scope: String,
     back: Int,
     head: Int,
 ) {
-    // The widget shows the list through the app's scope, so it has to say
-    // which one: a count of two under Discord and a count of two under All
-    // are different claims, and they look identical without this.
-    val title = if (scope.isEmpty()) "kastrup" else "kastrup · $scope"
+    // The first three views together, whatever scope the app has picked.
+    val title = "Messages"
     val openApp = actionStartActivity(openTab(LocalContext.current, Tab.Mail))
     Box(
         modifier = GlanceModifier

@@ -42,6 +42,14 @@ object Scope {
         else -> scope.replaceFirstChar { it.uppercase() }
     }
 
+    /** What the widget shows and what rings: the first three views
+     *  together, as the laptop's Home shows kastrup's views 1, 2 and 3.
+     *  Everything, when no view is saved. */
+    fun home(settings: Settings): List<String> =
+        settings.views().take(3).map { "view:${it.name}" }.ifEmpty { listOf("") }
+
+    fun atHome(m: Message, home: List<String>, settings: Settings) = home.any { matches(m, it, settings) }
+
     fun matches(m: Message, scope: String, settings: Settings): Boolean = when {
         scope.isEmpty() -> true
         // A view is any of its scopes, narrowed by its match. Defined in
