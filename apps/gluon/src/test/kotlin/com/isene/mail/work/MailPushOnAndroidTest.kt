@@ -59,6 +59,18 @@ class MailPushOnAndroidTest {
     }
 
     @Test
+    fun the_widget_and_the_notices_take_the_first_three_views() {
+        val s = com.isene.mail.data.Settings(RuntimeEnvironment.getApplication())
+        val from = { account: String -> mail("<$account>", "Bob <bob@example.com>", "Hi").copy(account = account) }
+        assertEquals(listOf(""), com.isene.mail.data.Scope.home(s))
+        s.viewsText = "One | mail:a@example.com\nTwo | mail:b@example.com\nThree | mail:c@example.com\nFour | mail:d@example.com"
+        val home = com.isene.mail.data.Scope.home(s)
+        assertEquals(listOf("view:One", "view:Two", "view:Three"), home)
+        val at = listOf("a", "c", "d").map { com.isene.mail.data.Scope.atHome(from("$it@example.com"), home, s) }
+        assertEquals(listOf(true, true, false), at)
+    }
+
+    @Test
     fun the_switch_off_starts_nothing() {
         val ctx = RuntimeEnvironment.getApplication()
         MailPush.sync(ctx)

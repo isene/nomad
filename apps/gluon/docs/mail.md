@@ -40,8 +40,8 @@ The Mail tab of [gluon](../README.md).
   Gmail on every account instead, in the words the Gmail app takes
   (`kvittering has:attachment after:2026/9/1`), and lists the 40 newest
   hits per account
-- A **home-screen widget**: the same unread list at a glance, through the
-  same account filter, tap to open
+- A **Messages widget** on the home screen: the unread in the first three
+  views together, tap to open
 
 ## Read state
 
@@ -116,7 +116,9 @@ and the file can always be written again.
 
 ## The widget
 
-Unread count and senders on the home screen. It reads a small summary
+The unread in the first three views, together, with senders and
+subjects, as the laptop's gluon shows kastrup's views 1, 2 and 3 at Home.
+With no views saved, it shows all. It reads a small summary
 file the app writes when the count moves, and declares no update period
 at all — a widget nobody looks at wakes nothing. The background fetch
 keeps it current; without one it is as fresh as the last time the app
@@ -126,15 +128,8 @@ The wallpaper shows through the widget. "Widget colours" in the menu
 puts a colour behind it, as solid as you like, and sets the colour of
 its header line.
 
-Its header names the scope it is showing (`kastrup · Discord  2`),
-because it draws the list through the app's scope and two counts under
-two scopes look identical without it. The chip in the app and the header
-take their name from the same rule, so they cannot disagree.
-
-A mailbox appears there in full (`kastrup · geir@example.com`). The chip
-shortens it to the local part, since it sits directly above the list it
-names — but three addresses that begin the same way are one word on the
-home screen, and the header is all there is to tell them apart.
+The scope picked in the app does not change it. Its header reads
+`Messages` and the unread count.
 
 The summary reaches the widget through Glance's own state, and is read
 inside the composition. Anything read in `provideGlance` is read once
@@ -173,8 +168,8 @@ Off by default. When on, a service keeps one line open to Gmail per
 account, waiting in IMAP IDLE on the INBOX. Gmail tells the phone the
 moment a mail lands, and the phone runs the same fetch as above.
 
-- Each new inbox mail that is unread and in scope gets a notice: the
-  sender, the subject and the account. Several stack under one summary,
+- Each new inbox mail that is unread and in the first three views gets
+  a notice: the sender, the subject and the account. Several stack under one summary,
   as in the Gmail app. A tap opens that mail; opening gluon clears them.
 - A quiet notice, "Waiting for new mail", stays while the service runs.
   Android requires it.

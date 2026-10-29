@@ -481,10 +481,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 query.isBlank() || listOf(it.from, it.to, it.subject)
                     .any { f -> f.contains(query, ignoreCase = true) }
             }
-        // Unread, through the same account filter the list uses — the
-        // widget is meant to be the list at a glance, not a second view
-        // with its own opinion. The read/unread filter is deliberately
-        // NOT mirrored: the widget is always the unread ones.
+        // The unread count for the chip, through the scope the list uses.
+        // The widget has its own: the first three views together.
         val unread = here
             .filter { inScope(it, scope) }
             .filter { it.messageId !in readIds }
@@ -514,7 +512,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             inbox = unread,
             hidden = all.size - here.size,
         )
-        publishWidget(unread)
+        val home = Scope.home(settings)
+        publishWidget(here.filter { it.messageId !in readIds && Scope.atHome(it, home, settings) })
     }
 
     /** Feed the home screen. Writes and redraws only when the summary
@@ -528,7 +527,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 subject = it.subject,
             )
         }
-        if (!WidgetStore.save(ctx, unread.size, rows, Scope.label(settings.scope, settings))) return
+        if (!WidgetStore.save(ctx, unread.size, rows)) return
         // App-lifetime scope: leaving the app must not cancel the push.
         WidgetPush.now(ctx)
     }

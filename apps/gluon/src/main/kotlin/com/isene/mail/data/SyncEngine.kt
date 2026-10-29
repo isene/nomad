@@ -178,8 +178,9 @@ object SyncEngine {
         // unread and in view. Not while gluon is open: the list shows it.
         if (settings.instant && !MailNotices.inFront) {
             val readIds = ReadState.effective(ctx, settings)
+            val home = Scope.home(settings)
             MailNotices.post(ctx, arrived.filter {
-                it.messageId !in readIds && it.messageId !in settings.dismissed && Scope.matches(it, settings.scope, settings)
+                it.messageId !in readIds && it.messageId !in settings.dismissed && Scope.atHome(it, home, settings)
             })
         }
 
@@ -196,12 +197,10 @@ object SyncEngine {
     fun summarize(ctx: Context, out: List<Message>, settings: Settings = Settings(ctx)): Pair<Int, Boolean> {
         val readIds = ReadState.effective(ctx, settings)
         val gone = settings.dismissed
-        // Through the same scope the list uses: the widget is meant to be
-        // the list at a glance, not a second view with its own opinion.
-        val scope = settings.scope
+        val home = Scope.home(settings)
         val unread = out
             .filter { it.messageId !in gone }
-            .filter { Scope.matches(it, scope, settings) }
+            .filter { Scope.atHome(it, home, settings) }
             .filter { it.messageId !in readIds }
         val moved = WidgetStore.save(
             ctx,
@@ -213,7 +212,6 @@ object SyncEngine {
                     subject = it.subject,
                 )
             },
-            Scope.label(scope, settings),
         )
         return unread.size to moved
     }

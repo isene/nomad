@@ -3,7 +3,7 @@
     <string name="app_name">gluon</string>
 
     <!-- mail (kastrup) -->
-    <string name="mail_widget_label">kastrup</string>
+    <string name="mail_widget_label">Messages</string>
 
     <!-- tock -->
     <string name="widget_name">Agenda</string>
