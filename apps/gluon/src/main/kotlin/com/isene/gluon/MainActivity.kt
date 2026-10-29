@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import com.isene.mail.viewmodel.MailViewModel
+import com.isene.mail.work.MailNotices
 import com.isene.tasks.reminder.ReminderReceiver
 import com.isene.tasks.viewmodel.TasksViewModel
 import com.isene.tock.AgendaWidget
@@ -51,6 +52,7 @@ class MainActivity : ComponentActivity() {
         savedInstanceState?.getString(KEY_TAB)?.let { tab = Tab.valueOf(it) }
         // Idempotent, and cheap when already set.
         com.isene.mail.work.MailSyncWorker.schedule(this)
+        com.isene.mail.work.MailPush.sync(this)
         com.isene.mail.widget.WidgetTick.arm(this)
         com.isene.tasks.widget.WidgetTick.arm(this)
         // A stamped task and a calendar reminder both need the right to
@@ -94,6 +96,7 @@ class MainActivity : ComponentActivity() {
                 tock.pick(LocalDate.now())
                 tock.startNew()
             }
+            intent.hasExtra(MailNotices.EXTRA_MAIL) -> intent.getStringExtra(MailNotices.EXTRA_MAIL)?.let { mail.pickId(it) }
             intent.hasExtra(EXTRA_EVENT) -> tock.openFromOutside(
                 intent.getLongExtra(EXTRA_EVENT, -1),
                 intent.getLongExtra(EXTRA_BEGIN, 0),
@@ -114,6 +117,13 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         mail.refresh()
+        MailNotices.inFront = true
+        MailNotices.clear(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        MailNotices.inFront = false
     }
 
     /** Leaving the app leaves current widgets behind, each only when

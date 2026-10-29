@@ -73,6 +73,23 @@ object ImapRepo {
         }.onFailure { errors[a.address] = it.toString() }.getOrNull()
     }
 
+    /** An open, read-only INBOX that the caller keeps and closes (with its
+     *  store): the line instant mail waits on. Null when it cannot open. */
+    fun openInbox(a: Account): IMAPFolder? {
+        val token = Oauth.accessToken(a) ?: return null.also { errors[a.address] = "no access token" }
+        return runCatching {
+            // No read timeout: IDLE waits as long as Gmail stays quiet.
+            val props = Properties().apply {
+                put("mail.imaps.ssl.enable", "true")
+                put("mail.imaps.auth.mechanisms", "XOAUTH2")
+                put("mail.imaps.connectiontimeout", "20000")
+            }
+            val store = Session.getInstance(props).getStore("imaps")
+            store.connect(HOST, a.address, token)
+            (store.getFolder("INBOX") as IMAPFolder).apply { open(Folder.READ_ONLY) }
+        }.onFailure { errors[a.address] = it.toString() }.getOrNull()
+    }
+
     /** Gmail's All Mail, found by its \All mark: its name follows the
      *  account's language ("[Gmail]/Alle e-poster" in Norwegian). */
     private fun allMail(store: Store): Folder =

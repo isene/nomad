@@ -15,6 +15,14 @@
     <!-- Alarms do not survive a restart: tasks arms its own again, and the
          agenda widget sets its next redraw. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Instant mail, only while its switch is on: an open line to Gmail
+         in a service with a quiet notice, a short wake lock for the
+         15-minute check, and a note when the network comes back. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:allowBackup="true"
@@ -73,6 +81,27 @@
         <receiver
             android:name="com.isene.mail.widget.WidgetTick"
             android:exported="false" />
+
+        <!-- Instant mail. Started only when its switch is on. -->
+        <service
+            android:name="com.isene.mail.work.MailPush"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Keeps an IMAP IDLE line open so new mail arrives at once" />
+        </service>
+        <receiver
+            android:name="com.isene.mail.work.MailPushPoke"
+            android:exported="false" />
+        <receiver
+            android:name="com.isene.mail.work.MailPushBoot"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
 
         <!-- tock: the agenda widget. -->
         <receiver
