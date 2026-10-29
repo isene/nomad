@@ -45,7 +45,8 @@ starts empty:
 1. Install gluon.
 2. Mail ⋮ → Settings: pick the shared mail folder, then **Import**.
 3. Calendar: let it read your calendars.
-4. Tasks: pick `todo.hl`.
+4. Tasks: pick `todo.hl`. Android's picker hides a folder such as
+   `.tasks`; open ☰ there and choose [pointer](../pointer/), which shows it.
 5. Place the widgets again, then remove the three old apps.
 
 ## Build
