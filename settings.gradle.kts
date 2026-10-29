@@ -22,12 +22,11 @@ dependencyResolutionManagement {
 
 rootProject.name = "nomad"
 
-include(":apps:tasks")
+include(":apps:gluon")
 include(":apps:hyperlist")
 include(":apps:relay")
 include(":apps:astro")
 include(":apps:watchit")
-include(":apps:mail")
 include(":apps:amardice")
 include(":apps:rpnx")
 include(":apps:vox")
@@ -40,6 +39,5 @@ include(":apps:fresh")
 include(":apps:gaze")
 include(":apps:outside")
 include(":apps:pointer")
-include(":apps:tock")
 include(":apps:prism")
 include(":apps:fleet")

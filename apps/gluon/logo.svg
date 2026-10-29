@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="gluon">
+  <!-- The gluon logo of the Fe2O3 suite in few shapes: three springs bind
+       mail, calendar and tasks, as gluons bind quarks. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a1a2e"/>
+      <stop offset="1" stop-color="#0a0a14"/>
+    </linearGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <!-- The springs, from the centre of one circle to the next -->
+  <g fill="none" stroke="#d97757" stroke-width="6" stroke-linecap="round">
+    <path transform="translate(128,80) rotate(121.7)" d="M0,0 q8,-16 16,0 t16,0 t16,0 t16,0 t16,0 t16,0 t16,0"/>
+    <path transform="translate(128,80) rotate(58.3)" d="M0,0 q8,-16 16,0 t16,0 t16,0 t16,0 t16,0 t16,0 t16,0"/>
+    <path transform="translate(70,174)" d="M0,0 q8,-16 16,0 t16,0 t16,0 t16,0 t16,0 t16,0 t16,0 t16,0"/>
+  </g>
+  <g stroke-width="6" fill="#191311">
+    <circle cx="128" cy="80" r="33" stroke="#f74c00"/>
+    <circle cx="70" cy="174" r="33" stroke="#ffb066"/>
+    <circle cx="186" cy="174" r="33" stroke="#9ccc65"/>
+  </g>
+  <!-- Mail, a calendar page, a task done -->
+  <path d="M110,68 h36 v25 h-36 z M110,69 l18,14 l18,-14" fill="none" stroke="#f74c00" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M55,161 h30 v27 h-30 z M55,171 h30" fill="none" stroke="#ffb066" stroke-width="5" stroke-linejoin="round"/>
+  <polyline points="172,175 182,185 200,162" fill="none" stroke="#9ccc65" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,0 +1,159 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- mail: IMAP and SMTP to Gmail, and the relay's chats. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The widgets' ten-minute ticks, and a stamped task's reminder. The
+         tasks scheduler falls back to an inexact alarm if it is absent. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <!-- tock: the events come from the calendars the phone already keeps
+         in sync, and new ones are written there. -->
+    <uses-permission android:name="android.permission.READ_CALENDAR" />
+    <uses-permission android:name="android.permission.WRITE_CALENDAR" />
+    <!-- A calendar reminder and a stamped task both post a notice. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Alarms do not survive a restart: tasks arms its own again, and the
+         agenda widget sets its next redraw. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Gluon">
+        <activity
+            android:name="com.isene.gluon.MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.Gluon"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- So a launcher or another app can ask for "the calendar". -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.APP_CALENDAR" />
+            </intent-filter>
+        </activity>
+
+        <!-- mail: hands a saved attachment to another app for one read,
+             and exposes nothing else. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.files"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- mail widget. No update period: the app pushes a redraw when the
+             unread count moves, and WidgetTick reads the synced files every
+             ten minutes while the screen is on. -->
+        <receiver
+            android:name="com.isene.mail.widget.MailWidgetReceiver"
+            android:exported="false"
+            android:label="@string/mail_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/mail_widget_info" />
+        </receiver>
+        <receiver
+            android:name="com.isene.mail.widget.WidgetTick"
+            android:exported="false" />
+
+        <!-- tock: the agenda widget. -->
+        <receiver
+            android:name="com.isene.tock.AgendaWidget"
+            android:exported="false"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/agenda_widget" />
+        </receiver>
+
+        <!-- Off until an agenda widget is placed, so a phone without one
+             never starts the app for these. -->
+        <receiver
+            android:name="com.isene.tock.WidgetEvents"
+            android:enabled="false"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.LOCALE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- For the agenda widget: run by Android when a calendar has changed. -->
+        <service
+            android:name="com.isene.tock.CalendarWatch"
+            android:exported="false"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
+        <!-- The phone's calendar store sends this when a reminder is due. -->
+        <receiver
+            android:name="com.isene.tock.Reminder"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.EVENT_REMINDER" />
+                <data android:scheme="content" />
+            </intent-filter>
+        </receiver>
+
+        <!-- tasks widget. -->
+        <receiver
+            android:name="com.isene.tasks.widget.TasksWidgetReceiver"
+            android:exported="false"
+            android:label="@string/tasks_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/tasks_widget_info" />
+        </receiver>
+
+        <!-- Reads todo.hl again every ten minutes while the screen is on
+             and a tasks widget is placed. -->
+        <receiver
+            android:name="com.isene.tasks.widget.WidgetTick"
+            android:exported="false" />
+
+        <!-- Fires when a stamped task comes due. -->
+        <receiver
+            android:name="com.isene.tasks.reminder.ReminderReceiver"
+            android:exported="false" />
+
+        <!-- Re-arms task alarms after a reboot or an app update (alarms do
+             not survive either), and on request from vox after it files a
+             spoken reminder. -->
+        <receiver
+            android:name="com.isene.tasks.reminder.RescanReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+                <action android:name="com.isene.tasks.action.RESCAN" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+</manifest>

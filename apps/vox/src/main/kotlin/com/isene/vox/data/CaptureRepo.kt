@@ -57,14 +57,15 @@ class CaptureRepo(private val context: Context) {
     }
 
     /**
-     * Ask tasks to re-read todo.hl and arm the new reminder. Explicit
-     * broadcast to that package; if tasks is not installed the send is a
-     * no-op and the line simply sits in the Inbox.
+     * Ask gluon (which holds tasks since 2026-10-29) to re-read todo.hl
+     * and arm the new reminder. Explicit broadcast to that package; if
+     * gluon is not installed the send is a no-op and the line simply sits
+     * in the Inbox.
      */
     private fun kickTasks() {
         try {
             context.sendBroadcast(
-                Intent("com.isene.tasks.action.RESCAN").setPackage("com.isene.tasks"),
+                Intent("com.isene.tasks.action.RESCAN").setPackage("com.isene.gluon"),
             )
         } catch (e: Exception) {
             // Nothing to recover: the item is already written.

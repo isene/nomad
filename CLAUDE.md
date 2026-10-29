@@ -34,7 +34,8 @@ These come from the original mobile-architecture artifact. Do not drift.
 - **Compose for screens. Glance for widgets. WorkManager for background.**
   Widgets render through `RemoteViews`, so all-Rust UI frameworks are
   rejected. Termux-style approaches are rejected. Super-apps are
-  rejected.
+  rejected, with one exception he asked for on 2026-10-29: gluon has
+  mail (kastrup), tock and tasks, as the laptop's gluon does.
 - **Each app ships as its own APK** with its own launcher icon. Shared
   core is consumed via a Gradle dependency on the local `core` crate
   (cargo-ndk builds the per-ABI `.so` files; UniFFI generates the
@@ -114,12 +115,36 @@ when building the core. Same rule as the rest of Fe₂O₃.
 
 ## Per-app notes
 
-### tasks (com.isene.tasks)
+### gluon (com.isene.gluon): mail, tock and tasks in one app
+
+- Asked 2026-10-29 after the laptop's gluon. Module `apps/gluon`, signed
+  with the tasks key. The three parts keep their Kotlin packages
+  (`com.isene.mail`, `com.isene.tock`, `com.isene.tasks`) and their notes
+  below; their old READMEs are `apps/gluon/docs/<part>.md`.
+- `com.isene.gluon` has the only activity (`MainActivity`: the work
+  the three activities did on start, resume and stop) and `Gluon.kt`
+  (the tab bar, `Kept`, the Home tab).
+- `Kept` keeps a tab composed once opened, unmeasured and undrawn while
+  hidden, with its back handlers on a dispatcher nothing calls. The
+  screens hold their state in plain `remember`, so without it a tab
+  switch dropped a half-written mail.
+- `openTab(ctx, Tab)` is the intent for widgets and notices. The action
+  names the tab, so two parts' PendingIntents never collide.
+- Shared names were split: notice channels `reminders` (tasks) and
+  `calendar` (tock); strings `mail_widget_label`, `tasks_widget_label`.
+  Prefs files (`mail_prefs`, `tasks_prefs`, `tock`) and files in
+  filesDir were already apart.
+- Home reads `MailViewModel.ui.inbox` (the unread through the scope, as
+  the widget has them), tock's `ui.days` for seven days and the tasks
+  hyperlist. A mail tapped there goes through `MailViewModel.pick`.
+- vox sends its RESCAN to `com.isene.gluon` since vox 0.2.3.
+
+### tasks (in gluon, package com.isene.tasks)
 
 - Supplants the existing standalone `tasks` repo (v0.3.0). Same
   applicationId, same signing key at `~/.android/tasks-release.jks`,
   alias `tasks`, valid until 2053. Drop a `key.properties` next to
-  `apps/tasks/build.gradle.kts` (gitignored).
+  `apps/gluon/build.gradle.kts` (gitignored).
 - Backwards-compatible data: 2-level hyperlist in `~/.tasks/todo.hl`,
   synced via Syncthing (laptop) ↔ Syncthing-Fork (phone, F-Droid).
   Phone reads through SAF.
@@ -462,7 +487,7 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - Not seen on a phone by Claude: there is no emulator here. Say so after
   every change to the panel.
 
-### tock (com.isene.tock)
+### tock (in gluon, package com.isene.tock)
 
 - A calendar after the laptop's tock. Signed with the tasks key. Kotlin
   only, like fresh: every event comes from Android's own calendar store
@@ -472,7 +497,7 @@ when building the core. Same rule as the rest of Fe₂O₃.
   that the Teams app opens (`teamsLink`); tock writes nothing for it.
 - The day and colour rules are in `Days.kt`, which touches no Android
   class. Their tests run on the laptop:
-  `./gradlew :apps:tock:testReleaseUnitTest`. An all-day event is
+  `./gradlew :apps:gluon:testReleaseUnitTest`. An all-day event is
   midnight to midnight UTC in the store, so its day is read in UTC and
   never in the phone's zone.
 - `LocalDate` is not `Comparable<LocalDate>` in Kotlin's eyes: `maxOf`,
@@ -522,7 +547,7 @@ when building the core. Same rule as the rest of Fe₂O₃.
   Android's own code at 360 by 700 dp with text at 130 % and fails when
   a slider or Copy falls off; it writes `build/screen.png` to look at.
 
-### mail (com.isene.mail, the kastrup app)
+### mail (in gluon, package com.isene.mail, the kastrup part)
 
 - 0.17.0: Laptop drafts (menu). `DraftsRepo` reads `drafts/` of the
   shared kastrup-read folder through the SAF tree. Send moves the file to
@@ -639,7 +664,8 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - Putting business logic in Kotlin because it's faster to prototype.
 - Hand-written JNI when UniFFI would do.
 - Pulling in heavy Compose dependencies for trivial features.
-- A super-app with internal modes instead of separate APKs.
+- A super-app with internal modes instead of separate APKs (gluon is
+  the one exception).
 - Background polling instead of WorkManager-scheduled or push-driven sync.
 - All-Rust UI experiments. Widgets require `RemoteViews`.
 - Duplicating logic between core and a shell.
