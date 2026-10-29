@@ -28,7 +28,9 @@ import com.isene.tock.TockViewModel
 import java.time.LocalDate
 
 /** The four tabs, as on the laptop: Home, then each app. */
-enum class Tab { Home, Mail, Calendar, Tasks }
+/** The tabs. Mail is shown as Messages, since it also holds feeds and
+ *  chats; the name stays, because notices and widgets open it by name. */
+enum class Tab(val label: String) { Home("Home"), Mail("Messages"), Calendar("Calendar"), Tasks("Tasks") }
 
 /** An intent that opens gluon on one tab. The action names the tab, so
  *  two parts' notices never share a PendingIntent (Android tells them

@@ -1,6 +1,6 @@
 # kastrup in gluon
 
-The Mail tab of [gluon](../README.md).
+The Messages tab of [gluon](../README.md).
 
 ## What it does
 
@@ -83,8 +83,8 @@ grow without bound.
    client id, secret and refresh token into `mail-accounts.json` in the
    folder Syncthing shares with the phone.
 2. **⋮ → Settings → Pick the shared folder** — the Syncthing folder
-   carrying kastrup's `~/.kastrup/sync`. Then **Import
-   mail-accounts.json** (drop that file in the folder first). Delete it
+   carrying kastrup's `~/.kastrup/sync`. Then **Import from the laptop**
+   reads `mail-accounts.json` (drop that file in the folder first). Delete it
    afterwards: a refresh token is the whole credential and has no
    business sitting in a synced folder. The field is editable, if you
    would rather type it.
@@ -93,7 +93,8 @@ grow without bound.
    mostly never gets read on a phone.
 4. **Feeds and Discord** come across with the accounts: `mail-accounts`
    also writes `feeds.txt` from kastrup's RSS source and `discord.json`
-   from its channel file and bot token, and one Import takes all three.
+   from its channel file and bot token, and one Import takes all three,
+   plus `views.txt` (one view per line, as in Settings) when it is there.
    Delete `mail-accounts.json` and `discord.json` afterwards — both hold
    credentials. The Settings field is editable — one
    `Title | https://…/feed.xml` per line, or a bare URL.
@@ -188,9 +189,9 @@ is down.
 A named list, in Settings, one per line:
 
 ```
-Dualog    | mail, match:dualog.com
-Calc talk | rss:https://www.hpmuseum.org/forum/…, discord
-Work      | mail:geir@passionfruits.net, discord:1288…
+AcmeCo    | mail, match:acmeco.com
+Calc talk | rss:https://forum.example.org/…, discord
+Work      | mail:alice@example.com, discord:1234…
 ```
 
 A name, a pipe, then the places to draw from — the same scope strings
@@ -198,7 +199,7 @@ the menu uses, OR'd together — plus an optional `match:` on sender,
 recipient or subject.
 
 The match is not a nicety. kastrup's own views filter on maildir folders
-(`.AA.Customers.Dualog`), and the phone has none: it reads one INBOX per
+(`.Customers.AcmeCo`), and the phone has none: it reads one INBOX per
 account with nothing filed. Matching the address is how the same view is
 expressed here.
 
@@ -261,7 +262,6 @@ stay in the laptop's database and are not listed.
 
 ## Not yet
 
-No push (the fetch is periodic, not instant) and no compose of new mail. Dualog
-Workspace is the obvious next channel, and the only one that needs
-something the phone cannot do alone — its OIDC login, or the laptop
-relaying into the shared folder.
+No compose of new mail. A work chat with its own login is the obvious
+next channel, and the only kind that needs something the phone cannot
+do alone: that login, or the laptop relaying into the shared folder.

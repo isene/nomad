@@ -59,6 +59,7 @@ import com.isene.gluon.BuildConfig
 import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.readAccountsFile
 import com.isene.mail.data.readDiscordFile
+import com.isene.mail.data.readViewsFile
 import com.isene.mail.data.readFeedsFile
 import com.isene.mail.viewmodel.ComposeRequest
 import com.isene.mail.viewmodel.MailViewModel
@@ -473,7 +474,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                     maxLines = 6,
                 )
                 Text(
-                    "`Dualog | mail, match:dualog.com` — a name, then the " +
+                    "`AcmeCo | mail, match:acmeco.com` — a name, then the " +
                         "places to draw from (mail, rss, discord, or one of " +
                         "each: mail:<address>, rss:<url>, discord:<id>), plus " +
                         "an optional match: on sender or subject.",
@@ -519,21 +520,24 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                         val acc = readAccountsFile(ctx, syncUri)
                         val fed = readFeedsFile(ctx, syncUri)
                         val dis = readDiscordFile(ctx, syncUri)
+                        val vws = readViewsFile(ctx, syncUri)
                         acc?.let { accounts = it; s.accountsJson = it }
                         fed?.let { feeds = it; s.feedsText = it }
                         dis?.let { s.discordJson = it }
+                        vws?.let { views = it; s.viewsText = it }
                         imported = when {
-                            acc == null && fed == null && dis == null ->
+                            acc == null && fed == null && dis == null && vws == null ->
                                 "Nothing to import from that folder"
                             else -> listOfNotNull(
                                 acc?.let { s.accounts().size.toString() + " accounts" },
                                 fed?.let { s.feeds().size.toString() + " feeds" },
                                 dis?.let { s.channels().size.toString() + " channels" },
+                                vws?.let { s.views().size.toString() + " views" },
                             ).joinToString(", ", prefix = "Imported ")
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("Import accounts, feeds + channels") }
+                ) { Text("Import from the laptop") }
                 Text(
                     imported ?: "Set up: " + s.configSummary(),
                     fontSize = 11.sp,

@@ -28,7 +28,7 @@ data class Feed(val url: String, val title: String)
  * [scopes] are the same scope strings the menu already uses, OR'd
  * together: a view is "any of these places". [match] narrows that to
  * messages whose sender, recipient or subject contains the text — which
- * is how a view like Dualog is expressed on a phone at all, since the
+ * is how a view of one customer's mail is expressed on a phone, since the
  * phone reads one INBOX and has none of the laptop's maildir folders to
  * filter on.
  */
@@ -183,9 +183,9 @@ class Settings(ctx: Context) {
     /**
      * Saved views, one per line:
      *
-     *     Dualog    | mail, match:dualog.com
-     *     Calc talk | rss:https://www.hpmuseum.org/…, discord
-     *     Work      | mail:geir@passionfruits.net, discord:1288…
+     *     AcmeCo    | mail, match:acmeco.com
+     *     Calc talk | rss:https://forum.example.org/…, discord
+     *     Work      | mail:alice@example.com, discord:1234…
      *
      * A name, a pipe, then a comma-separated list of the same scopes the
      * menu uses, plus an optional `match:` term. Plain text for the same
@@ -309,6 +309,10 @@ fun readFeedsFile(ctx: Context, treeUri: String): String? =
  *  after importing: it carries a bot token. */
 fun readDiscordFile(ctx: Context, treeUri: String): String? =
     readSharedFile(ctx, treeUri, "discord.json")
+
+/** The views, one per line as in Settings, written on the laptop. */
+fun readViewsFile(ctx: Context, treeUri: String): String? =
+    readSharedFile(ctx, treeUri, "views.txt")
 
 private fun readSharedFile(ctx: Context, treeUri: String, name: String): String? {
     if (treeUri.isEmpty()) return null
