@@ -1,6 +1,6 @@
-// Hyperlist: tab-indented hierarchy. One leading tab = category, two
-// leading tabs = item under the previous category. Matches what kastrup's
-// z-triage and scribe write to ~/.tasks/todo.hl.
+// Hyperlist: tab-indented hierarchy. The least indented lines are the
+// categories, and anything further in is an item under the category above.
+// Saves put categories at no tab and items at one, as ~/.tasks/todo.hl is.
 //
 // Ported 1:1 from the v0.3.0 Kotlin implementation in
 // /home/geir/Main/G/GIT-isene/tasks/app/src/main/kotlin/com/isene/tasks/data/Hyperlist.kt
@@ -54,31 +54,28 @@ pub fn parse(content: String) -> Hyperlist {
         }
     };
 
+    let tabs = |l: &str| l.chars().take_while(|&c| c == '\t').count();
+    let top = content.lines().filter(|l| !l.trim().is_empty()).map(tabs).min().unwrap_or(0);
     for line in content.lines() {
         if line.trim().is_empty() {
             continue;
         }
-        let leading_tabs = line.chars().take_while(|&c| c == '\t').count();
-        match leading_tabs {
-            1 => {
+        match tabs(line) {
+            n if n == top => {
                 commit(&mut current_name, &mut current_items, &mut categories);
-                let name = line[1..].trim().to_string();
+                let name = line.trim().to_string();
                 if !name.is_empty() {
                     current_name = Some(name);
                     current_items = Vec::new();
                 }
             }
-            n if n >= 2 => {
-                // Strip exactly two leading tabs for the item text. Anything
-                // deeper flattens to a single item; matches the existing
-                // app's 2-level subset.
+            _ => {
+                // Anything deeper flattens to a single item; matches the
+                // existing app's 2-level subset.
                 let text = line.trim_start_matches('\t').to_string();
                 if current_name.is_some() {
                     current_items.push(Item { text });
                 }
-            }
-            _ => {
-                // Zero-indent lines (top-level prose, comments) are skipped.
             }
         }
     }
@@ -91,11 +88,10 @@ pub fn parse(content: String) -> Hyperlist {
 pub fn serialize(hl: Hyperlist) -> String {
     let mut out = String::new();
     for cat in &hl.categories {
-        out.push('\t');
         out.push_str(&cat.name);
         out.push('\n');
         for item in &cat.items {
-            out.push_str("\t\t");
+            out.push('\t');
             out.push_str(&item.text);
             out.push('\n');
         }
@@ -276,7 +272,7 @@ mod tests {
     use super::*;
 
     fn sample() -> &'static str {
-        "\tPersonal\n\t\tRenew passport\n\t\tCall the dentist\n\tWork\n\t\tReview Q3 plan\n"
+        "Personal\n\tRenew passport\n\tCall the dentist\nWork\n\tReview Q3 plan\n"
     }
 
     #[test]
@@ -294,12 +290,11 @@ mod tests {
     }
 
     #[test]
-    fn parse_skips_blank_and_zero_indent() {
-        let input = "header line\n\n\tCat\n\t\titem\n\n";
+    fn an_indented_file_reads_the_same_and_saves_without_the_indent() {
+        let input = "\n\tPersonal\n\t\tRenew passport\n\t\tCall the dentist\n\n\tWork\n\t\tReview Q3 plan\n";
         let hl = parse(input.to_string());
-        assert_eq!(hl.categories.len(), 1);
-        assert_eq!(hl.categories[0].name, "Cat");
-        assert_eq!(hl.categories[0].items.len(), 1);
+        assert_eq!(hl, parse(sample().to_string()));
+        assert_eq!(serialize(hl), sample());
     }
 
     #[test]
@@ -307,7 +302,7 @@ mod tests {
         // Existing v0.3.0 behaviour: anything ≥ 2 tabs becomes an item
         // under the current category. Deeper structure flattens; we
         // document this in CLAUDE.md.
-        let input = "\tCat\n\t\titem\n\t\t\tdeep child\n";
+        let input = "Cat\n\titem\n\t\tdeep child\n";
         let hl = parse(input.to_string());
         assert_eq!(hl.categories[0].items.len(), 2);
         assert_eq!(hl.categories[0].items[1].text, "deep child");
@@ -435,7 +430,7 @@ mod tests {
     #[test]
     fn unicode_in_categories_and_items() {
         // Nordic chars in both category and item; must not slice mid-utf8.
-        let input = "\tFamilie\n\t\tKjøre Pål til skolen\n\t\tHåndtere æ-ø-å\n";
+        let input = "Familie\n\tKjøre Pål til skolen\n\tHåndtere æ-ø-å\n";
         let hl = parse(input.to_string());
         assert_eq!(hl.categories[0].name, "Familie");
         assert_eq!(hl.categories[0].items[0].text, "Kjøre Pål til skolen");

@@ -126,6 +126,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - The hyperlist parser, serializer, and transforms live in the Rust
   core (`core/src/hyperlist.rs`). Kotlin handles SAF I/O, Compose UI,
   and the Glance widget.
+- 0.10.1 (2026-10-29): the least indented lines are the categories, so a
+  file with sections at no tab reads right; saves put sections at no tab
+  and tasks at one, as Geir now keeps todo.hl. vox 0.2.2 shares the fix.
 - Since 0.8.0 (Geir asked on 2026-10-14) a widget line has its
   category's colour, and the name in front is off unless chosen. "Widget
   text" sets the size (13 sp at first), the names and a colour per
