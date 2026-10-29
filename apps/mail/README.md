@@ -43,14 +43,18 @@ Part of the [nomad](../../) mobile suite.
   — rather than as the `DTSTART;TZID=` they arrive as
 - **Tappable links** in the body
 - **Attachments** listed under the headers; tap one to open it in
-  whatever app handles the type
+  whatever app handles the type, or **Share** to hand it to another app
+  (a receipt to your accounting app, say)
 - A **Removed** chip to look through what a swipe hid, and swipe there to
   put one back
 - **Mark all read** and **Remove all** in the ⋮ menu, acting on what the
   list is showing — so a filter narrows them
 - **Search** (🔍): live, over sender, recipient and subject of what is
   held — not the body, which for mail is only fetched when a message is
-  opened, so most rows have none to search
+  opened, so most rows have none to search. **Enter** searches all of
+  Gmail on every account instead, in the words the Gmail app takes
+  (`kvittering has:attachment after:2026/9/1`), and lists the 40 newest
+  hits per account
 - A **home-screen widget**: the same unread list at a glance, through the
   same account filter, tap to open
 

@@ -33,6 +33,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -345,6 +346,10 @@ private fun AttachmentRows(raw: String, onStatus: (String) -> Unit) {
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.secondary,
             )
+            TextButton(onClick = {
+                val uri = Attachments.save(ctx, raw, i, a.filename)
+                if (uri == null || !Attachments.share(ctx, uri, a.mimeType)) onStatus("Could not share ${a.filename}")
+            }) { Text("Share", fontSize = 12.sp) }
         }
     }
     Spacer(Modifier.width(8.dp))

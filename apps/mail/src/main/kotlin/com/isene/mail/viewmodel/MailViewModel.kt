@@ -16,6 +16,8 @@ import com.isene.mail.data.WidgetRow
 import com.isene.mail.data.WidgetStore
 import com.isene.mail.widget.WidgetPush
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -96,6 +98,9 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     /** See [setQuery]. */
     private var query: String = ""
+
+    /** What the last Gmail search found; null while the list shows what is held. */
+    private var found: List<Message>? = null
 
 
     private val _ui = MutableStateFlow(UiState())
@@ -226,12 +231,13 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         viewModelScope.launch {
-            val raw = withContext(Dispatchers.IO) { ImapRepo.body(account, m.messageId, m.uid.toLong()) }
+            val raw = withContext(Dispatchers.IO) { ImapRepo.body(account, m.messageId, m.uid.toLong(), m.folder) }
             if (raw == null) {
                 _body.value = "(could not fetch this message)"
                 return@launch
             }
             all = all.map { if (it.messageId == m.messageId) it.copy(raw = raw) else it }
+            found = found?.map { if (it.messageId == m.messageId) it.copy(raw = raw) else it }
             _body.value = mailBodyText(raw, "")
             recompute()
             withContext(Dispatchers.IO) { Store.save(ctx, all) }
@@ -398,7 +404,31 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Transient by design: a search is a question about now, and coming
      *  back tomorrow to a list still narrowed by it reads as lost mail. */
-    fun setQuery(q: String) { query = q; recompute() }
+    fun setQuery(q: String) { query = q; found = null; recompute() }
+
+    /**
+     * Enter in the search field: Gmail searches all mail of every account
+     * on its own server, in the words the Gmail app takes. The list shows
+     * the 40 newest hits of each until the words change.
+     */
+    fun searchGmail() {
+        val words = query.trim()
+        val accounts = settings.accounts()
+        if (words.isEmpty() || accounts.isEmpty()) return
+        _ui.value = _ui.value.copy(busy = true)
+        viewModelScope.launch {
+            val got = withContext(Dispatchers.IO) {
+                accounts.map { a -> async { ImapRepo.search(a, words) } }.awaitAll()
+            }
+            _ui.value = _ui.value.copy(busy = false)
+            if (words != query.trim()) return@launch   // the words changed meanwhile
+            val hits = got.filterNotNull().flatten().distinctBy { it.messageId }.sortedByDescending { it.date }
+            found = hits
+            recompute()
+            val silent = got.count { it == null }
+            status("${hits.size} on Gmail for “$words”" + if (silent > 0) "; $silent account(s) did not answer" else "")
+        }
+    }
 
     fun setScope(s: String) { settings.scope = s; recompute() }
 
@@ -426,7 +456,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         // — the counts, the widget — still means the visible ones.
         val scope = settings.scope
         val base = if (filter == "removed") all.filter { it.messageId in gone } else here
-        val shown = base
+        val shown = found ?: base
             .filter { inScope(it, scope) }
             .filter { filter != "unread" || it.messageId !in readIds }
             // Sender, recipient, subject. Not the body: mail bodies are
