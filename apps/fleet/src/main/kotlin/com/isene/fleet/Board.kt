@@ -81,9 +81,15 @@ fun answerAddress(address: String, tag: String): String =
  *  would type it on the laptop ("3 yes", "5 no: not today", "7 done"),
  *  then the free text. Empty when nothing was chosen or written. */
 fun reply(choice: Map<Int, String>, notes: Map<Int, String>, free: String): String {
-    val items = choice.keys.sorted().map { n ->
+    val items = choice.keys.sorted().mapNotNull { n ->
         val note = notes[n].orEmpty().trim()
-        "$n ${choice[n]}" + if (note.isEmpty()) "" else ": $note"
+        val word = choice[n].orEmpty()
+        when {
+            word.isEmpty() && note.isEmpty() -> null   // Info, no words yet
+            word.isEmpty() -> "$n: $note"
+            note.isEmpty() -> "$n $word"
+            else -> "$n $word: $note"
+        }
     }
     return (items + listOfNotNull(free.trim().ifEmpty { null })).joinToString("\n")
 }

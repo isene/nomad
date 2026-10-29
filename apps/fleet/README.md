@@ -28,8 +28,10 @@ phone twin of [fleet](https://github.com/isene/fleet).
   answer (your prompt while they work); the rest take one line. It is
   asked for only while the screen shows.
 - Tap a session for its last answer in full, drawn as HyperList with
-  the laptop's colours. Each open item has Yes, No, Done and Rec (sent
-  as "as recommended"), with a line for words to go with it, and a box below takes words of your own.
+  the laptop's colours. Each open item has Y, N, Done, Rec (sent as
+  "as recommended") and Info, with a line for words to go with it; Info
+  sends the words alone ("3: the key is in the drawer"). A box below
+  takes words of your own.
   Send goes out as one message, as you would type it ("3 yes", "5 no:
   not today"). The items it answers leave the screen at once. One comes
   back only if the session's answer to it leaves it open.

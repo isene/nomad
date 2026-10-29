@@ -53,5 +53,8 @@ class AnswerOnAndroidTest {
         assertEquals("3 yes\n5 no: not today\nGo on.", reply(mapOf(5 to "no", 3 to "yes"), mapOf(5 to " not today "), "Go on. "))
         assertEquals("2 done\n4 as recommended", reply(mapOf(4 to "as recommended", 2 to "done"), emptyMap(), ""))
         assertEquals("", reply(emptyMap(), mapOf(2 to "a note alone"), "  "))
+        // Info: the words alone, and nothing until there are some.
+        assertEquals("1: the key is in the drawer\n2 yes", reply(mapOf(1 to "", 2 to "yes"), mapOf(1 to " the key is in the drawer "), ""))
+        assertEquals("", reply(mapOf(1 to ""), emptyMap(), ""))
     }
 }
