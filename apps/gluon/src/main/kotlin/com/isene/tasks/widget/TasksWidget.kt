@@ -60,7 +60,7 @@ internal const val KEY_NAMES = "widget_names"
 internal const val KEY_COLORS = "widget_colors"
 
 /** The size of the widget's text, in sp, until another is chosen. */
-internal const val TEXT_SIZE = 13
+internal const val TEXT_SIZE = 12
 private const val MAX_ROWS: UInt = 12u
 
 /** The list this widget is drawing, in the widget's own state. */
