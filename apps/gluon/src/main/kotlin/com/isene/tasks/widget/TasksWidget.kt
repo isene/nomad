@@ -175,7 +175,7 @@ private fun WidgetContent(rows: List<WidgetRow>, cats: List<String>, look: Look)
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "tasks",
+                    "Tasks",
                     style = TextStyle(
                         fontWeight = FontWeight.Bold,
                         color = GlanceTheme.colors.primary,

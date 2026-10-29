@@ -2,8 +2,9 @@ package com.isene.mail.data
 
 import android.content.Context
 import android.net.Uri
-import androidx.documentfile.provider.DocumentFile
+import android.provider.DocumentsContract
 import org.json.JSONArray
+import org.json.JSONObject
 
 private const val PREFS = "mail_prefs"
 
@@ -152,7 +153,7 @@ class Settings(ctx: Context) {
 
     /**
      * The Discord blob: `{"token": "...", "channels": [{id, name}]}`,
-     * written by the laptop's `mail-accounts` out of kastrup's own
+     * written by the laptop's `gluon-setup` out of kastrup's own
      * channel file. Holds a bot token, so it stays in this app's prefs.
      */
     var discordJson: String
@@ -288,38 +289,22 @@ class Settings(ctx: Context) {
 }
 
 /**
- * The `mail-accounts.json` the laptop's `mail-accounts` script drops in
- * the shared folder. Imported once into this app's own prefs, after
- * which the file should be deleted — a refresh token is the whole
- * credential and has no business sitting in a synced folder.
- *
- * Typing or clipboard-pasting a few KB of JSON on a phone is the kind
- * of chore that gets done wrong once and debugged for an hour.
+ * The setup file the laptop's `gluon-setup` writes: the accounts, feeds,
+ * Discord channels and views in one JSON object. Loading it sets them
+ * all, then deletes the file, since the refresh tokens in it are the
+ * whole login. Returns what to tell the user.
  */
-fun readAccountsFile(ctx: Context, treeUri: String): String? =
-    readSharedFile(ctx, treeUri, "mail-accounts.json")
-
-/** The feed list the same script writes, straight out of kastrup's own
- *  RSS source — so the phone subscribes to what the laptop does without
- *  either being retyped. Harmless to leave in the folder. */
-fun readFeedsFile(ctx: Context, treeUri: String): String? =
-    readSharedFile(ctx, treeUri, "feeds.txt")
-
-/** The Discord token and channels, same script, same folder. Delete it
- *  after importing: it carries a bot token. */
-fun readDiscordFile(ctx: Context, treeUri: String): String? =
-    readSharedFile(ctx, treeUri, "discord.json")
-
-/** The views, one per line as in Settings, written on the laptop. */
-fun readViewsFile(ctx: Context, treeUri: String): String? =
-    readSharedFile(ctx, treeUri, "views.txt")
-
-private fun readSharedFile(ctx: Context, treeUri: String, name: String): String? {
-    if (treeUri.isEmpty()) return null
-    val dir = runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri)) }.getOrNull()
-        ?: return null
-    val f = dir.findFile(name)?.takeIf { it.isFile } ?: return null
-    return runCatching {
-        ctx.contentResolver.openInputStream(f.uri)?.use { it.bufferedReader().readText() }
-    }.getOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+fun Settings.loadSetup(ctx: Context, uri: Uri): String {
+    val o = runCatching {
+        ctx.contentResolver.openInputStream(uri)?.use { JSONObject(it.bufferedReader().readText()) }
+    }.getOrNull()
+    if (o == null || !o.has("accounts")) return "That is not a gluon setup file."
+    o.optJSONArray("accounts")?.let { accountsJson = it.toString(2) }
+    o.optString("feeds").takeIf { it.isNotBlank() }?.let { feedsText = it.trim() }
+    o.optJSONObject("discord")?.let { discordJson = it.toString(2) }
+    o.optString("views").takeIf { it.isNotBlank() }?.let { viewsText = it.trim() }
+    val gone = runCatching { DocumentsContract.deleteDocument(ctx.contentResolver, uri) }.getOrDefault(false)
+    return "Loaded: " + configSummary() + ". " +
+        (if (gone) "The file is deleted." else "Delete the file now: it holds your logins.") +
+        (if (syncTreeUri.isEmpty()) " Last step: Settings, Pick the shared mail folder." else "")
 }

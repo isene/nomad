@@ -1,6 +1,7 @@
 package com.isene.mail.ui
 
 import android.content.Intent
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -31,6 +32,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -57,10 +59,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.isene.gluon.BuildConfig
 import com.isene.mail.data.ReadStateRepo
-import com.isene.mail.data.readAccountsFile
-import com.isene.mail.data.readDiscordFile
-import com.isene.mail.data.readViewsFile
-import com.isene.mail.data.readFeedsFile
+import com.isene.mail.data.loadSetup
 import com.isene.mail.viewmodel.ComposeRequest
 import com.isene.mail.viewmodel.MailViewModel
 import com.isene.mail.work.MailPush
@@ -126,7 +125,7 @@ fun MailApp(vm: MailViewModel) {
                 TopAppBar(
                     title = {
                         Text(
-                            if (ui.unread > 0) "kastrup  ${ui.unread}" else "kastrup",
+                            if (ui.unread > 0) "Messages  ${ui.unread}" else "Messages",
                             fontWeight = FontWeight.Bold,
                         )
                     },
@@ -411,6 +410,12 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
     }
     var syncUri by remember { mutableStateOf(s.syncTreeUri) }
     var imported by remember { mutableStateOf<String?>(null) }
+    val loadSetup = rememberSetupLoader(vm) {
+        imported = it
+        accounts = s.accountsJson
+        feeds = s.feedsText
+        views = s.viewsText
+    }
 
     // SAF, not a raw path: the shared folder lives on external storage
     // and this is the only way to get durable write access to it.
@@ -449,6 +454,15 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                Button(onClick = { loadSetup.launch(arrayOf("*/*")) }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Load setup file")
+                }
+                Text(
+                    imported ?: "Pick gluon-setup.json from the laptop. It sets everything below.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                Spacer(Modifier.width(4.dp))
                 Text("Chats", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 OutlinedButton(onClick = { pickGateway.launch(null) }, modifier = Modifier.fillMaxWidth()) {
                     Text(
@@ -513,36 +527,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 )
                 Spacer(Modifier.width(4.dp))
                 Text("Accounts", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-                // Run `mail-accounts` on the laptop, tap this, delete the
-                // file. Beats pasting a few KB of JSON on a phone keyboard.
-                OutlinedButton(
-                    onClick = {
-                        val acc = readAccountsFile(ctx, syncUri)
-                        val fed = readFeedsFile(ctx, syncUri)
-                        val dis = readDiscordFile(ctx, syncUri)
-                        val vws = readViewsFile(ctx, syncUri)
-                        acc?.let { accounts = it; s.accountsJson = it }
-                        fed?.let { feeds = it; s.feedsText = it }
-                        dis?.let { s.discordJson = it }
-                        vws?.let { views = it; s.viewsText = it }
-                        imported = when {
-                            acc == null && fed == null && dis == null && vws == null ->
-                                "Nothing to import from that folder"
-                            else -> listOfNotNull(
-                                acc?.let { s.accounts().size.toString() + " accounts" },
-                                fed?.let { s.feeds().size.toString() + " feeds" },
-                                dis?.let { s.channels().size.toString() + " channels" },
-                                vws?.let { s.views().size.toString() + " views" },
-                            ).joinToString(", ", prefix = "Imported ")
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Import from the laptop") }
-                Text(
-                    imported ?: "Set up: " + s.configSummary(),
-                    fontSize = 11.sp,
-                    color = MaterialTheme.colorScheme.primary,
-                )
+                Text(s.configSummary(), fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
                 OutlinedTextField(
                     accounts,
                     { accounts = it },
@@ -614,6 +599,23 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
         },
     )
 }
+
+/** The picker for the laptop's setup file. Loads it, says what it did,
+ *  and starts a fetch with the new accounts. */
+@Composable
+fun rememberSetupLoader(vm: MailViewModel, done: (String) -> Unit = {}) =
+    LocalContext.current.let { ctx ->
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            if (uri != null) {
+                val said = vm.settingsObj().loadSetup(ctx, uri)
+                Toast.makeText(ctx, said, Toast.LENGTH_LONG).show()
+                done(said)
+                MailSyncWorker.schedule(ctx)
+                vm.refresh()
+                vm.sync()
+            }
+        }
+    }
 
 /** The home-screen widget's colours: six hex digits for the background
  *  and how solid it is, six for the header line. At 0 % the wallpaper

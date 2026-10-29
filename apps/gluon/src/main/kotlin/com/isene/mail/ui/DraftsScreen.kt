@@ -127,7 +127,7 @@ fun DraftsScreen(treeUri: String, onBack: () -> Unit) {
         AlertDialog(
             onDismissRequest = { confirm = false },
             title = { Text(if (shown.to.isEmpty()) "Send this ${shown.kind} draft?" else "Send to ${shown.to}?") },
-            text = { Text("kastrup on the laptop sends it within a minute, if it is running.") },
+            text = { Text("The laptop sends it within a minute, if gluon or kastrup is running there.") },
             confirmButton = {
                 TextButton(onClick = {
                     confirm = false

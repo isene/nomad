@@ -79,25 +79,21 @@ grow without bound.
 
 ## Setup
 
-1. On the laptop, run `mail-accounts`. It gathers every Gmail account's
-   client id, secret and refresh token into `mail-accounts.json` in the
-   folder Syncthing shares with the phone.
-2. **⋮ → Settings → Pick the shared folder** — the Syncthing folder
-   carrying kastrup's `~/.kastrup/sync`. Then **Import from the laptop**
-   reads `mail-accounts.json` (drop that file in the folder first). Delete it
-   afterwards: a refresh token is the whole credential and has no
-   business sitting in a synced folder. The field is editable, if you
-   would rather type it.
-3. **↻** fetches headers. Bodies download when you open a message, not
+1. On the laptop, run `gluon-setup`. It writes one file,
+   `gluon-setup.json`, into a folder Syncthing shares with the phone:
+   every Gmail account's client id, secret and refresh token, the feeds
+   from kastrup's RSS source, the Discord bot token and channels, and
+   the phone's views.
+2. In gluon, tap **Load setup file** (on the empty Messages screen, or at
+   the top of ⋮ → Settings) and pick that file. gluon sets everything
+   from it and then deletes it: a refresh token is the whole login.
+3. **⋮ → Settings → Pick the shared mail folder**: the Syncthing folder
+   carrying kastrup's `~/.kastrup/sync`. It shares what you have read
+   with the laptop.
+4. **↻** fetches headers. Bodies download when you open a message, not
    before: a month of full bodies is minutes of radio for mail that
-   mostly never gets read on a phone.
-4. **Feeds and Discord** come across with the accounts: `mail-accounts`
-   also writes `feeds.txt` from kastrup's RSS source and `discord.json`
-   from its channel file and bot token, and one Import takes all three,
-   plus `views.txt` (one view per line, as in Settings) when it is there.
-   Delete `mail-accounts.json` and `discord.json` afterwards — both hold
-   credentials. The Settings field is editable — one
-   `Title | https://…/feed.xml` per line, or a bare URL.
+   mostly never gets read on a phone. The Settings fields stay editable:
+   one `Title | https://…/feed.xml` per line for feeds, or a bare URL.
 5. **Fetch every (min)** in Settings runs the same fetch in the
    background. 15 minutes by default, 0 turns it off.
 6. **Instant mail** in Settings, off by default, brings new mail the
