@@ -221,8 +221,9 @@ fun Answer(tag: String, close: () -> Unit) {
     }
 }
 
-/** Each chip and the words it sends. Rec is "as recommended". */
-private val CHOICES = listOf("Yes" to "yes", "No" to "no", "Done" to "done", "Rec" to "as recommended")
+/** Each chip and the words it sends. Rec is "as recommended"; Info sends
+ *  only the words written under it. */
+private val CHOICES = listOf("Y" to "yes", "N" to "no", "Done" to "done", "Rec" to "as recommended", "Info" to "")
 
 /** One open item: a chip for the answer, a second tap takes it back, and
  *  once one is picked a line for words to go with it. Drop takes it off
