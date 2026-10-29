@@ -132,7 +132,7 @@ private fun Ask(vm: TockViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                "tock shows the calendars this phone already keeps in sync, and writes new events to them.",
+                "gluon shows the calendars this phone already keeps in sync, and writes new events to them.",
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(20.dp))
@@ -301,7 +301,7 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 )
                 Spacer(Modifier.size(12.dp))
                 Text(
-                    "tock shows what the accounts on your phone have fetched. It asks them to fetch " +
+                    "gluon shows what the accounts on your phone have fetched. It asks them to fetch " +
                         "when you open it, and \"Sync now\" asks again. It has no network access of its own.",
                     style = MaterialTheme.typography.bodySmall,
                 )

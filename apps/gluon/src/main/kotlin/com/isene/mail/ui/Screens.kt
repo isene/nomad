@@ -84,11 +84,26 @@ private fun shortFrom(m: Message): String {
 
 @Composable
 fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOpen: (Message) -> Unit) {
+    if (ui.mails.isEmpty() && ui.accounts.isEmpty()) {
+        val load = rememberSetupLoader(vm)
+        Column(
+            modifier.fillMaxSize().padding(32.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Button(onClick = { load.launch(arrayOf("*/*")) }) { Text("Load setup file") }
+            Text(
+                "Pick gluon-setup.json from the laptop.",
+                Modifier.padding(top = 16.dp),
+                color = MaterialTheme.colorScheme.secondary,
+            )
+        }
+        return
+    }
     if (ui.mails.isEmpty()) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
                 when {
-                    ui.accounts.isEmpty() -> "Add your accounts in Settings, then tap ↻."
                     ui.filter == "removed" -> "Nothing removed on this phone."
                     else -> "Nothing here. Tap ↻ to fetch."
                 },

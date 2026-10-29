@@ -158,7 +158,7 @@ fun TasksScreen(vm: TasksViewModel) {
             TopAppBar(
                 title = {
                     Text(
-                        text = state.displayName ?: "tasks",
+                        text = state.displayName ?: "Tasks",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
