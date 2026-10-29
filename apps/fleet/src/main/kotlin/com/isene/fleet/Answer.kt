@@ -144,7 +144,7 @@ private fun shade(rgb: Int, dark: Boolean): Color {
 }
 
 /** A session's last answer in full, drawn as the laptop draws it, then
- *  Yes, No, Done and Rec for each open item and a box for words of your own. */
+ *  Y, N, Rec, Info and Done for each open item and a box for words of your own. */
 @Composable
 fun Answer(tag: String, close: () -> Unit) {
     val ctx = LocalContext.current
@@ -223,7 +223,7 @@ fun Answer(tag: String, close: () -> Unit) {
 
 /** Each chip and the words it sends. Rec is "as recommended"; Info sends
  *  only the words written under it. */
-private val CHOICES = listOf("Y" to "yes", "N" to "no", "Done" to "done", "Rec" to "as recommended", "Info" to "")
+private val CHOICES = listOf("Y" to "yes", "N" to "no", "Rec" to "as recommended", "Info" to "", "Done" to "done")
 
 /** One open item: a chip for the answer, a second tap takes it back, and
  *  once one is picked a line for words to go with it. Drop takes it off
