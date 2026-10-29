@@ -81,7 +81,7 @@ fun Gluon(tab: Tab, go: (Tab) -> Unit, mail: MailViewModel, tock: TockViewModel,
                         selected = t == tab,
                         onClick = { go(t) },
                         icon = { Icon(t.icon(), contentDescription = null) },
-                        label = { Text(t.name) },
+                        label = { Text(t.label) },
                     )
                 }
             },
@@ -136,7 +136,7 @@ private fun Home(go: (Tab) -> Unit, mail: MailViewModel, tock: TockViewModel, ta
         Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        item { Head(if (m.unread > 0) "Mail  ${m.unread} unread" else "Mail") { go(Tab.Mail) } }
+        item { Head(if (m.unread > 0) "Messages  ${m.unread} unread" else "Messages") { go(Tab.Mail) } }
         if (m.inbox.isEmpty()) item { Text("Nothing unread", color = dim) }
         items(m.inbox.take(MAIL_ROWS).size) { i ->
             val e = m.inbox[i]
