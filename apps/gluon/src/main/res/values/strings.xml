@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">gluon</string>
+
+    <!-- mail (kastrup) -->
+    <string name="mail_widget_label">kastrup</string>
+
+    <!-- tock -->
+    <string name="widget_name">Agenda</string>
+    <string name="widget_description">The coming days, one line per event, in each calendar\'s colour.</string>
+    <string name="widget_empty">Nothing in the next 30 days</string>
+    <string name="widget_locked">Open gluon once to let it read your calendars</string>
+    <string name="widget_add">New event</string>
+    <string name="reminders">Calendar reminders</string>
+
+    <!-- tasks -->
+    <string name="tasks_widget_label">tasks</string>
+    <string name="reminder_channel">Task reminders</string>
+    <string name="reminder_channel_desc">Items stamped with a date and time in todo.hl</string>
+</resources>

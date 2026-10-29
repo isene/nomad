@@ -1,9 +1,0 @@
-<resources>
-    <string name="app_name">tock</string>
-    <string name="widget_name">Agenda</string>
-    <string name="widget_description">The coming days, one line per event, in each calendar\'s colour.</string>
-    <string name="widget_empty">Nothing in the next 30 days</string>
-    <string name="widget_locked">Open tock once to let it read your calendars</string>
-    <string name="widget_add">New event</string>
-    <string name="reminders">Reminders</string>
-</resources>
