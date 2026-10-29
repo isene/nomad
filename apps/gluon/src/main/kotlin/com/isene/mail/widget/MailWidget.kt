@@ -7,6 +7,7 @@ import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.glance.GlanceId
@@ -45,6 +46,9 @@ import com.isene.mail.data.Settings
 private val NAME = ColorProvider(Color(0xFFCFE3F0))
 private val BODY = ColorProvider(Color.White)
 private val GREY = ColorProvider(Color(0xFF666666))
+
+/** One point under the system's 14. */
+private val TEXT = 13.sp
 
 /** The summary this widget is drawing, in the widget's own state. */
 internal val SUMMARY = stringPreferencesKey("summary")
@@ -121,13 +125,14 @@ private fun WidgetContent(
                 style = TextStyle(
                     fontWeight = FontWeight.Bold,
                     color = ColorProvider(Color(head)),
+                    fontSize = TEXT,
                 ),
                 modifier = GlanceModifier.padding(bottom = 4.dp).clickable(openApp),
             )
             if (rows.isEmpty()) {
                 Text(
                     if (unread == 0) "Nothing unread" else "Open the app",
-                    style = TextStyle(color = if (unread == 0) GREY else BODY),
+                    style = TextStyle(color = if (unread == 0) GREY else BODY, fontSize = TEXT),
                 )
             } else {
                 LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
@@ -146,13 +151,14 @@ private fun WidgetContent(
                                 style = TextStyle(
                                     fontWeight = FontWeight.Medium,
                                     color = NAME,
+                                    fontSize = TEXT,
                                 ),
                                 modifier = GlanceModifier.width(96.dp),
                                 maxLines = 1,
                             )
                             Text(
                                 text = row.subject,
-                                style = TextStyle(color = BODY),
+                                style = TextStyle(color = BODY, fontSize = TEXT),
                                 maxLines = 1,
                                 modifier = GlanceModifier.fillMaxWidth(),
                             )
