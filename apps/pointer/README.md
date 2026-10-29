@@ -22,6 +22,9 @@ taken back.
   Hold a mark and drag it to change the order.
 - **Save from any app.** Share a file from another app and pick
   *Save to folder*. Your marks come up; a tap on one saves the file there.
+- **A file source in other apps.** When an app asks you to pick a file,
+  open ☰ in Android's picker and choose *pointer*. It shows the hidden
+  folders the picker leaves out, such as `.tasks`.
 - **Tabs.** Keep several folders open and jump between them. They are
   there again the next time you open the app.
 - **Archives open as folders.** Walk into a zip, jar, tar or tar.gz file,
@@ -54,6 +57,8 @@ taken back.
 - No account, no ads, no tracking, nothing running in the background.
 - Android itself keeps `Android/data` and `Android/obb` closed to every
   app, this one too.
+- In Android's picker, an app gets only the one file you picked, to read
+  and save back.
 - *Save to folder* writes nothing before you tap a folder, so no other
   app can put a file on the phone through it unseen.
 - An archive is read and never changed. A file in it whose name points

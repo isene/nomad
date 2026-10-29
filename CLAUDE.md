@@ -353,6 +353,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - A file manager after the laptop's pointer. Signed with the tasks key.
   All-files access (`MANAGE_EXTERNAL_STORAGE`) and no INTERNET
   permission; keep it that way.
+- `PhoneDocuments` (0.4.0) puts pointer in Android's file picker, dot
+  folders included, so gluon's Tasks can pick `.tasks/todo.hl`. Only the
+  picker may call it (MANAGE_DOCUMENTS); `inside()` keeps every id below
+  the top of storage, and its test tries the ways out.
 - `core/src/pointer.rs` is the one core module that touches files
   (`std::fs`). Its tests run on real folders. Three promises it must
   keep: nothing is overwritten (a taken name gets a number), nothing is

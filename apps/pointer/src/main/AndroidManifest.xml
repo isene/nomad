@@ -54,6 +54,19 @@
             </intent-filter>
         </activity>
 
+        <!-- pointer in Android's file picker, hidden folders included. Only
+             the picker may call it; an app gets the one file it picked. -->
+        <provider
+            android:name=".PhoneDocuments"
+            android:authorities="${applicationId}.documents"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+
         <!-- Hands one file to another app for one open or one share, and
              exposes nothing else. -->
         <provider
