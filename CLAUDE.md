@@ -536,6 +536,15 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `SyncEngine.summarize`. It fetches nothing; new mail still comes with
   the fetch. Build mail and tasks in separate Gradle runs: one run
   with both fails on the shared Rust core's outputs.
+- 0.19.0 (asked 2026-10-29, step 1 of replacing the Gmail app): Enter in
+  the search field runs `ImapRepo.search`, Gmail's `X-GM-RAW` over All
+  Mail (found by its `\All` mark, since its name follows the account's
+  language), sent raw through `IMAPFolder.doCommand`. A hit keeps its
+  folder, so `body` opens it there. Attachments get Share (`ACTION_SEND`).
+  Next steps, in his order: new mail at once (IDLE in a foreground
+  service), web pictures after one tap, read/archive/delete back to the
+  laptop through the shared folder, compose from all five addresses,
+  threads. He uses no labels, snooze or undo send.
 
 ### fleet (com.isene.fleet)
 

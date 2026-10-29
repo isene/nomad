@@ -42,6 +42,22 @@ object Attachments {
         }.getOrNull()
     }
 
+    /** Hand it to another app as a file, for an app that takes files only
+     *  by share, such as an accounting app taking a receipt. */
+    fun share(ctx: Context, uri: Uri, mimeType: String): Boolean {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = mimeType.ifEmpty { "*/*" }
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        return runCatching {
+            ctx.startActivity(Intent.createChooser(intent, "Share").apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            })
+            true
+        }.getOrDefault(false)
+    }
+
     /** Open it in whatever handles the type; the chooser also offers save. */
     fun open(ctx: Context, uri: Uri, mimeType: String): Boolean {
         val intent = Intent(Intent.ACTION_VIEW).apply {
