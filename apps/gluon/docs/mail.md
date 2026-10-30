@@ -23,6 +23,10 @@ The Messages tab of [gluon](../README.md).
   crate kastrup uses, so quoted-printable, base64, RFC 2047 headers,
   multipart and HTML mail all come out the way they do on the desktop
 - **Read** / **Unread**; for mail the laptop hears it too
+- **New mail** (the pen at the bottom right), **Reply** and **Forward**
+  go straight from the phone through Gmail, with no laptop in the path.
+  A reply goes out from the address the mail came to, and **Send as** in
+  Settings adds From addresses, each with the account that sends it
 - Swipe a row (or **Archive** in a message) to take it off this phone
   and mark it read; the laptop keeps the mail
 - **Delete** in a mail: off this phone, and kastrup on the laptop

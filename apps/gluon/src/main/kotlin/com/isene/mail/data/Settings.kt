@@ -209,6 +209,33 @@ class Settings(ctx: Context) {
         )
     }
 
+    /**
+     * Other addresses mail may go out from, one per line, each with the
+     * account whose login sends it:
+     *
+     *     alias@example.com | me@example.com
+     *
+     * Written by the laptop's `gluon-setup`. Plain text, for the same
+     * reason the views are.
+     */
+    var sendAsText: String
+        get() = p.getString("sendas", "") ?: ""
+        set(v) = p.edit().putString("sendas", v).apply()
+
+    /** The From of the last mail sent, where a new mail starts. */
+    var lastFrom: String
+        get() = p.getString("last_from", "") ?: ""
+        set(v) = p.edit().putString("last_from", v).apply()
+
+    /** The send-as lines, parsed: address to the login that sends it. */
+    fun sendAs(): Map<String, String> = sendAsText.lines().mapNotNull { line ->
+        val t = line.trim()
+        if (t.isEmpty() || t.startsWith("#") || !t.contains('|')) return@mapNotNull null
+        val address = t.substringBefore('|').trim().lowercase()
+        val login = t.substringAfter('|').trim().lowercase()
+        if ('@' in address && '@' in login) address to login else null
+    }.toMap()
+
     /** SAF tree for the relay app's gateway folder on this phone, where
      *  the captured notifications land. Empty until picked. */
     var gatewayTreeUri: String
@@ -301,6 +328,7 @@ fun Settings.loadSetup(ctx: Context, uri: Uri): String {
     o.optString("feeds").takeIf { it.isNotBlank() }?.let { feedsText = it.trim() }
     o.optJSONObject("discord")?.let { discordJson = it.toString(2) }
     o.optString("views").takeIf { it.isNotBlank() }?.let { viewsText = it.trim() }
+    o.optString("sendas").takeIf { it.isNotBlank() }?.let { sendAsText = it.trim() }
     val gone = runCatching { DocumentsContract.deleteDocument(ctx.contentResolver, uri) }.getOrDefault(false)
     return "Loaded: " + configSummary() + ". " +
         (if (gone) "The file is deleted." else "Delete the file now: it holds your logins.") +

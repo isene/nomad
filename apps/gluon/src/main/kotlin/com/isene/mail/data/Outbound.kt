@@ -33,12 +33,13 @@ object Outbound {
     class Attachment(val filename: String, val mimeType: String, val bytes: ByteArray)
 
     /**
-     * Gmail over SMTP, with the same token IMAP reads with. Gmail files
+     * Gmail over SMTP, with the same token IMAP reads with. [from] is the
+     * account itself or a send-as address that its login sends. Gmail files
      * its own copy in Sent; the laptop's Sent importer links that copy
      * to the original through the In-Reply-To set here.
      */
     fun mail(
-        a: Account, to: String, cc: String, subject: String, body: String,
+        a: Account, from: String, to: String, cc: String, subject: String, body: String,
         inReplyTo: String, references: String, attachments: List<Attachment>,
     ): String? {
         val token = Oauth.accessToken(a) ?: return "Could not get a token for ${a.address}"
@@ -54,7 +55,7 @@ object Outbound {
         val session = Session.getInstance(props)
         return runCatching {
             val msg = MimeMessage(session).apply {
-                setFrom(InternetAddress(a.address))
+                setFrom(InternetAddress(from))
                 setRecipients(javax.mail.Message.RecipientType.TO, InternetAddress.parse(to))
                 if (cc.isNotBlank()) {
                     setRecipients(javax.mail.Message.RecipientType.CC, InternetAddress.parse(cc))

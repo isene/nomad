@@ -20,6 +20,7 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -29,6 +30,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -225,6 +227,9 @@ fun MailApp(vm: MailViewModel) {
                 }
             }
         },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { compose = vm.composeNew() }) { Icon(Icons.Filled.Edit, "New mail") }
+        },
     ) { pad ->
         MailList(vm, ui, Modifier.padding(pad)) { open = it }
     }
@@ -412,6 +417,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
     var instant by remember { mutableStateOf(s.instant) }
     var feeds by remember { mutableStateOf(s.feedsText) }
     var views by remember { mutableStateOf(s.viewsText) }
+    var sendAs by remember { mutableStateOf(s.sendAsText) }
     var gwUri by remember { mutableStateOf(s.gatewayTreeUri) }
     val pickGateway = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -432,6 +438,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
         accounts = s.accountsJson
         feeds = s.feedsText
         views = s.viewsText
+        sendAs = s.sendAsText
     }
 
     // SAF, not a raw path: the shared folder lives on external storage
@@ -459,6 +466,7 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 every.toIntOrNull()?.let { s.syncMinutes = if (it <= 0) 0 else it.coerceIn(15, 1440) }
                 s.feedsText = feeds.trim()
                 s.viewsText = views.trim()
+                s.sendAsText = sendAs.trim()
                 MailSyncWorker.schedule(ctx)
                 vm.refresh()
                 onDismiss()
@@ -539,6 +547,22 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 Text(
                     "The Syncthing folder the laptop writes its read state into. " +
                         "Each device writes only its own file, so nothing collides.",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.secondary,
+                )
+                Spacer(Modifier.width(4.dp))
+                Text("Send as", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                OutlinedTextField(
+                    sendAs,
+                    { sendAs = it },
+                    label = { Text("Address | account") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2,
+                    maxLines = 6,
+                )
+                Text(
+                    "More From addresses, each with the account that sends it. " +
+                        "A reply goes out from the address the mail came to.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.secondary,
                 )

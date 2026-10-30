@@ -40,8 +40,8 @@ import com.isene.mail.viewmodel.ComposeRequest
 import com.isene.mail.viewmodel.MailViewModel
 
 /**
- * Writing a reply or a forward. The fields arrive filled in by the
- * core; the user changes what they like and taps send.
+ * Writing a new mail, a reply or a forward. A reply's fields arrive
+ * filled in by the core; the user changes what they like and taps send.
  *
  * Mail shows the full envelope. A chat reply shows one box: the thread
  * is already decided by what is being answered.
@@ -84,7 +84,7 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (mail) {
-                FromPicker(from, ui.accounts) { from = it }
+                FromPicker(from, remember { vm.fromAddresses() }) { from = it }
                 OutlinedTextField(
                     to, { to = it }, label = { Text("To") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
@@ -112,7 +112,7 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
                 }
             } else {
                 Text(
-                    "To ${req.original.from} on ${req.channelLabel}",
+                    "To ${req.original?.from.orEmpty()} on ${req.channelLabel}",
                     fontSize = 12.sp,
                     color = MaterialTheme.colorScheme.secondary,
                 )

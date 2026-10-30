@@ -35,23 +35,29 @@ import uniffi.fe2o3_mobile_core.mailAttachmentBytes
 import uniffi.fe2o3_mobile_core.mailBodyText
 
 /**
- * A reply or forward on its way to the compose screen: the original,
- * what the core made of it, and the account it would go out from.
+ * A mail, reply or forward on its way to the compose screen: the
+ * original (none for a new mail), what the core made of it, and the
+ * account it would go out from.
  */
 data class ComposeRequest(
-    val kind: String, // "reply" | "forward"
-    val original: Message,
+    val kind: String, // "new" | "reply" | "forward"
+    val original: Message?,
     val draft: Draft,
     val fromAccount: String,
     /** What a forward carries along, by name, for the screen to say so. */
     val attachmentNames: List<String> = emptyList(),
 ) {
-    /** Forwards are always mail; so is a reply to mail. The rest answer
-     *  on their own channel. */
-    val viaMail: Boolean get() = kind == "forward" || original.source == "mail"
-    val title: String get() = if (kind == "forward") "Forward" else "Reply"
-    val channelLabel: String get() =
-        if (original.messageId.startsWith("gw_")) original.folder else "#${original.account}"
+    /** New mail and forwards are always mail; so is a reply to mail. The
+     *  rest answer on their own channel. */
+    val viaMail: Boolean get() = kind != "reply" || original?.source == "mail"
+    val title: String get() = when (kind) {
+        "new" -> "New mail"
+        "forward" -> "Forward"
+        else -> "Reply"
+    }
+    val channelLabel: String get() = original?.let {
+        if (it.messageId.startsWith("gw_")) it.folder else "#${it.account}"
+    }.orEmpty()
 }
 
 data class UiState(
@@ -291,6 +297,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Same shape as the laptop's "On …, X wrote:" line. */
     private val draftFmt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US)
+    private val addressPattern = Regex("[^\\s<>,;\"']+@[^\\s<>,;\"']+")
 
     /**
      * What the compose screen starts from. The core decides addressing,
@@ -302,11 +309,27 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         val date = if (held.date > 0) draftFmt.format(Date(held.date * 1000)) else ""
         val draft = if (kind == "forward") composeForward(held, date) else composeReply(held, all, date)
         val accounts = settings.accounts()
-        val from = accounts.firstOrNull { it.address == held.account }?.address
+        // Out from the address it came to, when that is one of ours: a
+        // reply to work mail goes from the work address.
+        val came = addressPattern.findAll(held.to.lowercase()).map { it.value }.toSet()
+        val from = fromAddresses().firstOrNull { it in came }
+            ?: accounts.firstOrNull { it.address == held.account }?.address
             ?: accounts.firstOrNull()?.address ?: ""
         val names = if (kind == "forward") Attachments.list(held.raw).map { it.filename } else emptyList()
         return ComposeRequest(kind, held, draft, from, names)
     }
+
+    /** Every address mail can go out from: the accounts and their
+     *  send-as addresses. */
+    fun fromAddresses(): List<String> =
+        (settings.accounts().map { it.address.lowercase() } + settings.sendAs().keys).distinct().sorted()
+
+    /** A new mail, from the address the last mail went from. */
+    fun composeNew(): ComposeRequest = ComposeRequest(
+        "new", null,
+        Draft(to = "", cc = "", subject = "", body = "", inReplyTo = "", references = ""),
+        settings.lastFrom.takeIf { it in fromAddresses() } ?: settings.accounts().firstOrNull()?.address ?: "",
+    )
 
     /**
      * Out it goes, on the channel the original came in on. Mail and
@@ -325,24 +348,27 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             val err = withContext(Dispatchers.IO) {
                 when {
                     req.viaMail -> {
-                        val a = settings.accounts().firstOrNull { it.address == from }
+                        val login = settings.sendAs()[from.lowercase()] ?: from
+                        val a = settings.accounts().firstOrNull { it.address.equals(login, ignoreCase = true) }
                         if (a == null) "No account to send from — add one in Settings"
                         else Outbound.mail(
-                            a, to, cc, subject, body, req.draft.inReplyTo, req.draft.references,
-                            if (req.kind == "forward") forwardAttachments(o) else emptyList(),
+                            a, from, to, cc, subject, body, req.draft.inReplyTo, req.draft.references,
+                            if (o != null && req.kind == "forward") forwardAttachments(o) else emptyList(),
                         )
                     }
+                    o == null -> "Nothing to reply to here"
                     o.messageId.startsWith("gw_") ->
                         Outbound.gateway(ctx, settings.gatewayTreeUri, o.folder, o.account, body)
                     o.source == "discord" -> Outbound.discord(settings.discordToken(), o.folder, body)
                     else -> "Nothing to reply to here"
                 }
             }
+            if (err == null && req.viaMail) settings.lastFrom = from.lowercase()
             _ui.value = _ui.value.copy(
                 busy = false,
                 status = err ?: when {
                     req.viaMail -> "Sent"
-                    o.messageId.startsWith("gw_") -> "Handed to relay — it sends while the notification is up"
+                    o?.messageId?.startsWith("gw_") == true -> "Handed to relay — it sends while the notification is up"
                     else -> "Posted"
                 },
             )
