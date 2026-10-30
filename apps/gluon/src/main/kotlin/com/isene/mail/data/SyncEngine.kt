@@ -21,7 +21,8 @@ object SyncEngine {
     data class Result(
         val mails: List<Message>,
         val failedAccounts: Int,
-        val failedFeeds: Int,
+        /** The titles of the feeds that failed. */
+        val failedFeeds: List<String>,
         val feeds: Int,
         val failedChannels: Int,
         val channels: Int,
@@ -70,7 +71,7 @@ object SyncEngine {
         val kept = stored.associateBy { it.messageId }
         var out = stored
         var failedAccounts = 0
-        var failedFeeds = 0
+        val failedFeeds = mutableListOf<String>()
         var failedChannels = 0
 
         // The accounts in parallel. Three sequential IMAP sessions —
@@ -121,7 +122,7 @@ object SyncEngine {
             feeds.map { f -> async(Dispatchers.IO) { f to FeedRepo.fetch(f) } }.awaitAll()
         }
         for ((f, items) in fetched) {
-            if (items == null) { failedFeeds++; continue }
+            if (items == null) { failedFeeds += f.title; continue }
             val fresh = items.map { it.messageId }.toSet()
             // Entries already held keep their place; a feed that drops an
             // old one off the end must not delete it here.
@@ -167,7 +168,7 @@ object SyncEngine {
             .filter { it.source != "mail" || it.date == 0L || it.date >= oldest }
             .sortedByDescending { it.date }
 
-        if (failedAccounts == 0 && failedFeeds == 0 && failedChannels == 0) {
+        if (failedAccounts == 0 && failedFeeds.isEmpty() && failedChannels == 0) {
             val live = out.map { it.messageId }.toSet()
             settings.dismissed = settings.dismissed.intersect(live)
         }

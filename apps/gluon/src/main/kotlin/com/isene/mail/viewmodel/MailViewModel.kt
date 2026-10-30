@@ -188,10 +188,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 busy = false,
                 status = when {
                     out == null -> "Nothing configured"
-                    out.failedAccounts > 0 || out.failedFeeds > 0 || out.failedChannels > 0 ->
+                    out.failedAccounts > 0 || out.failedFeeds.isNotEmpty() || out.failedChannels > 0 ->
                         listOfNotNull(
                             out.failedAccounts.takeIf { it > 0 }?.let { "$it account(s)" },
-                            out.failedFeeds.takeIf { it > 0 }?.let { "$it of ${out.feeds} feed(s)" },
+                            out.failedFeeds.takeIf { it.isNotEmpty() }?.joinToString(", "),
                             out.failedChannels.takeIf { it > 0 }?.let { "$it of ${out.channels} channel(s)" },
                         ).joinToString(" and ", postfix = " failed")
                     // Say what is on screen, not what is in the store —

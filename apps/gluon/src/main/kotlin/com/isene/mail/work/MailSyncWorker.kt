@@ -33,9 +33,10 @@ class MailSyncWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         val out = withContext(Dispatchers.IO) { SyncEngine.fetch(applicationContext) }
             ?: return Result.success()          // no accounts yet; nothing to retry
         WidgetPush.push(applicationContext)
-        // A failed account is usually a flaky network, and the next tick
-        // is close enough that a retry storm buys nothing.
-        return if (out.failedAccounts > 0 || out.failedFeeds > 0) Result.retry() else Result.success()
+        // A failed account is usually a flaky network: try again soon. A
+        // failed feed is often a dead one, and retrying it would wake the
+        // phone again and again for nothing, so it waits for the next tick.
+        return if (out.failedAccounts > 0) Result.retry() else Result.success()
     }
 
     companion object {
