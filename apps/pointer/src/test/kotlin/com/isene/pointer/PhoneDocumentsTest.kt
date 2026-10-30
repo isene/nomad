@@ -2,6 +2,7 @@ package com.isene.pointer
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertNotNull
 import org.junit.Test
 import java.nio.file.Files
 
@@ -22,5 +23,15 @@ class PhoneDocumentsTest {
         assertNull(inside(top, "phone/.tasks/../../x"))
         assertNull(inside(top, "/etc/passwd"))
         assertNull(inside(top, "phonex"))
+    }
+
+    @Test fun newFileOnlyInsideItsFolder() {
+        val dir = childId(ROOT, ".tasks")
+        assertEquals(top.resolve(".tasks/new.txt").canonicalFile, newChild(top, dir, "new.txt"))
+        assertNull(newChild(top, dir, "todo.hl"))
+        assertNull(newChild(top, dir, "../x.txt"))
+        assertNull(newChild(top, dir, "a/b.txt"))
+        assertNull(newChild(top, childId(dir, "todo.hl"), "x.txt"))
+        assertNotNull(newChild(top, ROOT, "x.txt"))
     }
 }
