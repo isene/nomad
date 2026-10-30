@@ -453,7 +453,7 @@ dependencies = [
 
 [[package]]
 name = "fe2o3-crust"
-version = "0.1.65"
+version = "0.1.69"
 dependencies = [
  "crossterm",
  "libc",
@@ -466,7 +466,7 @@ version = "0.1.1"
 
 [[package]]
 name = "fe2o3-mail"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "encoding_rs",
  "regex",
