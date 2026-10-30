@@ -47,21 +47,21 @@ object ReadStateRepo {
     private const val MINE = "mail-read-phone.json"
     private const val DELETES = "mail-delete-phone.txt"
 
-    /** Tell the laptop these were marked read or unread here. */
-    fun publish(ctx: Context, treeUri: String, ids: Collection<String>, read: Boolean, days: Int) {
-        if (ids.isEmpty()) return
+    /** Tell the laptop these were marked read or unread here. False if the file could not be written. */
+    fun publish(ctx: Context, treeUri: String, ids: Collection<String>, read: Boolean, days: Int): Boolean {
+        if (ids.isEmpty()) return true
         val now = System.currentTimeMillis() / 1000
         val marks = parseReadMarks(readText(ctx, treeUri, MINE) ?: "{}").associateBy { it.messageId }.toMutableMap()
         ids.forEach { marks[it] = ReadMark(it, read, now) }
         val keep = marks.values.filter { it.ts > now - days * 86_400L }
-        writeText(ctx, treeUri, MINE, "application/json", serializeReadMarks(keep))
+        return writeText(ctx, treeUri, MINE, "application/json", serializeReadMarks(keep))
     }
 
     /** Ask the laptop to delete these. A line is the Message-ID and when. */
-    fun delete(ctx: Context, treeUri: String, ids: Collection<String>, days: Int) {
-        if (ids.isEmpty()) return
+    fun delete(ctx: Context, treeUri: String, ids: Collection<String>, days: Int): Boolean {
+        if (ids.isEmpty()) return true
         val old = readText(ctx, treeUri, DELETES) ?: ""
-        writeText(ctx, treeUri, DELETES, "text/plain", deleteList(old, ids, System.currentTimeMillis() / 1000, days))
+        return writeText(ctx, treeUri, DELETES, "text/plain", deleteList(old, ids, System.currentTimeMillis() / 1000, days))
     }
 
     /** The delete list with these added and lines older than the window cut. */
@@ -81,11 +81,12 @@ object ReadStateRepo {
         }.getOrNull()
     }
 
-    private fun writeText(ctx: Context, treeUri: String, name: String, type: String, text: String) {
-        val dir = tree(ctx, treeUri) ?: return
-        val f = dir.findFile(name)?.takeIf { it.isFile } ?: dir.createFile(type, name) ?: return
-        runCatching { ctx.contentResolver.openOutputStream(f.uri, "wt")?.use { it.write(text.toByteArray()) } }
-    }
+    private fun writeText(ctx: Context, treeUri: String, name: String, type: String, text: String): Boolean =
+        runCatching {
+            val dir = tree(ctx, treeUri) ?: return false
+            val f = dir.findFile(name)?.takeIf { it.isFile } ?: dir.createFile(type, name) ?: return false
+            ctx.contentResolver.openOutputStream(f.uri, "wt")?.use { it.write(text.toByteArray()) } != null
+        }.getOrDefault(false)
 
     fun folderName(ctx: Context, treeUri: String): String? =
         runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri))?.name }.getOrNull()

@@ -173,8 +173,9 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         val ctx = getApplication<Application>()
         val days = settings.days
         viewModelScope.launch(Dispatchers.IO) {
-            ReadStateRepo.publish(ctx, tree, ids, read, days)
-            if (delete) ReadStateRepo.delete(ctx, tree, ids, days)
+            val ok = ReadStateRepo.publish(ctx, tree, ids, read, days) &&
+                (!delete || ReadStateRepo.delete(ctx, tree, ids, days))
+            if (!ok) status("Could not write to the shared folder; the laptop did not get this")
         }
     }
 
@@ -374,7 +375,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         undoable = emptySet()
         recompute()
         publish(listOf(m), read = true, delete = true)
-        status(if (settings.syncTreeUri.isEmpty()) "Deleted here; pick the shared folder to reach the laptop" else "Deleted here and on the laptop")
+        status(if (settings.syncTreeUri.isEmpty()) "Deleted here; pick the shared folder to reach the laptop" else "Deleted here and sent to the laptop")
     }
 
     /**
