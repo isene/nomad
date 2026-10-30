@@ -66,8 +66,8 @@ class MailPush : Service() {
     override fun onCreate() {
         super.onCreate()
         val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(NotificationChannel(QUIET, "Waiting for mail", NotificationManager.IMPORTANCE_MIN))
-        val notice = Notification.Builder(this, QUIET)
+        nm.createNotificationChannel(NotificationChannel(WAITING, "Waiting for mail", NotificationManager.IMPORTANCE_MIN))
+        val notice = Notification.Builder(this, WAITING)
             .setSmallIcon(R.drawable.ic_notice)
             .setContentTitle("Waiting for new mail")
             .build()
@@ -175,7 +175,7 @@ class MailPush : Service() {
     }
 
     companion object {
-        private const val QUIET = "mail_waiting"
+        const val WAITING = "mail_waiting"
         private const val SERVICE_ID = 40
         private const val POKE = "com.isene.gluon.POKE"
         private const val PAUSE_MS = 30_000L
