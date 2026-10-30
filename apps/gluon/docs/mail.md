@@ -26,7 +26,10 @@ The Messages tab of [gluon](../README.md).
 - **New mail** (the pen at the bottom right), **Reply** and **Forward**
   go straight from the phone through Gmail, with no laptop in the path.
   A reply goes out from the address the mail came to, and **Send as** in
-  Settings adds From addresses, each with the account that sends it
+  Settings adds From addresses, each with the account that sends it.
+  An address with a Microsoft 365 login in the setup file goes out
+  through Microsoft instead, as Outlook sends it, and lands in its
+  Sent Items
 - Swipe a row (or **Archive** in a message) to take it off this phone
   and mark it read; the laptop keeps the mail
 - **Delete** in a mail: off this phone, and kastrup on the laptop
@@ -89,8 +92,9 @@ database and from the Maildir; Gmail keeps its own copy.
 1. On the laptop, run `gluon-setup`. It writes one file,
    `gluon-setup.json`, into a folder Syncthing shares with the phone:
    every Gmail account's client id, secret and refresh token, the feeds
-   from kastrup's RSS source, the Discord bot token and channels, and
-   the phone's views.
+   from kastrup's RSS source, the Discord bot token and channels, the
+   phone's views and send-as lines, and a Microsoft 365 login if
+   there is one.
 2. In gluon, tap **Load setup file** (on the empty Messages screen, or at
    the top of ⋮ → Settings) and pick that file. gluon sets everything
    from it and then deletes it: a refresh token is the whole login.

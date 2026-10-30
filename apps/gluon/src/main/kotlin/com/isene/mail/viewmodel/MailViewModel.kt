@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.isene.mail.data.Attachments
 import com.isene.mail.data.ImapRepo
+import com.isene.mail.data.Oauth
 import com.isene.mail.data.Outbound
 import com.isene.mail.data.ReadState
 import com.isene.mail.data.Scope
@@ -319,10 +320,11 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         return ComposeRequest(kind, held, draft, from, names)
     }
 
-    /** Every address mail can go out from: the accounts and their
-     *  send-as addresses. */
+    /** Every address mail can go out from: the accounts, their send-as
+     *  addresses and the Microsoft 365 one. */
     fun fromAddresses(): List<String> =
-        (settings.accounts().map { it.address.lowercase() } + settings.sendAs().keys).distinct().sorted()
+        (settings.accounts().map { it.address.lowercase() } + settings.sendAs().keys + listOfNotNull(settings.graph()?.address))
+            .distinct().sorted()
 
     /** A new mail, from the address the last mail went from. */
     fun composeNew(): ComposeRequest = ComposeRequest(
@@ -348,13 +350,25 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             val err = withContext(Dispatchers.IO) {
                 when {
                     req.viaMail -> {
-                        val login = settings.sendAs()[from.lowercase()] ?: from
-                        val a = settings.accounts().firstOrNull { it.address.equals(login, ignoreCase = true) }
-                        if (a == null) "No account to send from — add one in Settings"
-                        else Outbound.mail(
-                            a, from, to, cc, subject, body, req.draft.inReplyTo, req.draft.references,
-                            if (o != null && req.kind == "forward") forwardAttachments(o) else emptyList(),
-                        )
+                        val atts = if (o != null && req.kind == "forward") forwardAttachments(o) else emptyList()
+                        val g = settings.graph()?.takeIf { it.address == from.lowercase() }
+                        if (g != null) {
+                            // Microsoft 365 sends this address, as Outlook would.
+                            val t = Oauth.graphToken(g)
+                            if (t == null) "Could not get a Microsoft token for ${g.address}"
+                            else {
+                                settings.keepGraphToken(t.second)
+                                Outbound.graphMail(
+                                    t.first, from, to, cc, subject, body,
+                                    req.draft.inReplyTo, req.draft.references, atts,
+                                )
+                            }
+                        } else {
+                            val login = settings.sendAs()[from.lowercase()] ?: from
+                            val a = settings.accounts().firstOrNull { it.address.equals(login, ignoreCase = true) }
+                            if (a == null) "No account to send from — add one in Settings"
+                            else Outbound.mail(a, from, to, cc, subject, body, req.draft.inReplyTo, req.draft.references, atts)
+                        }
                     }
                     o == null -> "Nothing to reply to here"
                     o.messageId.startsWith("gw_") ->
