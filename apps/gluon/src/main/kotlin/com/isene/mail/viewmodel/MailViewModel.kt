@@ -8,6 +8,7 @@ import com.isene.mail.data.ImapRepo
 import com.isene.mail.data.Outbound
 import com.isene.mail.data.ReadState
 import com.isene.mail.data.Scope
+import com.isene.mail.data.DraftsRepo
 import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.Settings
 import com.isene.mail.data.Store
@@ -82,6 +83,8 @@ data class UiState(
     val unread: Int = 0,
     /** The unread ones themselves, newest first, for gluon's Home tab. */
     val inbox: List<Message> = emptyList(),
+    /** Laptop drafts waiting in the shared folder, for the Home tab. */
+    val drafts: Int = 0,
     /** Held in the store but hidden by a swipe or Remove all. Counted so
      *  the app can never claim messages it is not showing. */
     val hidden: Int = 0,
@@ -124,6 +127,19 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     val pick: StateFlow<Message?> = _pick.asStateFlow()
     fun pick(m: Message?) { _pick.value = m }
 
+    /** The drafts screen, asked for from the Home tab. */
+    private val _wantDrafts = MutableStateFlow(false)
+    val wantDrafts: StateFlow<Boolean> = _wantDrafts.asStateFlow()
+    fun wantDrafts(on: Boolean) { _wantDrafts.value = on }
+
+    fun countDrafts() {
+        val ctx = getApplication<Application>()
+        viewModelScope.launch {
+            val n = withContext(Dispatchers.IO) { DraftsRepo.count(ctx, settings.syncTreeUri) }
+            _ui.value = _ui.value.copy(drafts = n)
+        }
+    }
+
     /** A tapped notice names its mail by id; it may have arrived after
      *  this list was read, so it is looked for after a fresh read. */
     private var wanted: String? = null
@@ -154,6 +170,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             laptopRead = marks.filter { it.read }.map { it.messageId }.toSet()
             recompute()
         }
+        countDrafts()
     }
 
     fun isRead(m: Message): Boolean = m.messageId in _ui.value.readIds

@@ -14,7 +14,8 @@ data class Draft(val name: String, val kind: String, val title: String, val to: 
  *
  * Send moves a draft into `send/`. kastrup on the laptop takes it from
  * there within a minute and sends it as it sends a scheduled message,
- * with a retry every five minutes if the send fails.
+ * with a retry every five minutes if the send fails. Edit writes the
+ * draft back in place, and Delete removes it on the laptop too.
  */
 object DraftsRepo {
     private fun dir(ctx: Context, treeUri: String, name: String): DocumentFile? {
@@ -64,6 +65,25 @@ object DraftsRepo {
         }.sortedByDescending { it.time }
     }
 
+    /** How many drafts wait, for the Home tab. Names only, no reads. */
+    fun count(ctx: Context, treeUri: String): Int =
+        dir(ctx, treeUri, "drafts")?.listFiles()?.count { it.isFile && it.name?.startsWith(".") == false } ?: 0
+
+    /** Write an edited draft back. Null when saved, else a line for the user. */
+    fun save(ctx: Context, treeUri: String, name: String, text: String): String? {
+        val f = dir(ctx, treeUri, "drafts")?.findFile(name) ?: return GONE
+        val ok = runCatching {
+            ctx.contentResolver.openOutputStream(f.uri, "wt")?.use { it.write(text.toByteArray()) } != null
+        }.getOrDefault(false)
+        return if (ok) null else "Could not save the draft"
+    }
+
+    /** Throw a draft away. Null when it is gone, else a line for the user. */
+    fun delete(ctx: Context, treeUri: String, name: String): String? {
+        val f = dir(ctx, treeUri, "drafts")?.findFile(name) ?: return null
+        return if (runCatching { f.delete() }.getOrDefault(false)) null else "Could not delete the draft"
+    }
+
     /** Sent from here and not yet taken by the laptop. */
     fun waiting(ctx: Context, treeUri: String): Int =
         dir(ctx, treeUri, "send")?.listFiles()?.count { it.isFile && it.name?.startsWith(".") == false } ?: 0
@@ -72,7 +92,7 @@ object DraftsRepo {
      *  the user. The draft is removed only after its copy is written. */
     fun send(ctx: Context, treeUri: String, d: Draft): String? {
         val drafts = dir(ctx, treeUri, "drafts") ?: return "The drafts folder is gone"
-        val src = drafts.findFile(d.name) ?: return "The draft is gone; it may have been sent on the laptop"
+        val src = drafts.findFile(d.name) ?: return GONE
         val root = DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri)) ?: return "The shared folder is gone"
         val send = root.findFile("send")?.takeIf { it.isDirectory } ?: root.createDirectory("send")
             ?: return "Could not make the send folder"
@@ -87,7 +107,10 @@ object DraftsRepo {
             f.delete()
             return "Could not write to the send folder"
         }
-        src.delete()
+        // Left behind, it could go out a second time.
+        if (!runCatching { src.delete() }.getOrDefault(false)) return "Sent, but the draft is still here; delete it"
         return null
     }
+
+    private const val GONE = "The draft is gone; it may have been sent on the laptop"
 }
