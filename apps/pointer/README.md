@@ -58,7 +58,8 @@ taken back.
 - Android itself keeps `Android/data` and `Android/obb` closed to every
   app, this one too.
 - In Android's picker, an app gets only the one file you picked, to read
-  and save back. An app that picks a folder may also make new files in it.
+  and save back. An app that picks a folder may also make files in it,
+  and delete them to pointer's trash.
 - *Save to folder* writes nothing before you tap a folder, so no other
   app can put a file on the phone through it unseen.
 - An archive is read and never changed. A file in it whose name points
