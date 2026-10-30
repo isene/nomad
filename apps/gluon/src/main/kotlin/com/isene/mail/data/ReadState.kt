@@ -5,10 +5,9 @@ import android.content.Context
 /**
  * What counts as read on this phone.
  *
- * Two sources, and the direction is one-way on purpose: the laptop's
- * marks arrive through the shared folder, this phone's own decisions
- * stay in its prefs and are never written back. Nothing done here
- * reaches the laptop.
+ * Two sources: the marks every device published in the shared folder,
+ * and this phone's own decisions in its prefs. A tap on mail also
+ * publishes, so the laptop hears it; see [ReadStateRepo].
  *
  * A local mark overrides the laptop's for that message, so hiding
  * something the laptop still calls unread works, and so does bringing

@@ -14,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import com.isene.mail.data.Scope
 import com.isene.mail.data.Settings
 
 /**
@@ -61,11 +62,13 @@ object WidgetPush {
             val text = WidgetStore.text(app)
             val back = Settings(app).widgetBack
             val head = Settings(app).widgetHead
+            val title = Scope.homeTitle(Settings(app))
             for (id in GlanceAppWidgetManager(app).getGlanceIds(MailWidget::class.java)) {
                 updateAppWidgetState(app, id) {
                     it[SUMMARY] = text
                     it[BACK] = back
                     it[HEAD] = head
+                    it[TITLE] = title
                 }
             }
             MailWidget().updateAll(app)

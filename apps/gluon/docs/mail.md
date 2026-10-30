@@ -15,24 +15,27 @@ The Messages tab of [gluon](../README.md).
 - **Discord DMs**, which belong to no channel, under **DMs** in the
   Discord group
 - **Views**: named lists saved in Settings, at the top of the scope menu
-- One **scope menu**: All, all mail or one mailbox, all feeds or one
-  feed, all channels or one channel
+- One **scope menu**: All, a view, all mail or one mailbox, all feeds or
+  one feed, all channels or one channel. Tick the box beside each view
+  you want to see together, such as views 1 to 3
 - An **Unread** chip that hides everything already dealt with
 - Bodies decoded by [fe2o3-mail](https://github.com/isene/mail) — the same
   crate kastrup uses, so quoted-printable, base64, RFC 2047 headers,
   multipart and HTML mail all come out the way they do on the desktop
-- **Mark READ** / **Mark unread**, on this phone only
-- Swipe a row (or **Remove** in a message) to take it off this phone —
-  local only, the laptop keeps the mail
+- **Mark READ** / **Mark unread**; for mail the laptop hears it too
+- Swipe a row (or **Archive** in a message) to take it off this phone
+  and mark it read; the laptop keeps the mail
+- **Delete** in a mail: off this phone, and kastrup on the laptop
+  deletes it too (Gmail keeps its copy)
 - **Calendar invitations** read as invitations — what, when, where, who
   — rather than as the `DTSTART;TZID=` they arrive as
 - **Tappable links** in the body
 - **Attachments** listed under the headers; tap one to open it in
   whatever app handles the type, or **Share** to hand it to another app
   (a receipt to your accounting app, say)
-- A **Removed** chip to look through what a swipe hid, and swipe there to
+- An **Archived** chip to look through what a swipe hid, and swipe there to
   put one back
-- **Mark all read** and **Remove all** in the ⋮ menu, acting on what the
+- **Mark all read** and **Archive all** in the ⋮ menu, acting on what the
   list is showing — so a filter narrows them
 - **Search** (🔍): live, over sender, recipient and subject of what is
   held — not the body, which for mail is only fetched when a message is
@@ -45,37 +48,35 @@ The Messages tab of [gluon](../README.md).
 
 ## Read state
 
-The laptop is the authoritative device. That is not a preference setting;
-it is what each side *writes*:
+Each device writes its own file in the shared folder, and every device
+reads them all. They are keyed by RFC822 `Message-ID`, and the newest
+mark wins (merged by the Rust core).
 
 | Event | Effect |
 |---|---|
 | Read on the laptop | Read here too |
 | Deleted on the laptop | Read here too |
-| Anything done here | Stays here |
+| Mark READ, Mark unread or Archive here | The same on the laptop |
+| Delete here | Deleted on the laptop too |
 
-The arrow points one way. This phone **writes nothing** into the shared
-folder — it reads the laptop's `mail-read-*.json` (keyed by RFC822
-`Message-ID`, newest timestamp wins, merged by the Rust core) and keeps
-its own marks in its own prefs, where they override the laptop's for
-display and reach nobody.
+The phone writes only what a button or a swipe chose; opening a mail
+marks nothing. The phone's files are `mail-read-phone.json` and
+`mail-delete-phone.txt` (a Message-ID and a time per line). Both keep
+only the fetch window.
 
-So marking read, marking unread, and removing are all free: none of them
-can cost you anything on the laptop, which is the machine that has the
-mail.
+Feeds and chats stay on this phone: kastrup's feed rows have no
+Message-ID to match.
 
 The server's `\Seen` flag is not consulted. The laptop's fetcher marks
-everything seen as it delivers, so the server has no opinion worth
-having.
+everything seen as it delivers, so it tells nothing.
 
-Removing is the one thing that stays put. A swipe writes a Message-ID to
-this phone's own prefs and nowhere else: no shared file, no IMAP delete,
-no server round trip. Clearing the phone's list must never cost you the
-mail. Nothing is deleted: a swipe adds a Message-ID to a local list, so
-the **Removed** chip can show you exactly what is on it and a swipe there
-takes one back off. The status line offers the last one back with a tap,
-and the list is pruned to the fetch window on every sync so it cannot
-grow without bound.
+Archive hides a message here and marks it read. The **Archived** chip
+shows what is hidden, a swipe there puts one back, and the status line
+offers the last one back with a tap. The hidden list is pruned to the
+fetch window on every sync.
+
+Delete is the one step with no undo. kastrup removes the mail from its
+database and from the Maildir; Gmail keeps its own copy.
 
 ## Setup
 
@@ -125,8 +126,9 @@ The wallpaper shows through the widget. "Widget colours" in the menu
 puts a colour behind it, as solid as you like, and sets the colour of
 its header line.
 
-The scope picked in the app does not change it. Its header reads
-`Messages` and the unread count.
+The scope picked in the app does not change it. Its header names
+the views it shows (`Work + Home + News  12`), or reads `Messages` when no
+view is saved.
 
 The summary reaches the widget through Glance's own state, and is read
 inside the composition. Anything read in `provideGlance` is read once

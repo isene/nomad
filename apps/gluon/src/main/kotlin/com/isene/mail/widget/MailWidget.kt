@@ -38,6 +38,7 @@ import androidx.glance.unit.ColorProvider
 import com.isene.mail.data.WidgetStore
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.glance.background
+import com.isene.mail.data.Scope
 import com.isene.mail.data.Settings
 
 // Fixed colours rather than GlanceTheme's. With no panel behind it the
@@ -59,6 +60,9 @@ internal val BACK = intPreferencesKey("back")
 
 /** The colour of the header line, as ARGB. */
 internal val HEAD = intPreferencesKey("head")
+
+/** The header: the names of the views it shows. */
+internal val TITLE = stringPreferencesKey("title")
 
 /**
  * Unread mail on the home screen: a count and who it is from.
@@ -88,20 +92,21 @@ class MailWidget : GlanceAppWidget() {
             val state = WidgetStore.parse(prefs[SUMMARY] ?: WidgetStore.text(ctx))
             val back = prefs[BACK] ?: Settings(ctx).widgetBack
             val head = prefs[HEAD] ?: Settings(ctx).widgetHead
-            GlanceTheme { WidgetContent(state.unread, state.rows, back, head) }
+            val title = prefs[TITLE] ?: Scope.homeTitle(Settings(ctx))
+            GlanceTheme { WidgetContent(title, state.unread, state.rows, back, head) }
         }
     }
 }
 
 @Composable
 private fun WidgetContent(
+    title: String,
     unread: Int,
     rows: List<com.isene.mail.data.WidgetRow>,
     back: Int,
     head: Int,
 ) {
     // The first three views together, whatever scope the app has picked.
-    val title = "Messages"
     val openApp = actionStartActivity(openTab(LocalContext.current, Tab.Mail))
     Box(
         modifier = GlanceModifier
@@ -124,6 +129,7 @@ private fun WidgetContent(
                     color = ColorProvider(Color(head)),
                     fontSize = TEXT,
                 ),
+                maxLines = 1,
                 modifier = GlanceModifier.padding(bottom = 4.dp).clickable(openApp),
             )
             if (rows.isEmpty()) {

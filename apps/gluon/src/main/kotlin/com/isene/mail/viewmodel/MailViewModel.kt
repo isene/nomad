@@ -158,13 +158,24 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun isRead(m: Message): Boolean = m.messageId in _ui.value.readIds
 
-    /**
-     * Mark it read, or unread, on this phone only. Nothing is written to
-     * the shared folder, so the laptop never hears about it.
-     */
+    /** Mark it read, or unread. Mail also tells the laptop. */
     fun setRead(m: Message, read: Boolean) {
         settings.localMarks = settings.localMarks + (m.messageId to read)
         recompute()
+        publish(listOf(m), read)
+    }
+
+    /** Hand the mail among these to the laptop, through the shared folder. */
+    private fun publish(ms: List<Message>, read: Boolean, delete: Boolean = false) {
+        val ids = ms.filter { it.source == "mail" }.map { it.messageId }
+        val tree = settings.syncTreeUri
+        if (ids.isEmpty() || tree.isEmpty()) return
+        val ctx = getApplication<Application>()
+        val days = settings.days
+        viewModelScope.launch(Dispatchers.IO) {
+            ReadStateRepo.publish(ctx, tree, ids, read, days)
+            if (delete) ReadStateRepo.delete(ctx, tree, ids, days)
+        }
     }
 
     // ---------- fetching ----------
@@ -335,26 +346,35 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     // ---------- filters ----------
 
     /**
-     * Take a message off this phone's list. Local only: the laptop is
-     * the archive and never hears about it, which is the whole point —
-     * clearing the phone must not cost you the mail.
+     * Archive: off this phone's list and marked read, which reaches the
+     * laptop for mail. The mail stays on the laptop and in Gmail.
      */
-    fun dismiss(m: Message) {
-        settings.dismissed = settings.dismissed + m.messageId
-        undoable = setOf(m.messageId)
-        recompute()
-        status("Removed here only — tap to undo")
-    }
+    fun dismiss(m: Message) = archive(listOf(m))
 
     /** Everything the list is showing. Bulk actions act on what you can
      *  see, never on what a filter is hiding. */
-    fun dismissAll() {
-        val ids = _ui.value.mails.map { it.messageId }.toSet()
-        if (ids.isEmpty()) return
+    fun dismissAll() = archive(_ui.value.mails)
+
+    private fun archive(ms: List<Message>) {
+        if (ms.isEmpty()) return
+        val ids = ms.map { it.messageId }.toSet()
         settings.dismissed = settings.dismissed + ids
+        settings.localMarks = settings.localMarks + ids.associateWith { true }
         undoable = ids
         recompute()
-        status("${ids.size} removed here only — tap to undo")
+        publish(ms, read = true)
+        status((if (ids.size == 1) "Archived" else "${ids.size} archived") + " — tap to undo")
+    }
+
+    /** Off this phone's list, and deleted from kastrup on the laptop. Gmail
+     *  keeps its copy. */
+    fun delete(m: Message) {
+        settings.dismissed = settings.dismissed + m.messageId
+        settings.localMarks = settings.localMarks + (m.messageId to true)
+        undoable = emptySet()
+        recompute()
+        publish(listOf(m), read = true, delete = true)
+        status(if (settings.syncTreeUri.isEmpty()) "Deleted here; pick the shared folder to reach the laptop" else "Deleted here and on the laptop")
     }
 
     /**
@@ -372,17 +392,18 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         if (ids.isEmpty()) { status("Nothing unread here"); return }
         settings.localMarks = settings.localMarks + ids.associateWith { true }
         recompute()
-        status("${ids.size} marked read here")
+        publish(_ui.value.mails.filter { it.messageId in ids }, read = true)
+        status("${ids.size} marked read")
     }
 
     /**
-     * Bring back everything removed on this phone. The messages were
-     * never gone — a swipe only adds an id to a local set — so this is
-     * just emptying it.
+     * Bring back everything archived on this phone. The messages were
+     * never gone, since a swipe only adds an id to a local set, so this
+     * empties it. They stay marked read.
      */
     fun restoreRemoved() {
         val n = settings.dismissed.size
-        if (n == 0) { status("Nothing removed"); return }
+        if (n == 0) { status("Nothing archived"); return }
         settings.dismissed = emptySet()
         undoable = emptySet()
         recompute()
