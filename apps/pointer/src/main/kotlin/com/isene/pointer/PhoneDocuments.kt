@@ -19,7 +19,8 @@ import java.io.FileNotFoundException
  *
  * Only the system picker may call this (the manifest asks for
  * MANAGE_DOCUMENTS). An app that picks a file gets a grant for that one
- * file, to read and to write back, and nothing else.
+ * file, to read and to write back, and nothing else. An app that picks a
+ * folder may also make new files in it.
  */
 class PhoneDocuments : DocumentsProvider() {
     private val top: File get() = Environment.getExternalStorageDirectory()
@@ -34,7 +35,7 @@ class PhoneDocuments : DocumentsProvider() {
                 .add(Root.COLUMN_TITLE, context!!.getString(R.string.app_name))
                 .add(Root.COLUMN_SUMMARY, "Phone, with hidden folders")
                 .add(Root.COLUMN_ICON, R.mipmap.ic_launcher)
-                .add(Root.COLUMN_FLAGS, Root.FLAG_LOCAL_ONLY or Root.FLAG_SUPPORTS_IS_CHILD)
+                .add(Root.COLUMN_FLAGS, Root.FLAG_LOCAL_ONLY or Root.FLAG_SUPPORTS_IS_CHILD or Root.FLAG_SUPPORTS_CREATE)
         }
 
     override fun queryDocument(documentId: String, projection: Array<String>?): Cursor =
@@ -49,6 +50,13 @@ class PhoneDocuments : DocumentsProvider() {
     override fun openDocument(documentId: String, mode: String, signal: CancellationSignal?): ParcelFileDescriptor =
         ParcelFileDescriptor.open(file(documentId), ParcelFileDescriptor.parseMode(mode))
 
+    override fun createDocument(parentId: String, mimeType: String, displayName: String): String {
+        val f = newChild(top, parentId, displayName) ?: throw FileNotFoundException(displayName)
+        val made = if (mimeType == Document.MIME_TYPE_DIR) f.mkdir() else f.createNewFile()
+        if (!made) throw FileNotFoundException(displayName)
+        return childId(parentId, displayName)
+    }
+
     override fun isChildDocument(parentId: String, documentId: String) =
         documentId.startsWith(if (parentId == ROOT) "$ROOT/" else "$parentId/")
 
@@ -62,7 +70,11 @@ class PhoneDocuments : DocumentsProvider() {
             .add(Document.COLUMN_MIME_TYPE, if (dir) Document.MIME_TYPE_DIR else mime(f))
             .add(Document.COLUMN_SIZE, if (dir) null else f.length())
             .add(Document.COLUMN_LAST_MODIFIED, f.lastModified())
-            .add(Document.COLUMN_FLAGS, if (!dir && f.canWrite()) Document.FLAG_SUPPORTS_WRITE else 0)
+            .add(Document.COLUMN_FLAGS, when {
+                !f.canWrite() -> 0
+                dir -> Document.FLAG_DIR_SUPPORTS_CREATE
+                else -> Document.FLAG_SUPPORTS_WRITE
+            })
     }
 
     private fun mime(f: File): String =
@@ -92,4 +104,10 @@ internal fun inside(top: File, id: String): File? {
     val base = top.canonicalFile
     val f = File(base, id.removePrefix(ROOT).trimStart('/')).canonicalFile
     return f.takeIf { it == base || it.path.startsWith(base.path + File.separator) }
+}
+
+/** A new file's place in a folder, or null if the name is taken or leads elsewhere. */
+internal fun newChild(top: File, parentId: String, name: String): File? {
+    val dir = inside(top, parentId)?.takeIf { it.isDirectory } ?: return null
+    return inside(top, childId(parentId, name))?.takeIf { it.parentFile == dir && !it.exists() }
 }
