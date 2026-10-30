@@ -254,10 +254,17 @@ for; everything worth subscribing to redirects there anyway.
 
 ## Laptop drafts
 
-Menu, Laptop drafts lists the drafts kastrup on the laptop holds in its
-drop folder, where Claude sessions write theirs. The laptop's drop folder
+Menu, Laptop drafts lists the drafts kastrup on the laptop keeps in its
+drop folder, where Claude sessions write theirs. Home shows a Drafts
+heading with the count while any wait. The laptop's drop folder
 must be `drafts/` in the shared folder (kastrup's README says how). Tap
-one to read it as it will go out, then Send. The phone moves it to
+one to read it as it will go out, then Send, Edit or Delete.
+
+- Edit changes the file itself, headers too, and Save writes it back.
+- Delete removes it on the laptop too. pointer keeps a copy in its trash.
+- Both need pointer 0.4.2 or later as the shared folder's source.
+
+Send moves it to
 `send/`, and kastrup on the laptop sends it within a minute, as it sends
 a scheduled message. Mail goes from the laptop's own account, so a reply
 threads and its original gets the ← mark. Postponed and scheduled mail

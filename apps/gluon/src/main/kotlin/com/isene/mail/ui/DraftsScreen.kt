@@ -2,9 +2,12 @@ package com.isene.mail.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +23,8 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,6 +39,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -47,7 +53,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** The laptop's drafts: the list, one draft in full, and Send. */
+/** The laptop's drafts: the list, one draft in full, and Send, Edit and Delete. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DraftsScreen(treeUri: String, onBack: () -> Unit) {
@@ -57,6 +63,9 @@ fun DraftsScreen(treeUri: String, onBack: () -> Unit) {
     var waiting by remember { mutableIntStateOf(0) }
     var open by remember { mutableStateOf<Draft?>(null) }
     var confirm by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
+    // The draft's text while it is being edited; null when it is not.
+    var editing by remember { mutableStateOf<String?>(null) }
     var status by remember { mutableStateOf<String?>(null) }
     var round by remember { mutableIntStateOf(0) }
     LaunchedEffect(round) {
@@ -66,14 +75,15 @@ fun DraftsScreen(treeUri: String, onBack: () -> Unit) {
             withContext(Dispatchers.Main) { drafts = l; waiting = w }
         }
     }
-    BackHandler { if (open != null) open = null else onBack() }
+    val back = { if (editing != null) editing = null else if (open != null) open = null else onBack() }
+    BackHandler(onBack = back)
     val shown = open
 
     Scaffold(
         topBar = {
             TopAppBar(
                 navigationIcon = {
-                    IconButton(onClick = { if (open != null) open = null else onBack() }) {
+                    IconButton(onClick = back) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
@@ -88,12 +98,37 @@ fun DraftsScreen(treeUri: String, onBack: () -> Unit) {
             status?.let {
                 Text(it, Modifier.padding(horizontal = 16.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
             }
-            if (shown != null) {
+            val text = editing
+            if (shown != null && text != null) {
+                OutlinedTextField(
+                    value = text, onValueChange = { editing = it },
+                    modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+                    textStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+                )
+                Row(Modifier.fillMaxWidth().imePadding().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = {
+                        scope.launch {
+                            val err = withContext(Dispatchers.IO) { DraftsRepo.save(ctx, treeUri, shown.name, text) }
+                            status = err ?: "Saved; the laptop has it within a minute"
+                            if (err == null) {
+                                open = DraftsRepo.parse(shown.name, text, System.currentTimeMillis())
+                                editing = null
+                                round++
+                            }
+                        }
+                    }, Modifier.weight(1f)) { Text("Save") }
+                    OutlinedButton(onClick = { editing = null }, Modifier.weight(1f)) { Text("Cancel") }
+                }
+            } else if (shown != null) {
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp)) {
                     Text("${shown.kind} draft from ${stamp(shown.time)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
                     Text(shown.text, fontFamily = FontFamily.Monospace, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
                 }
-                Button(onClick = { confirm = true }, modifier = Modifier.fillMaxWidth().padding(16.dp)) { Text("Send") }
+                Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { confirm = true }, Modifier.weight(1f)) { Text("Send") }
+                    OutlinedButton(onClick = { status = null; editing = shown.text }, Modifier.weight(1f)) { Text("Edit") }
+                    OutlinedButton(onClick = { confirmDelete = true }, Modifier.weight(1f)) { Text("Delete") }
+                }
             } else {
                 val list = drafts
                 if (waiting > 0) {
@@ -139,6 +174,25 @@ fun DraftsScreen(treeUri: String, onBack: () -> Unit) {
                 }) { Text("Send") }
             },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
+        )
+    }
+
+    if (confirmDelete && shown != null) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Delete this draft?") },
+            text = { Text("It goes from the laptop too. pointer keeps a copy in its trash on the phone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    confirmDelete = false
+                    scope.launch {
+                        val err = withContext(Dispatchers.IO) { DraftsRepo.delete(ctx, treeUri, shown.name) }
+                        status = err ?: "Deleted: ${shown.title}"
+                        if (err == null) { open = null; round++ }
+                    }
+                }) { Text("Delete") }
+            },
+            dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
         )
     }
 }

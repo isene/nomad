@@ -93,9 +93,13 @@ fun MailApp(vm: MailViewModel) {
     LaunchedEffect(pick) {
         pick?.let { compose = null; showDrafts = false; open = it; vm.pick(null) }
     }
+    val wantDrafts by vm.wantDrafts.collectAsState()
+    LaunchedEffect(wantDrafts) {
+        if (wantDrafts) { compose = null; open = null; showDrafts = true; vm.wantDrafts(false) }
+    }
 
     if (showDrafts) {
-        DraftsScreen(vm.settingsObj().syncTreeUri) { showDrafts = false }
+        DraftsScreen(vm.settingsObj().syncTreeUri) { showDrafts = false; vm.countDrafts() }
         return
     }
 
@@ -160,7 +164,7 @@ fun MailApp(vm: MailViewModel) {
                                     onClick = { menuOpen = false; vm.restoreRemoved() },
                                 )
                             }
-                            DropdownMenuItem(text = { Text("Laptop drafts") }, onClick = { menuOpen = false; showDrafts = true })
+                            DropdownMenuItem(text = { Text(if (ui.drafts > 0) "Laptop drafts (${ui.drafts})" else "Laptop drafts") }, onClick = { menuOpen = false; showDrafts = true })
                             DropdownMenuItem(text = { Text("Settings") }, onClick = { menuOpen = false; showSettings = true })
                             DropdownMenuItem(text = { Text("Widget colours") }, onClick = { menuOpen = false; showBack = true })
                             DropdownMenuItem(text = { Text("About") }, onClick = { menuOpen = false; showAbout = true })

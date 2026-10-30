@@ -124,7 +124,7 @@ private fun Kept(shown: Boolean, content: @Composable () -> Unit) {
     }
 }
 
-/** What the laptop's Home tab has: unread mail, the coming days and the
+/** What the laptop's Home tab has: drafts waiting, unread mail, the coming days and the
  *  tasks. A tap opens the thing in its own tab. */
 @Composable
 private fun Home(go: (Tab) -> Unit, mail: MailViewModel, tock: TockViewModel, tasks: TasksViewModel) {
@@ -136,6 +136,7 @@ private fun Home(go: (Tab) -> Unit, mail: MailViewModel, tock: TockViewModel, ta
         Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
+        if (m.drafts > 0) item { Head("Drafts  ${m.drafts}") { mail.wantDrafts(true); go(Tab.Mail) } }
         item { Head(if (m.unread > 0) "Messages  ${m.unread} unread" else "Messages") { go(Tab.Mail) } }
         if (m.inbox.isEmpty()) item { Text("Nothing unread", color = dim) }
         items(m.inbox.take(MAIL_ROWS).size) { i ->
