@@ -604,10 +604,22 @@ private fun SettingsDialog(vm: MailViewModel, onDismiss: () -> Unit) {
                 }
                 Text(
                     "Keeps a line open to Gmail, so new mail lands at once. " +
-                        "About 12 radio wakes an hour, and a quiet notice while on.",
+                        "About 12 radio wakes an hour. Android needs a notice while it runs; " +
+                        "hide it below and the new-mail notices still come.",
                     fontSize = 11.sp,
                     color = MaterialTheme.colorScheme.secondary,
                 )
+                if (instant) {
+                    TextButton(onClick = {
+                        runCatching {
+                            ctx.startActivity(
+                                Intent(android.provider.Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, ctx.packageName)
+                                    .putExtra(android.provider.Settings.EXTRA_CHANNEL_ID, MailPush.WAITING),
+                            )
+                        }
+                    }) { Text("Hide \"Waiting for new mail\"") }
+                }
             }
         },
     )
@@ -694,12 +706,11 @@ private fun AboutDialog(onDismiss: () -> Unit) {
                 Text("Your Gmail inboxes on the phone, sharing one decoder and one notion of \"read\" with kastrup on the laptop.")
                 Text("Read state", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    "The laptop is authoritative. Read there, read here. " +
-                        "Opening a message here changes nothing — only Mark READ does, " +
-                        "and that reaches the laptop too.",
+                    "Read on the laptop, read here. Opening a message changes nothing; " +
+                        "Read, Unread, Archive and Delete reach the laptop too.",
                 )
                 Text("How to use", style = MaterialTheme.typography.titleSmall)
-                Text("• Settings: paste the accounts JSON and pick the shared folder.\n• ↻ fetches the last N days of every inbox.\n• Tap a message to read it; bodies download on demand.\n• Unread / account chips filter the list.")
+                Text("• Load setup file, then Settings: pick the shared folder.\n• ↻ fetches the last N days of every inbox.\n• Tap a message to read it; bodies download on demand.\n• The scope menu and the Unread chip filter the list.")
                 Text("Bodies are decoded by fe2o3-mail, the same crate kastrup uses. Created by Geir Isene.")
                 val uri = LocalUriHandler.current
                 Text(

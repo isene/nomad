@@ -245,7 +245,7 @@ fun MessageScreen(
                 // Opening a mail publishes nothing; these buttons do, so
                 // the laptop hears only what you chose.
                 Button(onClick = { vm.setRead(mail, !read) }, modifier = Modifier.weight(1f)) {
-                    Text(if (read) "Mark unread" else "Mark READ")
+                    Text(if (read) "Unread" else "Read")
                 }
                 if (mail.link.isNotEmpty()) {
                     val ctx = LocalContext.current

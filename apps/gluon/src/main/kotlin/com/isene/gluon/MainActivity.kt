@@ -57,12 +57,15 @@ class MainActivity : ComponentActivity() {
         com.isene.mail.work.MailPush.sync(this)
         com.isene.mail.widget.WidgetTick.arm(this)
         com.isene.tasks.widget.WidgetTick.arm(this)
-        // A stamped task and a calendar reminder both need the right to
-        // post a notice, and minSdk 33 always requires asking.
+        // A stamped task, a calendar reminder and new mail need the right
+        // to post a notice. Asked once: a "no" stays a no.
         ReminderReceiver.ensureChannel(this)
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+        val prefs = getPreferences(MODE_PRIVATE)
+        if (!prefs.getBoolean("asked_notices", false) &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
             != PackageManager.PERMISSION_GRANTED
         ) {
+            prefs.edit().putBoolean("asked_notices", true).apply()
             askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
         setContent { Gluon(tab, { tab = it }, mail, tock, tasks) }

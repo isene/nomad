@@ -22,7 +22,7 @@ The Messages tab of [gluon](../README.md).
 - Bodies decoded by [fe2o3-mail](https://github.com/isene/mail) — the same
   crate kastrup uses, so quoted-printable, base64, RFC 2047 headers,
   multipart and HTML mail all come out the way they do on the desktop
-- **Mark READ** / **Mark unread**; for mail the laptop hears it too
+- **Read** / **Unread**; for mail the laptop hears it too
 - Swipe a row (or **Archive** in a message) to take it off this phone
   and mark it read; the laptop keeps the mail
 - **Delete** in a mail: off this phone, and kastrup on the laptop
@@ -58,7 +58,7 @@ mark wins (merged by the Rust core).
 |---|---|
 | Read on the laptop | Read here too |
 | Deleted on the laptop | Read here too |
-| Mark READ, Mark unread or Archive here | The same on the laptop |
+| Read, Unread or Archive here | The same on the laptop |
 | Delete here | Deleted on the laptop too |
 
 The phone writes only what a button or a swipe chose; opening a mail
@@ -172,7 +172,10 @@ moment a mail lands, and the phone runs the same fetch as above.
 - Each new inbox mail that is unread and in the first three views gets
   a notice: the sender, the subject and the account. Several stack under one summary,
   as in the Gmail app. A tap opens that mail; opening gluon clears them.
-- A quiet notice, "Waiting for new mail", stays while the service runs.
+- Android needs a notice, "Waiting for new mail", while the service runs.
+  Settings → **Hide "Waiting for new mail"** turns off that one alone; the
+  new-mail notices still come. gluon asks for the right to post notices
+  once, at the first start.
   Android requires it.
 - Turning it on asks once to leave gluon out of battery saving, since
   Android cuts the line of an app it puts to sleep.

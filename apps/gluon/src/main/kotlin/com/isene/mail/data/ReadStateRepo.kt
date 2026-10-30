@@ -18,7 +18,7 @@ import uniffi.fe2o3_mobile_core.serializeReadMarks
  *
  * This phone writes two files of its own here, and only for what you
  * did with a tap (opening a mail writes nothing):
- * - `mail-read-phone.json`: Mark READ, Mark unread, Archive, Delete.
+ * - `mail-read-phone.json`: Read, Unread, Archive, Delete.
  *   kastrup on the laptop takes these as its own.
  * - `mail-delete-phone.txt`: a Message-ID per line; kastrup deletes it.
  * Both keep only the fetch window, so they stay small. Drafts to send
