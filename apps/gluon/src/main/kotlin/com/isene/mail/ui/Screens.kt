@@ -126,27 +126,42 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
     LazyColumn(modifier.fillMaxSize()) {
         items(ui.mails, key = { it.messageId }) { m ->
             val read = m.messageId in ui.readIds
-            // Swipe archives the message, or puts it back when this IS
-            // the list of archived ones. Archiving marks mail read on the
-            // laptop too; the mail itself stays there.
+            // Swipe left archives the message; swipe right deletes a mail
+            // as Delete does (other rows archive either way). In the list
+            // of archived ones, a swipe puts it back. Archiving marks mail
+            // read on the laptop too; the mail itself stays there.
             val removedView = ui.filter == "removed"
+            val canDelete = !removedView && m.source == "mail"
             val swipe = rememberSwipeToDismissBoxState(
                 confirmValueChange = { v ->
-                    if (v == SwipeToDismissBoxValue.Settled) false
-                    else { if (removedView) vm.restore(m) else vm.dismiss(m); true }
+                    when {
+                        v == SwipeToDismissBoxValue.Settled -> false
+                        removedView -> { vm.restore(m); true }
+                        v == SwipeToDismissBoxValue.StartToEnd && canDelete -> { vm.delete(m); true }
+                        else -> { vm.dismiss(m); true }
+                    }
                 },
             )
             SwipeToDismissBox(
                 state = swipe,
                 backgroundContent = {
+                    val deleting = canDelete && swipe.dismissDirection == SwipeToDismissBoxValue.StartToEnd
                     Box(
                         Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp),
-                        contentAlignment = Alignment.CenterEnd,
+                        contentAlignment = if (swipe.dismissDirection == SwipeToDismissBoxValue.StartToEnd) {
+                            Alignment.CenterStart
+                        } else {
+                            Alignment.CenterEnd
+                        },
                     ) {
                         Text(
-                            if (removedView) "put back" else "remove here",
+                            when {
+                                removedView -> "put back"
+                                deleting -> "delete"
+                                else -> "remove here"
+                            },
                             fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.tertiary,
+                            color = if (deleting) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary,
                         )
                     }
                 },

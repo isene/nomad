@@ -30,8 +30,9 @@ The Messages tab of [gluon](../README.md).
   An address with a Microsoft 365 login in the setup file goes out
   through Microsoft instead, as Outlook sends it, and lands in its
   Sent Items
-- Swipe a row (or **Archive** in a message) to take it off this phone
-  and mark it read; the laptop keeps the mail
+- Swipe a row left (or **Archive** in a message) to take it off this
+  phone and mark it read; the laptop keeps the mail. Swipe a mail right
+  to delete it, as **Delete** does
 - **Delete** in a mail: off this phone, and kastrup on the laptop
   deletes it too (Gmail keeps its copy)
 - **Calendar invitations** read as invitations — what, when, where, who
