@@ -30,6 +30,8 @@ The Messages tab of [gluon](../README.md).
 - **Calendar invitations** read as invitations — what, when, where, who
   — rather than as the `DTSTART;TZID=` they arrive as
 - **Tappable links** in the body
+- **Show pictures** in an HTML mail or feed entry: one tap shows it as
+  sent, pictures and all. Until then nothing loads from the sender's server
 - **Attachments** listed under the headers; tap one to open it in
   whatever app handles the type, or **Share** to hand it to another app
   (a receipt to your accounting app, say)

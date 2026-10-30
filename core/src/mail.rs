@@ -223,6 +223,14 @@ pub fn parse_gateway(json: String, file_id: String) -> Option<Message> {
     })
 }
 
+/// The mail as it was sent, for the "Show pictures" view: the HTML part
+/// with its inline pictures in place. A feed entry has its HTML already,
+/// in `html`. Empty when there is none.
+#[uniffi::export]
+pub fn mail_html(raw: String, html: String) -> String {
+    mail::attach::html(&raw).unwrap_or(html)
+}
+
 /// One attachment, without its contents.
 #[derive(Debug, Clone, PartialEq, Default, uniffi::Record)]
 pub struct MailAttachment {
