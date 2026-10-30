@@ -11,6 +11,7 @@ import android.provider.DocumentsProvider
 import android.webkit.MimeTypeMap
 import java.io.File
 import java.io.FileNotFoundException
+import uniffi.fe2o3_mobile_core.pointerTrash
 
 /**
  * pointer in Android's file picker. The picker hides folders whose name
@@ -20,7 +21,8 @@ import java.io.FileNotFoundException
  * Only the system picker may call this (the manifest asks for
  * MANAGE_DOCUMENTS). An app that picks a file gets a grant for that one
  * file, to read and to write back, and nothing else. An app that picks a
- * folder may also make new files in it.
+ * folder may also make new files in it, and delete its files. A delete
+ * moves the file to pointer's trash, as in pointer itself.
  */
 class PhoneDocuments : DocumentsProvider() {
     private val top: File get() = Environment.getExternalStorageDirectory()
@@ -57,6 +59,12 @@ class PhoneDocuments : DocumentsProvider() {
         return childId(parentId, displayName)
     }
 
+    override fun deleteDocument(documentId: String) {
+        val f = file(documentId).takeIf { it.isFile } ?: throw FileNotFoundException(documentId)
+        val out = pointerTrash(f.path, listOf(top.canonicalPath))
+        if (out.error.isNotEmpty()) throw FileNotFoundException(out.error)
+    }
+
     override fun isChildDocument(parentId: String, documentId: String) =
         documentId.startsWith(if (parentId == ROOT) "$ROOT/" else "$parentId/")
 
@@ -73,7 +81,7 @@ class PhoneDocuments : DocumentsProvider() {
             .add(Document.COLUMN_FLAGS, when {
                 !f.canWrite() -> 0
                 dir -> Document.FLAG_DIR_SUPPORTS_CREATE
-                else -> Document.FLAG_SUPPORTS_WRITE
+                else -> Document.FLAG_SUPPORTS_WRITE or Document.FLAG_SUPPORTS_DELETE
             })
     }
 
