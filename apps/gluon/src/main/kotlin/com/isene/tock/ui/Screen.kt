@@ -1,5 +1,6 @@
 package com.isene.tock.ui
 
+import com.isene.gluon.Swatch
 import android.Manifest
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -251,7 +252,7 @@ private fun WidgetBackDialog(argb: Int, set: (Int) -> Unit, close: () -> Unit) {
                         modifier = Modifier.weight(1f),
                     )
                     Spacer(Modifier.width(16.dp))
-                    Box(Modifier.size(40.dp).background(Color(0xFF000000.toInt() or (rgb ?: 0))))
+                    Swatch(rgb ?: 0, 40.dp) { hex = "%06X".format(it) }
                 }
                 Text("Solid: ${(solid * 100).roundToInt()} %. At 0 the wallpaper shows through.")
                 Slider(value = solid, onValueChange = { solid = it })
