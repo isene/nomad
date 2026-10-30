@@ -40,6 +40,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.viewinterop.AndroidView
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import uniffi.fe2o3_mobile_core.mailHtml
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -292,10 +299,48 @@ fun MessageScreen(
             if (body == null) {
                 CircularProgressIndicator(strokeWidth = 2.dp)
             } else {
-                Text(linkify(body!!), fontSize = 14.sp, fontFamily = FontFamily.SansSerif)
+                // Text first, so no sender's server learns you opened it;
+                // one tap shows the mail as it was sent, pictures and all.
+                var pictures by remember(mail.messageId) { mutableStateOf(false) }
+                val hasHtml = held.html.isNotBlank() || held.raw.contains("text/html", ignoreCase = true)
+                if (pictures) {
+                    val html = remember(held.raw, held.html) { mailHtml(held.raw, held.html) }
+                    MailWeb(html.replace("src=\"http://", "src=\"https://", ignoreCase = true))
+                } else {
+                    if (hasHtml) {
+                        OutlinedButton(onClick = { pictures = true }) { Text("Show pictures") }
+                    }
+                    Text(linkify(body!!), fontSize = 14.sp, fontFamily = FontFamily.SansSerif)
+                }
             }
         }
     }
+}
+
+/**
+ * The mail's own HTML. No JavaScript and no file access; a tapped link
+ * opens in the browser. Android refuses plain http, so picture links are
+ * asked for over https.
+ */
+@Composable
+private fun MailWeb(html: String) {
+    AndroidView(
+        factory = { c ->
+            WebView(c).apply {
+                settings.javaScriptEnabled = false
+                settings.allowFileAccess = false
+                settings.allowContentAccess = false
+                webViewClient = object : WebViewClient() {
+                    override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
+                        runCatching { c.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, req.url)) }
+                        return true
+                    }
+                }
+                loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
 }
 
 private val URL_RE = Regex("""(https?://[^\s<>"')\]]+)""")
