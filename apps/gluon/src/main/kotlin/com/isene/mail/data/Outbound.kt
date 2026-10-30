@@ -74,7 +74,9 @@ object Outbound {
         inReplyTo: String, references: String, attachments: List<Attachment>,
     ): String? = runCatching {
         val raw = ByteArrayOutputStream().also {
-            message(Session.getInstance(Properties()), from, to, cc, subject, body, inReplyTo, references, attachments)
+            // mail.from gives the Message-ID the sender's domain, not @localhost.
+            val session = Session.getInstance(Properties().apply { put("mail.from", from) })
+            message(session, from, to, cc, subject, body, inReplyTo, references, attachments)
                 .writeTo(it)
         }.toByteArray()
         val req = Request.Builder()
