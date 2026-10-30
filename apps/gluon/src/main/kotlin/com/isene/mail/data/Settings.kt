@@ -114,10 +114,8 @@ class Settings(ctx: Context) {
     /**
      * This phone's own read decisions, `messageId -> read`.
      *
-     * Local, and deliberately so: the phone writes nothing to the shared
-     * folder, so marking or clearing something here cannot change what
-     * the laptop shows. The laptop still reaches the phone; the arrow
-     * only points one way.
+     * They win over the shared folder's marks here. Opening a mail
+     * lands only here; a button also publishes it, see [ReadStateRepo].
      */
     var localMarks: Map<String, Boolean>
         get() = runCatching {

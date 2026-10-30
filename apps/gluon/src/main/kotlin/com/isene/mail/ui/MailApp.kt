@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -149,13 +150,13 @@ fun MailApp(vm: MailViewModel) {
                             )
                             if (ui.filter != "removed") {
                                 DropdownMenuItem(
-                                    text = { Text("Remove all (${ui.mails.size})") },
+                                    text = { Text("Archive all (${ui.mails.size})") },
                                     onClick = { menuOpen = false; confirmBulk = "remove" },
                                 )
                             }
                             if (ui.hidden > 0) {
                                 DropdownMenuItem(
-                                    text = { Text("Restore removed (${ui.hidden})") },
+                                    text = { Text("Restore archived (${ui.hidden})") },
                                     onClick = { menuOpen = false; vm.restoreRemoved() },
                                 )
                             }
@@ -185,7 +186,7 @@ fun MailApp(vm: MailViewModel) {
                         FilterChip(
                             selected = ui.filter == "removed",
                             onClick = { vm.setFilter(if (ui.filter == "removed") "all" else "removed") },
-                            label = { Text("Removed ${ui.hidden}") },
+                            label = { Text("Archived ${ui.hidden}") },
                         )
                     }
                 }
@@ -244,22 +245,22 @@ fun MailApp(vm: MailViewModel) {
         val n = if (read) ui.mails.count { m -> m.messageId !in ui.readIds } else ui.mails.size
         AlertDialog(
             onDismissRequest = { confirmBulk = null },
-            title = { Text(if (read) "Mark $n read?" else "Remove $n from this phone?") },
+            title = { Text(if (read) "Mark $n read?" else "Archive $n?") },
             text = {
                 Text(
                     // Say which messages, because a scope is often set and
                     // "all" then means something narrower than it sounds.
                     (if (ui.scope.isEmpty()) "Everything the list is showing. "
                      else "Everything showing in this scope. ") +
-                        if (read) "Marked on this phone only."
-                        else "Local only — the laptop keeps the mail, and the status line offers it back."
+                        if (read) "Mail is marked read on the laptop too."
+                        else "Off this list and marked read. The laptop keeps the mail, and the status line offers it back."
                 )
             },
             confirmButton = {
                 TextButton(onClick = {
                     if (read) vm.markAllRead() else vm.dismissAll()
                     confirmBulk = null
-                }) { Text(if (read) "Mark read" else "Remove") }
+                }) { Text(if (read) "Mark read" else "Archive") }
             },
             dismissButton = { TextButton(onClick = { confirmBulk = null }) { Text("Cancel") } },
         )
@@ -298,8 +299,20 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
             DropdownMenuItem(text = { Text("All") }, onClick = { open = false; onPick("") })
             if (ui.views.isNotEmpty()) {
                 SectionLabel("Views")
+                // The name picks that view alone; the box adds it to the
+                // views already picked, so the list shows them together.
+                val picked = ui.scope.split('\t').filter { it.startsWith("view:") }.toSet()
                 ui.views.forEach { v ->
-                    DropdownMenuItem(text = { Text(v) }, onClick = { open = false; onPick("view:$v") })
+                    val me = "view:$v"
+                    DropdownMenuItem(
+                        text = { Text(v) },
+                        onClick = { open = false; onPick(me) },
+                        trailingIcon = {
+                            Checkbox(checked = me in picked, onCheckedChange = {
+                                onPick(ui.views.map { "view:$it" }.filter { (it in picked) != (it == me) }.joinToString("\t"))
+                            })
+                        },
+                    )
                 }
             }
             Group("Mail", "mail", "All mail", ui.accounts.map { it to "mail:$it" },

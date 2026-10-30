@@ -104,7 +104,7 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
                 when {
-                    ui.filter == "removed" -> "Nothing removed on this phone."
+                    ui.filter == "removed" -> "Nothing archived on this phone."
                     else -> "Nothing here. Tap ↻ to fetch."
                 },
                 Modifier.padding(32.dp),
@@ -119,9 +119,9 @@ fun MailList(vm: MailViewModel, ui: UiState, modifier: Modifier = Modifier, onOp
     LazyColumn(modifier.fillMaxSize()) {
         items(ui.mails, key = { it.messageId }) { m ->
             val read = m.messageId in ui.readIds
-            // Swipe takes the message off this phone — or puts it back,
-            // when this IS the list of the ones taken off. Nothing leaves
-            // the device either way: the laptop never hears about it.
+            // Swipe archives the message, or puts it back when this IS
+            // the list of archived ones. Archiving marks mail read on the
+            // laptop too; the mail itself stays there.
             val removedView = ui.filter == "removed"
             val swipe = rememberSwipeToDismissBoxState(
                 confirmValueChange = { v ->
@@ -235,8 +235,8 @@ fun MessageScreen(
                 Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                // The explicit act. Nothing else on this phone publishes
-                // read state, so the laptop keeps its say.
+                // Opening a mail publishes nothing; these buttons do, so
+                // the laptop hears only what you chose.
                 Button(onClick = { vm.setRead(mail, !read) }, modifier = Modifier.weight(1f)) {
                     Text(if (read) "Mark unread" else "Mark READ")
                 }
@@ -254,7 +254,12 @@ fun MessageScreen(
                     }) { Text("Open") }
                 }
                 OutlinedButton(onClick = { vm.dismiss(mail); vm.closeBody(); onBack() }) {
-                    Text("Remove")
+                    Text("Archive")
+                }
+                if (mail.source == "mail") {
+                    OutlinedButton(onClick = { vm.delete(mail); vm.closeBody(); onBack() }) {
+                        Text("Delete")
+                    }
                 }
             }
         },

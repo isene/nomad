@@ -26,6 +26,7 @@ object Scope {
      */
     fun label(scope: String, settings: Settings, short: Boolean = false): String = when {
         scope.isEmpty() -> "All"
+        '\t' in scope -> scope.split('\t').joinToString(" + ") { label(it, settings, short) }
         scope.startsWith("view:") -> scope.removePrefix("view:")
         scope == "mail" -> "Mail"
         scope == "rss" -> "Feeds"
@@ -48,10 +49,16 @@ object Scope {
     fun home(settings: Settings): List<String> =
         settings.views().take(3).map { "view:${it.name}" }.ifEmpty { listOf("") }
 
+    /** The widget's header: the views it shows, or "Messages" with none. */
+    fun homeTitle(settings: Settings): String =
+        home(settings).joinToString("\t").let { if (it.isEmpty()) "Messages" else label(it, settings) }
+
     fun atHome(m: Message, home: List<String>, settings: Settings) = home.any { matches(m, it, settings) }
 
     fun matches(m: Message, scope: String, settings: Settings): Boolean = when {
         scope.isEmpty() -> true
+        // Several views picked together, joined by tabs: any of them.
+        '\t' in scope -> scope.split('\t').any { matches(m, it, settings) }
         // A view is any of its scopes, narrowed by its match. Defined in
         // terms of the same strings, so there is one rule, not two.
         scope.startsWith("view:") -> {
