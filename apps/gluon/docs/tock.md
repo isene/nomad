@@ -26,7 +26,7 @@ phone twin of [tock](https://github.com/isene/tock).
 - Widget: the coming 30 days as a list that scrolls. A tap opens the
   event, and the plus starts a new one. The wallpaper shows through it;
   "Widget background" in the menu puts a colour behind it, as solid as
-  you like.
+  you like. Type six hex digits, or tap the colour square to pick one.
 - Each calendar can be hidden, and can take the colour tock has for it on
   the laptop.
 - About, in the menu, says how to use it.

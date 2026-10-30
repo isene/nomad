@@ -45,7 +45,8 @@ A clock for the home screen, one row tall and the full width.
   screen, under "Widget: choose what a tap opens".
 - The wallpaper shows through the widget. "Widget: choose the
   background", at the bottom of outside's screen, puts a colour behind
-  it, as solid as you like.
+  it, as solid as you like. Type six hex digits, or tap the colour
+  square to pick one.
 
 The sun, the moon and the weather are for the place on outside's screen.
 Choose another place there, and the widget shows that place. With "Current

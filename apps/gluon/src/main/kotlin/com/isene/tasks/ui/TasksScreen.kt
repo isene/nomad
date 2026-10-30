@@ -1,5 +1,6 @@
 package com.isene.tasks.ui
 
+import com.isene.gluon.Swatch
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -426,7 +427,7 @@ private fun WidgetBackDialog(argb: Int, set: (Int) -> Unit, close: () -> Unit) {
                         modifier = Modifier.weight(1f),
                     )
                     Spacer(Modifier.width(16.dp))
-                    Box(Modifier.size(40.dp).background(Color(0xFF000000.toInt() or (rgb ?: 0))))
+                    Swatch(rgb ?: 0, 40.dp) { hex = "%06X".format(it) }
                 }
                 Text("Solid: ${(solid * 100).roundToInt()} %. At 0 the wallpaper shows through.")
                 Slider(value = solid, onValueChange = { solid = it })
@@ -477,7 +478,7 @@ private fun WidgetTextDialog(
                     val usual = categoryColor(cat, i, emptyMap())
                     val typed = hex[cat].orEmpty()
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(24.dp).background(Color(rgb(typed)?.let { 0xFF000000.toInt() or it } ?: usual)))
+                        Swatch(rgb(typed) ?: usual, 32.dp) { hex[cat] = "%06X".format(it) }
                         Spacer(Modifier.width(12.dp))
                         Text(cat, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         OutlinedTextField(

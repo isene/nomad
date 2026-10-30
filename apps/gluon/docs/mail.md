@@ -130,7 +130,7 @@ ran.
 
 The wallpaper shows through the widget. "Widget colours" in the menu
 puts a colour behind it, as solid as you like, and sets the colour of
-its header line.
+its header line. Type six hex digits, or tap a colour square to pick one.
 
 The scope picked in the app does not change it. Its header names
 the views it shows (`Work + Home + News  12`), or reads `Messages` when no

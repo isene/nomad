@@ -1,5 +1,6 @@
 package com.isene.mail.ui
 
+import com.isene.gluon.Swatch
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -704,7 +705,8 @@ private fun WidgetColoursDialog(argb: Int, head: Int, set: (Int, Int) -> Unit, c
     )
 }
 
-/** A hex field with a square of the colour it names beside it. */
+/** A hex field with a square of the colour it names beside it; a tap on
+ *  the square opens a picker. */
 @Composable
 private fun HexRow(label: String, hex: String, rgb: Int?, onHex: (String) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -716,7 +718,7 @@ private fun HexRow(label: String, hex: String, rgb: Int?, onHex: (String) -> Uni
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(16.dp))
-        Box(Modifier.size(40.dp).background(Color(0xFF000000.toInt() or (rgb ?: 0))))
+        Swatch(rgb ?: 0, 40.dp) { onHex("%06X".format(it)) }
     }
 }
 
