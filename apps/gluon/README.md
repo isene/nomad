@@ -6,7 +6,7 @@
 
 **[Download for Android (APK)](https://github.com/isene/nomad/releases/download/apk/gluon.apk)** · [how to install](https://isene.org/nomad/#get)
 
-![version](https://img.shields.io/badge/version-0.8.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.9.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Mail, calendar and tasks in one app, as
 [gluon](https://github.com/isene/gluon) has them on the laptop.
@@ -24,9 +24,9 @@ Four tabs at the bottom:
 
 - **Home**: drafts waiting on the laptop, the unread messages, the coming
   week's events and the tasks, on one screen. Tap a message or an event to open it in its tab.
-- **Messages**: your Gmail inboxes, feeds and chats, with a search over all
-  of Gmail, and instant mail with a notice per mail when you turn it
-  on. See [docs/mail.md](docs/mail.md).
+- **Messages**: your Gmail inboxes, feeds and chats, new mail sent straight
+  from the phone, a search over all of Gmail, and instant mail with a
+  notice per mail when you turn it on. See [docs/mail.md](docs/mail.md).
 - **Calendar**: the phone's calendars as a month and an agenda, with
   reminders. See [docs/tock.md](docs/tock.md).
 - **Tasks**: `~/.tasks/todo.hl` over Syncthing, with reminders for
