@@ -8,6 +8,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.util.Base64
 import java.util.Date
 import java.util.Properties
 import java.util.concurrent.TimeUnit
@@ -54,34 +56,7 @@ object Outbound {
         }
         val session = Session.getInstance(props)
         return runCatching {
-            val msg = MimeMessage(session).apply {
-                setFrom(InternetAddress(from))
-                setRecipients(javax.mail.Message.RecipientType.TO, InternetAddress.parse(to))
-                if (cc.isNotBlank()) {
-                    setRecipients(javax.mail.Message.RecipientType.CC, InternetAddress.parse(cc))
-                }
-                setSubject(subject, "UTF-8")
-                sentDate = Date()
-                if (inReplyTo.isNotEmpty()) {
-                    setHeader("In-Reply-To", "<$inReplyTo>")
-                    setHeader("References", references)
-                }
-                if (attachments.isEmpty()) {
-                    setText(body, "UTF-8")
-                } else {
-                    val parts = MimeMultipart("mixed")
-                    parts.addBodyPart(MimeBodyPart().apply { setText(body, "UTF-8") })
-                    for (att in attachments) {
-                        parts.addBodyPart(MimeBodyPart().apply {
-                            dataHandler = DataHandler(
-                                ByteArrayDataSource(att.bytes, att.mimeType.ifEmpty { "application/octet-stream" }),
-                            )
-                            fileName = att.filename
-                        })
-                    }
-                    setContent(parts)
-                }
-            }
+            val msg = message(session, from, to, cc, subject, body, inReplyTo, references, attachments)
             val t = session.getTransport("smtp")
             t.connect(SMTP_HOST, a.address, token)
             try { t.sendMessage(msg, msg.allRecipients) } finally { t.close() }
@@ -89,9 +64,71 @@ object Outbound {
         }.getOrElse { "Send failed: ${it.message ?: it.javaClass.simpleName}" }
     }
 
+    /**
+     * Microsoft 365: the same mail as [mail] builds, posted whole to
+     * Graph's sendMail with a token from [Oauth.graphToken]. It leaves
+     * from Microsoft as Outlook's mail does, and lands in Sent Items.
+     */
+    fun graphMail(
+        access: String, from: String, to: String, cc: String, subject: String, body: String,
+        inReplyTo: String, references: String, attachments: List<Attachment>,
+    ): String? = runCatching {
+        val raw = ByteArrayOutputStream().also {
+            message(Session.getInstance(Properties()), from, to, cc, subject, body, inReplyTo, references, attachments)
+                .writeTo(it)
+        }.toByteArray()
+        val req = Request.Builder()
+            .url("https://graph.microsoft.com/v1.0/me/sendMail")
+            .header("Authorization", "Bearer $access")
+            .post(Base64.getEncoder().encodeToString(raw).toRequestBody("text/plain".toMediaType()))
+            .build()
+        slowHttp.newCall(req).execute().use { r ->
+            if (r.isSuccessful) null else "Microsoft said ${r.code}: ${r.body?.string().orEmpty().take(160)}"
+        }
+    }.getOrElse { "Send failed: ${it.message ?: it.javaClass.simpleName}" }
+
+    private fun message(
+        session: Session, from: String, to: String, cc: String, subject: String, body: String,
+        inReplyTo: String, references: String, attachments: List<Attachment>,
+    ): MimeMessage = MimeMessage(session).apply {
+        setFrom(InternetAddress(from))
+        setRecipients(javax.mail.Message.RecipientType.TO, InternetAddress.parse(to))
+        if (cc.isNotBlank()) {
+            setRecipients(javax.mail.Message.RecipientType.CC, InternetAddress.parse(cc))
+        }
+        setSubject(subject, "UTF-8")
+        sentDate = Date()
+        if (inReplyTo.isNotEmpty()) {
+            setHeader("In-Reply-To", "<$inReplyTo>")
+            setHeader("References", references)
+        }
+        if (attachments.isEmpty()) {
+            setText(body, "UTF-8")
+        } else {
+            val parts = MimeMultipart("mixed")
+            parts.addBodyPart(MimeBodyPart().apply { setText(body, "UTF-8") })
+            for (att in attachments) {
+                parts.addBodyPart(MimeBodyPart().apply {
+                    dataHandler = DataHandler(
+                        ByteArrayDataSource(att.bytes, att.mimeType.ifEmpty { "application/octet-stream" }),
+                    )
+                    fileName = att.filename
+                })
+            }
+            setContent(parts)
+        }
+        saveChanges()
+    }
+
     private val http = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
+        .build()
+
+    /** For a mail with attachments, which takes longer to go up. */
+    private val slowHttp = http.newBuilder()
+        .writeTimeout(90, TimeUnit.SECONDS)
+        .readTimeout(90, TimeUnit.SECONDS)
         .build()
 
     /** One post to a channel, as the bot. */

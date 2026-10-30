@@ -20,6 +20,17 @@ data class Account(
     val refreshToken: String,
 )
 
+/**
+ * A Microsoft 365 login that sends one address through Graph, so its
+ * mail leaves from Microsoft as Outlook's does, not from Gmail.
+ */
+data class Graph(
+    val address: String,
+    val clientId: String,
+    val tenantId: String,
+    val refreshToken: String,
+)
+
 /** One subscribed feed. */
 data class Feed(val url: String, val title: String)
 
@@ -227,6 +238,32 @@ class Settings(ctx: Context) {
         get() = p.getString("last_from", "") ?: ""
         set(v) = p.edit().putString("last_from", v).apply()
 
+    /**
+     * The Microsoft 365 login, as `gluon-setup` writes it:
+     *
+     * ```json
+     * {"address": "…", "client_id": "…", "tenant_id": "…", "refresh_token": "…"}
+     * ```
+     *
+     * Microsoft hands out a new refresh token with every access token;
+     * [keepGraphToken] puts the newest here.
+     */
+    var graphJson: String
+        get() = p.getString("graph", "") ?: ""
+        set(v) = p.edit().putString("graph", v).apply()
+
+    fun graph(): Graph? = runCatching {
+        val o = JSONObject(graphJson)
+        Graph(
+            o.getString("address").lowercase(), o.getString("client_id"),
+            o.getString("tenant_id"), o.getString("refresh_token"),
+        )
+    }.getOrNull()
+
+    fun keepGraphToken(refreshToken: String) {
+        runCatching { graphJson = JSONObject(graphJson).put("refresh_token", refreshToken).toString(2) }
+    }
+
     /** The send-as lines, parsed: address to the login that sends it. */
     fun sendAs(): Map<String, String> = sendAsText.lines().mapNotNull { line ->
         val t = line.trim()
@@ -310,7 +347,8 @@ class Settings(ctx: Context) {
         feeds().size to "feed",
         channels().size to "channel",
     ).joinToString(" · ") { (n, what) -> "$n $what" + if (n == 1) "" else "s" } +
-        if (gatewayTreeUri.isEmpty()) " · no chat folder" else " · chats on"
+        (if (gatewayTreeUri.isEmpty()) " · no chat folder" else " · chats on") +
+        (graph()?.let { " · ${it.address} by Microsoft 365" } ?: "")
 }
 
 /**
@@ -329,6 +367,7 @@ fun Settings.loadSetup(ctx: Context, uri: Uri): String {
     o.optJSONObject("discord")?.let { discordJson = it.toString(2) }
     o.optString("views").takeIf { it.isNotBlank() }?.let { viewsText = it.trim() }
     o.optString("sendas").takeIf { it.isNotBlank() }?.let { sendAsText = it.trim() }
+    o.optJSONObject("graph")?.let { graphJson = it.toString(2) }
     val gone = runCatching { DocumentsContract.deleteDocument(ctx.contentResolver, uri) }.getOrDefault(false)
     return "Loaded: " + configSummary() + ". " +
         (if (gone) "The file is deleted." else "Delete the file now: it holds your logins.") +
