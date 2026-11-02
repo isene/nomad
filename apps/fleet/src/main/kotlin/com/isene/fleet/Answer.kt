@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -205,7 +206,8 @@ fun Answer(tag: String, close: () -> Unit) {
                     choice.remove(n)
                     notes.remove(n)
                     Board.drop(ctx, tag, n, t)
-                })
+                },
+                run = { Board.send(ctx, tag, it) })
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
             Column(Modifier.inSight(free), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedTextField(
@@ -231,14 +233,23 @@ fun Answer(tag: String, close: () -> Unit) {
  *  only the words written under it. */
 private val CHOICES = listOf("Y" to "yes", "N" to "no", "Rec" to "as recommended", "Info" to "", "Done" to "done")
 
+/** The first `! command` span of an item's text, as it is, or null. */
+fun command(text: String): String? =
+    text.split('`').filterIndexed { i, _ -> i % 2 == 1 }.firstOrNull { it.startsWith("!") }
+
 /** One open item: a chip for the answer, a second tap takes it back, and
  *  once one is picked a line for words to go with it. Drop takes it off
- *  the list without a word to the session, for one answered on the laptop. */
+ *  the list without a word to the session, for one answered on the laptop.
+ *  Run, on an item with a `! command`, sends that command once you confirm;
+ *  the laptop runs it only while it is an open move. */
 @Composable
-private fun Item(num: Int, text: String, pick: String?, note: String, choose: (String?) -> Unit, write: (String) -> Unit, drop: () -> Unit) {
+private fun Item(num: Int, text: String, pick: String?, note: String, choose: (String?) -> Unit, write: (String) -> Unit, drop: () -> Unit, run: (String) -> Unit) {
+    val cmd = remember(text) { command(text) }
+    var asking by remember(text) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("$num. $text", color = Color(0xFFFF8700), modifier = Modifier.weight(1f))
+            if (cmd != null) TextButton(onClick = { asking = true }) { Text("Run") }
             TextButton(onClick = drop) { Text("Drop") }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -253,6 +264,12 @@ private fun Item(num: Int, text: String, pick: String?, note: String, choose: (S
             modifier = Modifier.fillMaxWidth().inSight(note),
         )
     }
+    if (asking && cmd != null) AlertDialog(
+        onDismissRequest = { asking = false },
+        text = { Text("Run on the laptop: ${cmd.drop(1).trim()}?") },
+        confirmButton = { TextButton(onClick = { asking = false; run(cmd) }) { Text("Run") } },
+        dismissButton = { TextButton(onClick = { asking = false }) { Text("Cancel") } },
+    )
 }
 
 /** Keeps a field, and the button under it, in sight above the keyboard:

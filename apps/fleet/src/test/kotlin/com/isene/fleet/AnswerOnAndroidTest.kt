@@ -57,4 +57,12 @@ class AnswerOnAndroidTest {
         assertEquals("1: the key is in the drawer\n2 yes", reply(mapOf(1 to "", 2 to "yes"), mapOf(1 to " the key is in the drawer "), ""))
         assertEquals("", reply(mapOf(1 to ""), emptyMap(), ""))
     }
+
+    @Test
+    fun an_item_with_a_command_has_one_to_run() {
+        assertEquals("! /tmp/deploy.sh", command("`! /tmp/deploy.sh` uploads the pages."))
+        assertEquals("!  /tmp/a.sh x", command("Run `scribe x` first, then `!  /tmp/a.sh x`, then `! /tmp/b.sh`."))
+        assertNull("a span with no ! is no command", command("press `+` in kastrup"))
+        assertNull("no span, no command", command("! /tmp/deploy.sh without backticks"))
+    }
 }

@@ -37,6 +37,10 @@ phone twin of [fleet](https://github.com/isene/fleet).
   back only if the session's answer to it leaves it open.
 - Drop beside an item takes it off the list without waking the session,
   for one you answered on the laptop.
+- Run beside an item with a command in it (`` `! /tmp/deploy.sh` ``) asks
+  "Run on the laptop: /tmp/deploy.sh?" and sends "! /tmp/deploy.sh" to the
+  session. The laptop runs it only while it is one of that session's open
+  items.
 - Hold a session to write it a message. fleet on the laptop wakes the
   session with it once the session waits at its prompt.
 - Paste the address of your fleet connector once. It stays on the phone, and
