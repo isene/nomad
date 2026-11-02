@@ -28,7 +28,7 @@ phone twin of [fleet](https://github.com/isene/fleet).
   answer (your prompt while they work); the rest take one line. It is
   asked for only while the screen shows.
 - Tap a session for its last answer in full, drawn as HyperList with
-  the laptop's colours. Each open item has Y, N, Rec (sent as
+  the laptop's colours. Hold a word in it to select and copy text. Each open item has Y, N, Rec (sent as
   "as recommended"), Info and Done, with a line for words to go with it; Info
   sends the words alone ("3: the key is in the drawer"). A box below
   takes words of your own.

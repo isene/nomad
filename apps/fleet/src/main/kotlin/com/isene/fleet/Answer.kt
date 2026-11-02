@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -183,8 +184,13 @@ fun Answer(tag: String, close: () -> Unit) {
             when {
                 shown != null -> {
                     Text("Answer from ${clock(shown.t)}", style = MaterialTheme.typography.bodySmall, color = dim)
-                    for (l in lines(shown.text, dark)) {
-                        Text(l.text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = (l.depth * 14).dp))
+                    // Hold a word to select it, and drag across lines to copy them.
+                    SelectionContainer {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            for (l in lines(shown.text, dark)) {
+                                Text(l.text, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = (l.depth * 14).dp))
+                            }
+                        }
                     }
                 }
                 none -> Text("No answer kept for this session, or no word from the server.", color = dim)
