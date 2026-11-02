@@ -65,4 +65,13 @@ class AnswerOnAndroidTest {
         assertNull("a span with no ! is no command", command("press `+` in kastrup"))
         assertNull("no span, no command", command("! /tmp/deploy.sh without backticks"))
     }
+
+    @Test
+    fun a_waiting_call_is_read_whole() {
+        val a = parseBoard("""{"stamp": 7, "sessions": [{"tag": "ci", "ask": {"call": "toolu_1", "line": "Bash: git push", "full": "Bash: git push\n  --force"}}]}""")!!
+        val s = a.sessions!![0]
+        assertEquals(Triple("Bash: git push", "toolu_1", "Bash: git push\n  --force"), Triple(s.ask, s.call, s.full))
+        val b = parseBoard("""{"stamp": 8, "sessions": [{"tag": "ci", "ask": {"call": "", "line": "3 calls wait", "full": ""}}]}""")!!
+        assertEquals("several calls wait: no buttons", "", b.sessions!![0].call)
+    }
 }

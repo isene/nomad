@@ -350,6 +350,7 @@ private fun Seat(s: Session, scroll: ScrollState, open: () -> Unit, hold: () -> 
             val about = listOfNotNull(s.ws?.let { "WS $it" }, clock(s.at), s.ctx?.let { "${it}k" }, s.model.ifEmpty { null })
             Text(about.joinToString("   "), style = small, color = dim)
             if (s.ask.isNotEmpty()) Text("Waits for your yes: ${s.ask}", style = small, color = Color(0xFFFF8700), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Permission(s)
             val text = if (s.state == "working" || s.answer.isEmpty()) s.prompt else s.answer.lines().joinToString("\n") { it.trim() }
             if (text.isNotEmpty()) Text(text, style = small, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }

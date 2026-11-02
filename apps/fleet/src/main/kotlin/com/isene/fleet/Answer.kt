@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -24,6 +25,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -42,6 +44,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -181,6 +184,7 @@ fun Answer(tag: String, close: () -> Unit) {
             s?.ask?.takeIf { it.isNotEmpty() }?.let {
                 Text("Waits for your yes on the laptop: $it", color = Color(0xFFFF8700), fontWeight = FontWeight.Bold)
             }
+            s?.let { Permission(it) }
             val shown = full
             when {
                 shown != null -> {
@@ -227,6 +231,30 @@ fun Answer(tag: String, close: () -> Unit) {
             }
         }
     }
+}
+
+/** Allow and Deny for the permission dialog a session waits on, when one
+ *  call waits. Allow shows the whole call first; Deny goes at once. fleet
+ *  presses the key only while that same call waits, so a late tap does nothing. */
+@Composable
+fun Permission(s: Session) {
+    if (s.call.isEmpty()) return
+    val ctx = LocalContext.current
+    var asking by remember(s.call) { mutableStateOf(false) }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Button(onClick = { asking = true }) { Text("Allow") }
+        OutlinedButton(onClick = { Board.send(ctx, s.tag, "deny ${s.call}") }) { Text("Deny") }
+    }
+    if (asking) AlertDialog(
+        onDismissRequest = { asking = false },
+        title = { Text("Allow on the laptop?") },
+        text = {
+            Text(s.full, fontFamily = FontFamily.Monospace,
+                modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()))
+        },
+        confirmButton = { TextButton(onClick = { asking = false; Board.send(ctx, s.tag, "allow ${s.call}") }) { Text("Allow") } },
+        dismissButton = { TextButton(onClick = { asking = false }) { Text("Cancel") } },
+    )
 }
 
 /** Each chip and the words it sends. Rec is "as recommended"; Info sends

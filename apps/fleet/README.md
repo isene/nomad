@@ -35,6 +35,10 @@ phone twin of [fleet](https://github.com/isene/fleet).
   Send goes out as one message, as you would type it ("3 yes", "5 no:
   not today"). The items it answers leave the screen at once. One comes
   back only if the session's answer to it leaves it open.
+- A session held by a permission dialog shows Allow and Deny, in the list
+  and on its answer screen. Allow first shows the whole call; Deny goes at
+  once. fleet on the laptop presses the key only while that call still
+  waits. With several calls waiting there are no buttons.
 - Drop beside an item takes it off the list without waking the session,
   for one you answered on the laptop.
 - Run beside an item with a command in it (`` `! /tmp/deploy.sh` ``) asks
