@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.net.ConnectivityManager
 import android.net.Network
+import android.net.NetworkCapabilities
 import android.os.IBinder
 import androidx.compose.runtime.mutableStateOf
 import java.time.LocalTime
@@ -122,6 +123,7 @@ class Watch : Service() {
         // first answer.
         var known = -1
         var pause = PAUSE_MS
+        val outage = Outage()
         try {
             while (running && store.on) {
                 back.clear()
@@ -130,13 +132,17 @@ class Watch : Service() {
                 val heard = ask(asking(store.address, since, if (cursor < 0) 0 else WAIT_S, phone))
                 if (!running) break
                 if (heard == null) {
-                    val again = LocalTime.now().plusSeconds(pause / 1000).format(DateTimeFormatter.ofPattern("HH:mm"))
+                    val now = System.currentTimeMillis()
+                    if (outage.failed(now, online())) ring(this, Done("server", now / 1000, "alert", "", "The fleet server does not answer"))
+                    val wait = minOf(pause, maxOf(outage.left(now), 1000))
+                    val again = LocalTime.now().plusSeconds(wait / 1000).format(DateTimeFormatter.ofPattern("HH:mm"))
                     status.value = "No answer from the server. Trying again at $again."
-                    back.poll(pause, TimeUnit.MILLISECONDS)
+                    back.poll(wait, TimeUnit.MILLISECONDS)
                     pause = minOf(pause * 2, MAX_PAUSE_MS)
                     continue
                 }
                 pause = PAUSE_MS
+                if (outage.answered()) ring(this, Done("server", System.currentTimeMillis() / 1000, "alert", "", "The fleet server answers again"))
                 status.value = "Listening."
                 if (cursor >= 0) ringing(heard.events, store.eta, store.every).forEach { ring(this, it) }
                 heard.waiting?.let { n ->
@@ -148,6 +154,12 @@ class Watch : Service() {
         } catch (_: InterruptedException) {
         }
         if (running) stopSelf()
+    }
+
+    /** Whether the phone's own network works, as Android checked it. */
+    private fun online(): Boolean {
+        val cm = getSystemService(ConnectivityManager::class.java)
+        return cm.getNetworkCapabilities(cm.activeNetwork)?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
     }
 
     /** One request. Null on any fault; nothing about it is logged, since
@@ -192,8 +204,10 @@ class Watch : Service() {
         /** The buzz: one notice per session, replaced by its next one. A
          *  session can finish twice within a minute when the style hook
          *  sends its answer back; the second does not buzz again while the
-         *  first is still shown. */
+         *  first is still shown. A server alert is red, has a notice of its
+         *  own for each line, and a tap opens the list. */
         fun ring(ctx: Context, d: Done) {
+            val alert = d.kind == "alert"
             val n = Notification.Builder(ctx, DONE)
                 .setSmallIcon(R.drawable.ic_notice)
                 .setContentTitle(title(d))
@@ -203,20 +217,22 @@ class Watch : Service() {
                 .setShowWhen(true)
                 // A dialog that waits buzzes even over the session's
                 // last notice, and is orange like an open item.
-                .setOnlyAlertOnce(d.kind != "ask")
+                .setOnlyAlertOnce(d.kind != "ask" && !alert)
                 .apply { if (d.kind == "ask") setColor(0xFFFF8700.toInt()) }
+                .apply { if (alert) setColor(0xFFFF0000.toInt()) }
                 .setAutoCancel(true)
                 .setContentIntent(
                     PendingIntent.getActivity(
                         ctx, d.tag.hashCode(),
-                        Intent(ctx, MainActivity::class.java).putExtra(SESSION, d.tag).addFlags(
+                        Intent(ctx, MainActivity::class.java).apply { if (!alert) putExtra(SESSION, d.tag) }.addFlags(
                             Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP,
                         ),
                         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
                     ),
                 )
                 .build()
-            ctx.getSystemService(NotificationManager::class.java).notify(d.tag, 0, n)
+            val nm = ctx.getSystemService(NotificationManager::class.java)
+            if (alert) nm.notify("alert", d.line.hashCode(), n) else nm.notify(d.tag, 0, n)
         }
 
         /** The notice for messages the laptop sessions wrote to the phone,

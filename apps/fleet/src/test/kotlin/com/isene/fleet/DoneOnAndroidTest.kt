@@ -124,4 +124,41 @@ class DoneOnAndroidTest {
             assertTrue(p, "android.permission.$p" in listed)
         }
     }
+
+    @Test
+    fun a_server_alert_rings_whatever_the_switches_and_opens_the_list() {
+        val down = Done("relay1", 200, "alert", "", "relay1: weechat: not running")
+        val back = down.copy(t = 260, line = "relay1: weechat works again")
+        assertEquals(listOf(down), ringing(listOf(down), eta = false, every = false))
+        assertEquals("Server check", title(down))
+        val ctx = RuntimeEnvironment.getApplication()
+        Watch.channel(ctx)
+        Watch.ring(ctx, down)
+        Watch.ring(ctx, back)
+        val shown = ctx.getSystemService(NotificationManager::class.java).activeNotifications.filter { it.tag == "alert" }
+        assertEquals("each line has its own notice", 2, shown.size)
+        val n = shown.first { it.notification.extras.getCharSequence(Notification.EXTRA_TEXT).toString() == down.line }.notification
+        assertEquals(0xFFFF0000.toInt(), n.color)
+        assertTrue(n.flags and Notification.FLAG_ONLY_ALERT_ONCE == 0)
+        assertNull("no session to open", shadowOf(n.contentIntent).savedIntent.getStringExtra(Watch.SESSION))
+    }
+
+    @Test
+    fun the_server_is_said_out_after_ten_minutes_once_and_back_once() {
+        val o = Outage()
+        assertTrue("no answer before is no news", !o.answered())
+        assertTrue(!o.failed(0, online = true))
+        assertEquals(600_000L - 30_000, o.left(30_000))
+        assertTrue(!o.failed(599_000, online = true))
+        assertTrue(o.failed(600_000, online = true))
+        assertTrue("once", !o.failed(900_000, online = true))
+        assertTrue(o.answered())
+        assertTrue("once", !o.answered())
+        // A phone with no network of its own starts the count again.
+        assertTrue(!o.failed(1_000_000, online = true))
+        assertTrue(!o.failed(1_500_000, online = false))
+        assertTrue(!o.failed(1_700_000, online = true))
+        assertTrue(!o.failed(2_200_000, online = true))
+        assertTrue(o.failed(2_300_000, online = true))
+    }
 }

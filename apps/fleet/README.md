@@ -39,6 +39,11 @@ phone twin of [fleet](https://github.com/isene/fleet).
   and on its answer screen. Allow first shows the whole call; Deny goes at
   once. fleet on the laptop presses the key only while that call still
   waits. With several calls waiting there are no buttons.
+- A failed or recovered server check (kind "alert" from the fleet server)
+  buzzes with a red notice, whatever the switches say, and shows its line
+  as it is. When the fleet server itself gives no answer for ten minutes
+  while the phone has a working network, a notice says so once, and once
+  more when it answers again.
 - Drop beside an item takes it off the list without waking the session,
   for one you answered on the laptop.
 - Run beside an item with a command in it (`` `! /tmp/deploy.sh` ``) asks
