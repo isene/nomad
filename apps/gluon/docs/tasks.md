@@ -11,6 +11,8 @@ shows up on the other — no Google account, no cloud middleman.
 
 - Two-level hyperlist (categories → items), parsed and serialized by the Rust core
 - Add / edit / complete / delete items; categories collapse
+- The ⋮ menu on an item sets its todo marker: `[_]` open, `[O]` in
+  progress, `[x]` done. An item without one gets it in front.
 - **Reminders**: "Add a reminder" under an item's text picks a day and a time,
   and the phone notifies you then. It is written into the list the HyperList
   way, `2026-10-17 09.00: Call Alice`, so a stamp typed in scribe works too

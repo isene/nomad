@@ -81,7 +81,9 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.isene.gluon.BuildConfig
 import com.isene.tasks.data.Row as TaskRow
 import com.isene.tasks.data.flatRows
+import com.isene.tasks.viewmodel.MARKERS
 import com.isene.tasks.viewmodel.TasksViewModel
+import com.isene.tasks.viewmodel.markerOf
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
@@ -250,6 +252,7 @@ fun TasksScreen(vm: TasksViewModel) {
                                         onMoveUp = { vm.moveItemUp(row.catIdx, row.itemIdx) },
                                         onMoveDown = { vm.moveItemDown(row.catIdx, row.itemIdx) },
                                         onMoveToCat = { moveItemTo = row.catIdx to row.itemIdx },
+                                        onMarker = { m -> vm.setMarker(row.catIdx, row.itemIdx, m) },
                                         onDelete = { vm.deleteItem(row.catIdx, row.itemIdx) },
                                         dragHandle = Modifier.draggableHandle(onDragStopped = { vm.onDragEnd() }),
                                     )
@@ -676,6 +679,7 @@ private fun ItemRow(
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
     onMoveToCat: () -> Unit,
+    onMarker: (String) -> Unit,
     onDelete: () -> Unit,
     dragHandle: Modifier = Modifier,
 ) {
@@ -731,6 +735,14 @@ private fun ItemRow(
                 leadingIcon = { Icon(Icons.Filled.DriveFileMove, null) },
                 onClick = { menuOpen = false; onMoveToCat() },
             )
+            val now = markerOf(item.text)
+            MARKERS.zip(listOf("Open", "In progress", "Done")).forEach { (m, name) ->
+                DropdownMenuItem(
+                    text = { Text("$m  $name") },
+                    enabled = m != now,
+                    onClick = { menuOpen = false; onMarker(m) },
+                )
+            }
             DropdownMenuItem(
                 text = { Text("Delete") },
                 leadingIcon = { Icon(Icons.Filled.Delete, null) },

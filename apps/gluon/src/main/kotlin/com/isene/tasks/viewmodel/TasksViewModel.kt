@@ -37,6 +37,16 @@ private const val KEY_URI = "doc_uri"
 private const val KEY_COLLAPSED = "collapsed_categories"
 private const val KEY_WIDGET_BACK = "widget_back"
 
+/** The HyperList todo markers, in the order the item menu shows them. */
+val MARKERS = listOf("[_]", "[O]", "[x]")
+
+/** The todo marker [text] starts with, or null when it has none. */
+fun markerOf(text: String): String? = MARKERS.firstOrNull { text.startsWith("$it ") }
+
+/** [text] with its todo marker swapped for [marker], or put in front. */
+fun withMarker(text: String, marker: String): String =
+    "$marker ${markerOf(text)?.let { text.drop(it.length + 1) } ?: text}"
+
 data class UiState(
     val pickedUri: Uri? = null,
     val displayName: String? = null,
@@ -171,6 +181,11 @@ class TasksViewModel(app: Application) : AndroidViewModel(app) {
 
     fun renameItem(catIdx: Int, itemIdx: Int, newText: String) =
         apply { rustRenameItem(it, catIdx.toUInt(), itemIdx.toUInt(), newText) }
+
+    fun setMarker(catIdx: Int, itemIdx: Int, marker: String) = apply {
+        val text = it.categories.getOrNull(catIdx)?.items?.getOrNull(itemIdx)?.text ?: return@apply it
+        rustRenameItem(it, catIdx.toUInt(), itemIdx.toUInt(), withMarker(text, marker))
+    }
 
     fun deleteItem(catIdx: Int, itemIdx: Int) =
         apply { rustDeleteItem(it, catIdx.toUInt(), itemIdx.toUInt()) }
