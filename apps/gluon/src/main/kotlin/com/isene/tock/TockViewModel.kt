@@ -60,6 +60,8 @@ data class Ui(
     val page: Page = Page.Main,
     /** One line to tell the user, shown once. */
     val notice: String = "",
+    /** True while Save is at work, so a second tap makes no second event. */
+    val saving: Boolean = false,
 )
 
 class TockViewModel(app: Application) : AndroidViewModel(app) {
@@ -248,19 +250,35 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun save(d: Draft) {
+        if (!startSaving()) return
         viewModelScope.launch {
-            val ok = withContext(Dispatchers.IO) {
-                runCatching { Phone.save(getApplication(), d, ZoneId.systemDefault()) }.getOrDefault(false)
+            try {
+                write(d)
+            } finally {
+                _ui.update { it.copy(saving = false) }
             }
-            if (!ok) {
-                say("The phone did not take the event")
-                return@launch
-            }
-            if (d.id == null) settings.last = d.calendarId
-            _ui.update { it.copy(page = Page.Main) }
-            pick(d.start.toLocalDate())
-            load()
         }
+    }
+
+    /** False when a save is already at work. */
+    private fun startSaving(): Boolean {
+        if (_ui.value.saving) return false
+        _ui.update { it.copy(saving = true) }
+        return true
+    }
+
+    private suspend fun write(d: Draft) {
+        val ok = withContext(Dispatchers.IO) {
+            runCatching { Phone.save(getApplication(), d, ZoneId.systemDefault()) }.getOrDefault(false)
+        }
+        if (!ok) {
+            say("The phone did not take the event")
+            return
+        }
+        if (d.id == null) settings.last = d.calendarId
+        _ui.update { it.copy(page = Page.Main) }
+        pick(d.start.toLocalDate())
+        load()
     }
 
     /** A new Teams meeting: made in the Microsoft 365 calendar with the
@@ -268,24 +286,33 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
      *  there. Without that login, or when it may not write the calendar,
      *  Teams gets the meeting as a link to finish it in. */
     fun teams(d: Draft) {
+        if (!startSaving()) return
         viewModelScope.launch {
-            val mail = com.isene.mail.data.Settings(getApplication())
-            val g = mail.graph()
-            val token = g?.let { withContext(Dispatchers.IO) { com.isene.mail.data.Oauth.graphToken(it, com.isene.mail.data.Oauth.CALENDARS) } }
-            if (token == null) {
-                openTeams(d)
-                return@launch
+            try {
+                meet(d)
+            } finally {
+                _ui.update { it.copy(saving = false) }
             }
-            mail.keepGraphToken(token.second)
-            val err = withContext(Dispatchers.IO) { Phone.teamsMeeting(token.first, d, ZoneId.systemDefault()) }
-            if (err != null) {
-                say(err)
-                return@launch
-            }
-            say("Teams meeting made; the guests get the invitation")
-            _ui.update { it.copy(page = Page.Main) }
-            Phone.sync(getApplication())
         }
+    }
+
+    private suspend fun meet(d: Draft) {
+        val mail = com.isene.mail.data.Settings(getApplication())
+        val g = mail.graph()
+        val token = g?.let { withContext(Dispatchers.IO) { com.isene.mail.data.Oauth.graphToken(it, com.isene.mail.data.Oauth.CALENDARS) } }
+        if (token == null) {
+            openTeams(d)
+            return
+        }
+        mail.keepGraphToken(token.second)
+        val err = withContext(Dispatchers.IO) { Phone.teamsMeeting(token.first, d, ZoneId.systemDefault()) }
+        if (err != null) {
+            say(err)
+            return
+        }
+        say("Teams meeting made; the guests get the invitation")
+        _ui.update { it.copy(page = Page.Main) }
+        Phone.sync(getApplication())
     }
 
     private fun openTeams(d: Draft) {

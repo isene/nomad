@@ -219,4 +219,17 @@ class AnswerOnAndroidTest {
         assertEquals("bob@example.com", guests.getJSONObject(1).getJSONObject("emailAddress").getString("address"))
         assertEquals(10, body.getInt("reminderMinutesBeforeStart"))
     }
+
+    @Test
+    fun a_second_tap_on_save_makes_no_second_event() {
+        val vm = TockViewModel(app)
+        val at = LocalDateTime.of(2026, 11, 6, 10, 0)
+        val d = Draft(id = null, calendarId = 1, title = "Coffee", start = at, end = at.plusHours(1), remind = null)
+        vm.save(d)
+        vm.save(d)
+        val main = org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper())
+        repeat(200) { if (vm.ui.value.saving) { Thread.sleep(10); main.idle() } }
+        assertFalse(vm.ui.value.saving)
+        assertEquals(1, store.writes.count { (uri, v) -> uri == Events.CONTENT_URI && v.getAsString(Events.TITLE) == "Coffee" })
+    }
 }

@@ -407,7 +407,7 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
                 },
                 navigationIcon = { IconButton(onClick = { vm.back() }) { Icon(Icons.Default.Close, "Cancel") } },
                 actions = {
-                    TextButton(onClick = {
+                    TextButton(enabled = !ui.saving, onClick = {
                         // A name that is not one person's address is asked again.
                         val typed = guestPieces(guests)
                         val unclear = typed.firstOrNull { guestOf(it) == null && suggest(people, it).size != 1 }
@@ -423,7 +423,7 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
                             )
                             if (toTeams) vm.teams(d) else vm.save(d)
                         }
-                    }) { Text("Save") }
+                    }) { Text(if (ui.saving) "Saving…" else "Save") }
                 },
             )
         },
