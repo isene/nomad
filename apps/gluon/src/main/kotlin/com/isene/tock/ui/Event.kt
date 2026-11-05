@@ -423,7 +423,7 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
                             )
                             if (toTeams) vm.teams(d) else vm.save(d)
                         }
-                    }) { Text(if (toTeams) "Teams" else "Save") }
+                    }) { Text("Save") }
                 },
             )
         },

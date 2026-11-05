@@ -17,6 +17,12 @@ import android.provider.CalendarContract.Events
 import android.provider.CalendarContract.Instances
 import android.provider.CalendarContract.Reminders
 import androidx.core.content.edit
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONArray
+import org.json.JSONObject
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -286,7 +292,7 @@ object Phone {
             if (cr.update(ContentUris.withAppendedId(Events.CONTENT_URI, d.id), values, null, null) == 0) return false
             d.id
         }
-        if (d.instance == null) d.guests?.let { guests(cr, id, it) }
+        d.guests?.let { guests(cr, id, it) }
         // The screen shows the first reminder. One that was left as it was
         // is not written again, so an event keeps a second reminder.
         if (reminders(ctx, id).minOrNull() != d.remind) {
@@ -454,6 +460,48 @@ object Phone {
             null, null,
         ) > 0
     }
+
+    /** What Microsoft 365 is sent for a new Teams meeting: the event, its
+     *  guests, and a Teams link that Outlook puts in the invitation. The
+     *  times go as UTC, which Graph takes without a zone table. */
+    fun meetingBody(d: Draft, zone: ZoneId): JSONObject {
+        fun at(t: LocalDateTime) = JSONObject()
+            .put("dateTime", t.atZone(zone).withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime().toString())
+            .put("timeZone", "UTC")
+        val guests = JSONArray()
+        for ((name, address) in d.guests.orEmpty().mapNotNull { guestOf(it) }) {
+            val who = JSONObject().put("address", address)
+            if (name.isNotEmpty()) who.put("name", name)
+            guests.put(JSONObject().put("emailAddress", who).put("type", "required"))
+        }
+        return JSONObject()
+            .put("subject", d.title.trim())
+            .put("body", JSONObject().put("contentType", "text").put("content", d.notes))
+            .put("start", at(d.start))
+            .put("end", at(d.end))
+            .put("location", JSONObject().put("displayName", d.place.trim()))
+            .put("attendees", guests)
+            .put("isOnlineMeeting", true)
+            .put("onlineMeetingProvider", "teamsForBusiness")
+            .put("isReminderOn", d.remind != null)
+            .put("reminderMinutesBeforeStart", d.remind ?: 0)
+    }
+
+    /** Make the Teams meeting in the Microsoft 365 calendar, which mails
+     *  the guests; the phone's work calendar syncs it after. Null when it
+     *  is made, else what went wrong. Blocking. */
+    fun teamsMeeting(access: String, d: Draft, zone: ZoneId): String? = runCatching {
+        val req = Request.Builder()
+            .url("https://graph.microsoft.com/v1.0/me/events")
+            .header("Authorization", "Bearer $access")
+            .post(meetingBody(d, zone).toString().toRequestBody("application/json".toMediaType()))
+            .build()
+        http.newCall(req).execute().use { r ->
+            if (r.isSuccessful) null else "Microsoft said ${r.code}: ${r.body?.string().orEmpty().take(160)}"
+        }
+    }.getOrElse { "No meeting made: ${it.message ?: it.javaClass.simpleName}" }
+
+    private val http = OkHttpClient()
 
     /** Ask each account to fetch its calendars now. The phone does this by
      *  itself too, but it can take hours. */

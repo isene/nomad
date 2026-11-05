@@ -18,6 +18,10 @@ object Oauth {
 
     private val cache = HashMap<String, Token>()
 
+    const val MAIL_SEND = "https://graph.microsoft.com/Mail.Send"
+    /** For a Teams meeting made from the calendar. */
+    const val CALENDARS = "https://graph.microsoft.com/Calendars.ReadWrite"
+
     /** Blocking. Call on Dispatchers.IO. */
     @Synchronized
     fun accessToken(a: Account): String? {
@@ -42,16 +46,16 @@ object Oauth {
     }
 
     /**
-     * Microsoft 365: an access token for sending mail, and the refresh
+     * Microsoft 365: an access token for sending mail (or for `scope`), and the refresh
      * token to use next time (Microsoft hands out a new one each time).
      * Not cached: it is asked for once per mail sent. Blocking.
      */
-    fun graphToken(g: Graph): Pair<String, String>? {
+    fun graphToken(g: Graph, scope: String = MAIL_SEND): Pair<String, String>? {
         val body = FormBody.Builder()
             .add("client_id", g.clientId)
             .add("refresh_token", g.refreshToken)
             .add("grant_type", "refresh_token")
-            .add("scope", "https://graph.microsoft.com/Mail.Send offline_access")
+            .add("scope", "$scope offline_access")
             .build()
         val req = Request.Builder()
             .url("https://login.microsoftonline.com/${g.tenantId}/oauth2/v2.0/token")

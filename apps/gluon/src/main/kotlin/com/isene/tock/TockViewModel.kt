@@ -237,8 +237,8 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
             // A repeating event is changed from one time: that time alone,
             // or with the later ones.
             instance = if (s.repeats) s.begin else null, later = later,
-            // The guests of the user's own event, not of a repeating one.
-            guests = if (more.mine && !s.repeats) {
+            // The guests of the user's own event.
+            guests = if (more.mine) {
                 more.guests.filter { !it.self }.map { if (it.name == it.email) it.email else "${it.name.replace(",", "")} <${it.email}>" }
             } else {
                 null
@@ -263,9 +263,32 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Hand a new event to Teams, which makes it a Teams meeting in the
-     *  work calendar. tock itself saves nothing. */
+    /** A new Teams meeting: made in the Microsoft 365 calendar with the
+     *  login the phone sends Dualog mail with, and the guests mailed from
+     *  there. Without that login, or when it may not write the calendar,
+     *  Teams gets the meeting as a link to finish it in. */
     fun teams(d: Draft) {
+        viewModelScope.launch {
+            val mail = com.isene.mail.data.Settings(getApplication())
+            val g = mail.graph()
+            val token = g?.let { withContext(Dispatchers.IO) { com.isene.mail.data.Oauth.graphToken(it, com.isene.mail.data.Oauth.CALENDARS) } }
+            if (token == null) {
+                openTeams(d)
+                return@launch
+            }
+            mail.keepGraphToken(token.second)
+            val err = withContext(Dispatchers.IO) { Phone.teamsMeeting(token.first, d, ZoneId.systemDefault()) }
+            if (err != null) {
+                say(err)
+                return@launch
+            }
+            say("Teams meeting made; the guests get the invitation")
+            _ui.update { it.copy(page = Page.Main) }
+            Phone.sync(getApplication())
+        }
+    }
+
+    private fun openTeams(d: Draft) {
         val open = Intent(Intent.ACTION_VIEW, Uri.parse(teamsLink(d, ZoneId.systemDefault())))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (runCatching { getApplication<Application>().startActivity(open) }.isFailure) {

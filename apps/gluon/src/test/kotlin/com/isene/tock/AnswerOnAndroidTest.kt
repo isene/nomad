@@ -187,4 +187,36 @@ class AnswerOnAndroidTest {
         assertTrue(Phone.save(app, edit(null), ZoneId.of("Europe/Oslo")))
         assertEquals(2, store.writes.size)
     }
+
+    @Test
+    fun one_time_of_a_repeating_event_gets_its_own_guests() {
+        val d = edit(listOf("bob@example.com")).copy(instance = meeting(repeats = true).begin)
+        assertTrue(Phone.save(app, d, ZoneId.of("Europe/Oslo")))
+        assertEquals(ContentUris.withAppendedId(Events.CONTENT_EXCEPTION_URI, 5), store.writes[0].first)
+        // The store answers every guest query with the series' list.
+        assertEquals(ContentUris.withAppendedId(Attendees.CONTENT_URI, 7), store.writes[1].first)
+        assertEquals("bob@example.com", store.writes[2].second.getAsString(Attendees.ATTENDEE_EMAIL))
+        assertEquals(99L, store.writes[2].second.getAsLong(Attendees.EVENT_ID))
+    }
+
+    @Test
+    fun a_teams_meeting_for_microsoft_has_the_guests_and_utc_times() {
+        val start = LocalDateTime.of(2026, 11, 6, 9, 0)
+        val d = Draft(
+            calendarId = 1, title = " Plan ", start = start, end = start.plusMinutes(30), place = "Room 2",
+            notes = "Agenda", remind = 10, guests = listOf("Alice <alice@example.com>", "bob@example.com"),
+        )
+        val body = Phone.meetingBody(d, ZoneId.of("Europe/Oslo"))
+        assertEquals("Plan", body.getString("subject"))
+        assertEquals("2026-11-06T08:00", body.getJSONObject("start").getString("dateTime"))
+        assertEquals("UTC", body.getJSONObject("end").getString("timeZone"))
+        assertEquals("2026-11-06T08:30", body.getJSONObject("end").getString("dateTime"))
+        assertTrue(body.getBoolean("isOnlineMeeting"))
+        assertEquals("teamsForBusiness", body.getString("onlineMeetingProvider"))
+        val guests = body.getJSONArray("attendees")
+        assertEquals(2, guests.length())
+        assertEquals("Alice", guests.getJSONObject(0).getJSONObject("emailAddress").getString("name"))
+        assertEquals("bob@example.com", guests.getJSONObject(1).getJSONObject("emailAddress").getString("address"))
+        assertEquals(10, body.getInt("reminderMinutesBeforeStart"))
+    }
 }
