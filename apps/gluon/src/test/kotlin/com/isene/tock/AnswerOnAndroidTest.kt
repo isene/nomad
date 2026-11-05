@@ -69,7 +69,10 @@ class AnswerOnAndroidTest {
             return ContentUris.withAppendedId(Events.CONTENT_URI, 99)
         }
 
-        override fun delete(uri: Uri, selection: String?, args: Array<String>?) = 0
+        override fun delete(uri: Uri, selection: String?, args: Array<String>?): Int {
+            writes += uri to ContentValues()
+            return 1
+        }
 
         override fun getType(uri: Uri): String? = null
     }
@@ -150,5 +153,38 @@ class AnswerOnAndroidTest {
         assertTrue(guests.all { it.getAsLong(Attendees.EVENT_ID) == 99L })
         assertEquals(listOf("Alice", ""), guests.map { it.getAsString(Attendees.ATTENDEE_NAME) })
         assertEquals(Attendees.ATTENDEE_STATUS_INVITED, guests[0].getAsInteger(Attendees.ATTENDEE_STATUS))
+    }
+
+    private fun edit(guests: List<String>?) = LocalDateTime.of(2026, 10, 21, 11, 0).let {
+        Draft(id = 5, calendarId = 1, title = "Plans", start = it, end = it.plusHours(1), remind = null, guests = guests)
+    }
+
+    @Test
+    fun a_new_guest_is_invited_and_the_others_stay() {
+        assertTrue(Phone.save(app, edit(listOf("Alice <alice@example.com>", "Bob <bob@example.com>")), ZoneId.of("Europe/Oslo")))
+        val (eventUri, event) = store.writes[0]
+        assertEquals(ContentUris.withAppendedId(Events.CONTENT_URI, 5), eventUri)
+        assertEquals(1, event.getAsInteger(Events.HAS_ATTENDEE_DATA))
+        val (uri, bob) = store.writes.drop(1).single()
+        assertEquals(Attendees.CONTENT_URI, uri)
+        assertEquals(5L, bob.getAsLong(Attendees.EVENT_ID))
+        assertEquals("Bob", bob.getAsString(Attendees.ATTENDEE_NAME))
+        assertEquals("bob@example.com", bob.getAsString(Attendees.ATTENDEE_EMAIL))
+        assertEquals(Attendees.ATTENDEE_STATUS_INVITED, bob.getAsInteger(Attendees.ATTENDEE_STATUS))
+    }
+
+    @Test
+    fun a_guest_left_out_comes_off_but_never_the_user() {
+        assertTrue(Phone.save(app, edit(emptyList()), ZoneId.of("Europe/Oslo")))
+        val (uri, _) = store.writes.drop(1).single()
+        assertEquals(ContentUris.withAppendedId(Attendees.CONTENT_URI, 7), uri)
+    }
+
+    @Test
+    fun a_guest_list_as_it_was_or_left_alone_writes_nothing() {
+        assertTrue(Phone.save(app, edit(listOf("alice@EXAMPLE.com")), ZoneId.of("Europe/Oslo")))
+        assertEquals(1, store.writes.size)
+        assertTrue(Phone.save(app, edit(null), ZoneId.of("Europe/Oslo")))
+        assertEquals(2, store.writes.size)
     }
 }

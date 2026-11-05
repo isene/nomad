@@ -223,7 +223,7 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
         } else {
             ui.selected.atTime(9, 0)
         }
-        _ui.update { it.copy(page = Page.Edit(Draft(calendarId = into.id, start = start, end = start.plusHours(1)))) }
+        _ui.update { it.copy(page = Page.Edit(Draft(calendarId = into.id, start = start, end = start.plusHours(1), guests = emptyList()))) }
     }
 
     /** Change an event. A repeating one is not offered here. */
@@ -237,6 +237,12 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
             // A repeating event is changed from one time: that time alone,
             // or with the later ones.
             instance = if (s.repeats) s.begin else null, later = later,
+            // The guests of the user's own event, not of a repeating one.
+            guests = if (more.mine && !s.repeats) {
+                more.guests.filter { !it.self }.map { if (it.name == it.email) it.email else "${it.name.replace(",", "")} <${it.email}>" }
+            } else {
+                null
+            },
         )
         _ui.update { it.copy(page = Page.Edit(draft)) }
     }
@@ -368,7 +374,14 @@ class TockViewModel(app: Application) : AndroidViewModel(app) {
         say("Asked the accounts to sync")
     }
 
-    private fun say(text: String) = _ui.update { it.copy(notice = text) }
+    fun say(text: String) = _ui.update { it.copy(notice = text) }
+
+    /** Who a guest can be typed as: the people mail came from. */
+    suspend fun people(): List<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            com.isene.tock.people(com.isene.mail.data.Store.load(getApplication()).filter { it.source == "mail" }.sortedByDescending { it.date }.map { it.from })
+        }.getOrDefault(emptyList())
+    }
 
     fun said() = _ui.update { it.copy(notice = "") }
 

@@ -229,5 +229,38 @@ fun teamsLink(d: Draft, zone: ZoneId): String {
         "?subject=" + enc(d.title.trim()) +
         "&startTime=" + enc(d.start.atZone(zone).format(at)) +
         "&endTime=" + enc(d.end.atZone(zone).format(at)) +
-        "&content=" + enc(d.notes)
+        "&content=" + enc(d.notes) +
+        d.guests.orEmpty().mapNotNull { guestOf(it)?.second }.let { if (it.isEmpty()) "" else "&attendees=" + enc(it.joinToString(",")) }
+}
+
+/** A guest as picked or typed, "Alice <alice@example.com>" or a bare
+ *  address: its name and its address, or null when it has no address. */
+fun guestOf(entry: String): Pair<String, String>? {
+    val s = entry.trim()
+    val address = if ('<' in s) s.substringAfter('<').substringBefore('>').trim() else s
+    if (!Regex("[^@\\s<>,]+@[^@\\s<>,]+\\.[^@\\s<>,]+").matches(address)) return null
+    return (if ('<' in s) s.substringBefore('<').trim().trim('"') else "") to address
+}
+
+/** The guests in the field, split at its commas. */
+fun guestPieces(text: String): List<String> = text.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+
+/** The people mail came from, newest first, once each, as "Name <address>":
+ *  who a guest can be typed as. A comma in a name would split the field,
+ *  so it goes, and so do senders nobody can answer. */
+fun people(froms: List<String>): List<String> {
+    val seen = HashSet<String>()
+    return froms.mapNotNull { guestOf(it) }
+        .filter { (_, address) -> !Regex("no-?reply|donotreply|mailer-daemon", RegexOption.IGNORE_CASE).containsMatchIn(address) }
+        .filter { (_, address) -> seen.add(address.lowercase()) }
+        .map { (name, address) -> if (name.isEmpty()) address else "${name.replace(",", "")} <$address>" }
+}
+
+/** Up to four people whose name or address has every word of the guest
+ *  being typed, the text after the last comma. */
+fun suggest(people: List<String>, text: String): List<String> {
+    val typed = text.substringAfterLast(',').trim()
+    if (typed.length < 2 || '<' in typed) return emptyList()
+    val words = typed.lowercase().split(Regex("\\s+"))
+    return people.filter { p -> p.lowercase().let { l -> words.all { it in l } } }.take(4)
 }

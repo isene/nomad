@@ -195,4 +195,38 @@ class DaysTest {
             teamsLink(d, oslo),
         )
     }
+
+    @Test
+    fun a_guest_is_a_name_and_an_address_or_nothing() {
+        assertEquals("Alice" to "alice@example.com", guestOf("Alice <alice@example.com>"))
+        assertEquals("" to "bob@example.com", guestOf(" bob@example.com "))
+        assertNull(guestOf("Alice"))
+        assertNull(guestOf("alice@"))
+        assertEquals(listOf("Alice <a@example.com>", "b@example.com"), guestPieces("Alice <a@example.com>, b@example.com, "))
+    }
+
+    @Test
+    fun people_come_from_the_mail_once_each_and_never_from_noreply() {
+        val froms = listOf(
+            "\"Doe, Alice\" <alice@example.com>", "News <noreply@example.com>",
+            "Alice Doe <ALICE@example.com>", "bob@example.com", "Robot",
+        )
+        assertEquals(listOf("Doe Alice <alice@example.com>", "bob@example.com"), people(froms))
+    }
+
+    @Test
+    fun the_guest_being_typed_is_matched_on_every_word() {
+        val people = listOf("Alice Doe <alice@example.com>", "Alice Roe <ar@example.org>", "Bob <bob@example.com>")
+        assertEquals(people.take(2), suggest(people, "Bob <bob@example.com>, ali"))
+        assertEquals(listOf("Alice Roe <ar@example.org>"), suggest(people, "alice ro"))
+        assertEquals(emptyList<String>(), suggest(people, "Bob <bob@example.com>, "))
+        assertEquals(emptyList<String>(), suggest(people, "a"))
+    }
+
+    @Test
+    fun a_teams_meeting_takes_the_guests_along() {
+        val start = LocalDateTime.of(2026, 10, 15, 9, 0)
+        val d = Draft(calendarId = 1, title = "Plan", start = start, end = start.plusHours(1), guests = listOf("Alice <a@example.com>", "b@example.com"))
+        assertTrue(teamsLink(d, oslo).endsWith("&attendees=a%40example.com%2Cb%40example.com"))
+    }
 }

@@ -19,8 +19,13 @@ phone twin of [tock](https://github.com/isene/tock).
   week, two weeks, month or year, with an end day or none. A repeating
   event can be deleted, one time or every time. A change to one is to
   that time alone, or to that time and every later one.
-- Teams meeting: a switch on a new event hands its title, times and notes
-  to the Teams app, which makes the meeting in the work calendar.
+- Guests: a new event, or one of your own that does not repeat, has a
+  Guests field. Type a name and pick the person from those your mail
+  came from, or type an address. Save, and the account mails each new
+  guest an invitation; a guest taken out comes off the event.
+- Teams meeting: a switch on a new event hands its title, times, notes
+  and guests to the Teams app, which makes the meeting in the work
+  calendar.
 - Reminders come as notifications, from the alarms the phone's calendar
   store keeps.
 - Widget: the coming 30 days as a list that scrolls. A tap opens the

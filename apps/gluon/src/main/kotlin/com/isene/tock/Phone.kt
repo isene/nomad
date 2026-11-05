@@ -41,7 +41,7 @@ data class Cal(
 )
 
 /** Someone invited to an event, and what they answered. */
-data class Guest(val name: String, val status: Int)
+data class Guest(val name: String, val email: String, val status: Int, val self: Boolean = false)
 
 /** What the event's own screen shows beyond the line in a list. */
 data class More(
@@ -79,6 +79,10 @@ data class Draft(
     val instance: Long? = null,
     /** With `instance`: that time and every time after it change. */
     val later: Boolean = false,
+    /** The guests, as "Name <address>" or an address. The event's guest
+     *  list becomes this one, and the phone's account mails the new
+     *  guests. Null leaves the list as it is. */
+    val guests: List<String>? = null,
 )
 
 /** What the user has chosen in this app: which calendars to show, and a
@@ -219,11 +223,12 @@ object Phone {
         )?.use { c ->
             buildList {
                 while (c.moveToNext()) {
-                    if (owner.isNotEmpty() && c.text(1).equals(owner, ignoreCase = true)) {
+                    val self = owner.isNotEmpty() && c.text(1).equals(owner, ignoreCase = true)
+                    if (self) {
                         me = c.getLong(3)
                         answer = c.getInt(2)
                     }
-                    add(Guest(c.text(0).ifEmpty { c.text(1) }, c.getInt(2)))
+                    add(Guest(c.text(0).ifEmpty { c.text(1) }, c.text(1), c.getInt(2), self))
                 }
             }
         } ?: emptyList()
@@ -264,6 +269,7 @@ object Phone {
                 putNull(Events.DTEND)
             }
         }
+        if (!d.guests.isNullOrEmpty()) values.put(Events.HAS_ATTENDEE_DATA, 1)
         val cr = ctx.contentResolver
         val id = if (d.id == null) {
             values.put(Events.CALENDAR_ID, d.calendarId)
@@ -280,6 +286,7 @@ object Phone {
             if (cr.update(ContentUris.withAppendedId(Events.CONTENT_URI, d.id), values, null, null) == 0) return false
             d.id
         }
+        if (d.instance == null) d.guests?.let { guests(cr, id, it) }
         // The screen shows the first reminder. One that was left as it was
         // is not written again, so an event keeps a second reminder.
         if (reminders(ctx, id).minOrNull() != d.remind) {
@@ -296,6 +303,46 @@ object Phone {
             }
         }
         return true
+    }
+
+    /** Make an event's guest list the one typed: the new guests go in as
+     *  invited, and those left out come off. The user's own line and the
+     *  organizer's stay. A list as it was writes nothing. */
+    private fun guests(cr: ContentResolver, id: Long, typed: List<String>) {
+        val want = typed.mapNotNull { guestOf(it) }.distinctBy { it.second.lowercase() }
+        var owner = ""
+        cr.query(ContentUris.withAppendedId(Events.CONTENT_URI, id), arrayOf(Events.OWNER_ACCOUNT), null, null, null)?.use { c ->
+            if (c.moveToFirst()) owner = c.text(0)
+        }
+        val have = HashMap<String, Long>()
+        cr.query(
+            Attendees.CONTENT_URI, arrayOf(Attendees._ID, Attendees.ATTENDEE_EMAIL, Attendees.ATTENDEE_RELATIONSHIP),
+            "${Attendees.EVENT_ID} = ?", arrayOf(id.toString()), null,
+        )?.use { c ->
+            while (c.moveToNext()) {
+                val address = c.text(1)
+                if (address.equals(owner, ignoreCase = true) || c.getInt(2) == Attendees.RELATIONSHIP_ORGANIZER) continue
+                have[address.lowercase()] = c.getLong(0)
+            }
+        }
+        val wanted = want.map { it.second.lowercase() }.toSet()
+        for ((address, row) in have) {
+            if (address !in wanted) cr.delete(ContentUris.withAppendedId(Attendees.CONTENT_URI, row), null, null)
+        }
+        for ((name, address) in want) {
+            if (address.lowercase() in have) continue
+            cr.insert(
+                Attendees.CONTENT_URI,
+                ContentValues().apply {
+                    put(Attendees.EVENT_ID, id)
+                    put(Attendees.ATTENDEE_NAME, name)
+                    put(Attendees.ATTENDEE_EMAIL, address)
+                    put(Attendees.ATTENDEE_RELATIONSHIP, Attendees.RELATIONSHIP_ATTENDEE)
+                    put(Attendees.ATTENDEE_TYPE, Attendees.TYPE_REQUIRED)
+                    put(Attendees.ATTENDEE_STATUS, Attendees.ATTENDEE_STATUS_INVITED)
+                },
+            )
+        }
     }
 
     /** Change one time of a repeating event and every time after it, as

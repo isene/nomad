@@ -28,7 +28,7 @@ Four tabs at the bottom:
   from the phone, a search over all of Gmail, and instant mail with a
   notice per mail when you turn it on. See [docs/mail.md](docs/mail.md).
 - **Calendar**: the phone's calendars as a month and an agenda, with
-  reminders. See [docs/tock.md](docs/tock.md).
+  reminders and guests you invite. See [docs/tock.md](docs/tock.md).
 - **Tasks**: `~/.tasks/todo.hl` over Syncthing, with reminders for
   stamped items. See [docs/tasks.md](docs/tasks.md).
 

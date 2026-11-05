@@ -47,6 +47,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -59,6 +60,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.unit.dp
@@ -69,8 +71,11 @@ import com.isene.tock.Showing
 import com.isene.tock.TockViewModel
 import com.isene.tock.Ui
 import com.isene.tock.firstDay
+import com.isene.tock.guestOf
+import com.isene.tock.guestPieces
 import com.isene.tock.lastDay
 import com.isene.tock.shortDay
+import com.isene.tock.suggest
 import com.isene.tock.times
 import com.isene.tock.utcMs
 import java.time.Duration
@@ -364,6 +369,9 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
     var repeat by rememberSaveable { mutableStateOf(first.repeat) }
     var until by rememberSaveable { mutableStateOf(first.until) }
     var teams by rememberSaveable { mutableStateOf(false) }
+    var guests by rememberSaveable { mutableStateOf(first.guests.orEmpty().joinToString(", ").let { if (it.isEmpty()) it else "$it, " }) }
+    // Who a guest can be typed as, read once the form opens.
+    val people by produceState(emptyList<String>()) { if (first.guests != null) value = vm.people() }
     // Which picker is open: "", "start day", "start time", "end day", "end time", "until".
     var picking by remember { mutableStateOf("") }
     var choosing by remember { mutableStateOf(false) }
@@ -400,13 +408,21 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
                 navigationIcon = { IconButton(onClick = { vm.back() }) { Icon(Icons.Default.Close, "Cancel") } },
                 actions = {
                     TextButton(onClick = {
-                        val d = first.copy(
-                            calendarId = calendar, title = title, allDay = allDay, start = start,
-                            // An end before the start is an event of no length.
-                            end = if (end.isBefore(start)) start else end,
-                            place = place, notes = notes, remind = remind, repeat = repeat, until = until,
-                        )
-                        if (toTeams) vm.teams(d) else vm.save(d)
+                        // A name that is not one person's address is asked again.
+                        val typed = guestPieces(guests)
+                        val unclear = typed.firstOrNull { guestOf(it) == null && suggest(people, it).size != 1 }
+                        if (unclear != null) {
+                            vm.say("Pick an address for $unclear")
+                        } else {
+                            val d = first.copy(
+                                calendarId = calendar, title = title, allDay = allDay, start = start,
+                                // An end before the start is an event of no length.
+                                end = if (end.isBefore(start)) start else end,
+                                place = place, notes = notes, remind = remind, repeat = repeat, until = until,
+                                guests = first.guests?.let { typed.map { if (guestOf(it) != null) it else suggest(people, it).single() } },
+                            )
+                            if (toTeams) vm.teams(d) else vm.save(d)
+                        }
                     }) { Text(if (toTeams) "Teams" else "Save") }
                 },
             )
@@ -505,6 +521,25 @@ fun EventEdit(vm: TockViewModel, ui: Ui, first: Draft) {
                 singleLine = true, modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
             )
+
+            if (first.guests != null) {
+                OutlinedTextField(
+                    value = guests, onValueChange = { guests = it }, label = { Text("Guests") },
+                    placeholder = { Text("Names or addresses, a comma between") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                )
+                // People from the mail who match the guest being typed; a tap puts them in.
+                for (person in suggest(people, guests)) {
+                    Text(
+                        person,
+                        Modifier.fillMaxWidth().clickable {
+                            guests = guests.substringBeforeLast(',', "").trim().let { if (it.isEmpty()) "" else "$it, " } + "$person, "
+                        }.padding(vertical = 10.dp),
+                        color = dim,
+                    )
+                }
+            }
 
             Box {
                 Text(
