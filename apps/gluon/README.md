@@ -23,7 +23,8 @@ and [scribe](https://github.com/isene/scribe)
 Four tabs at the bottom:
 
 - **Home**: drafts waiting on the laptop, the unread messages, the coming
-  week's events and the tasks, on one screen. Tap a message or an event to open it in its tab.
+  week's events and the tasks, each on a card with its tab's icon and a count. Today is
+  bright, and each task has its category's colour. Tap a message or an event to open it in its tab.
 - **Messages**: your Gmail inboxes, feeds and chats, new mail sent straight
   from the phone, a search over all of Gmail, and instant mail with a
   notice per mail when you turn it on. See [docs/mail.md](docs/mail.md).

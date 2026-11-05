@@ -19,16 +19,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.MailOutline
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -125,7 +129,7 @@ private fun Kept(shown: Boolean, content: @Composable () -> Unit) {
 }
 
 /** What the laptop's Home tab has: drafts waiting, unread mail, the coming days and the
- *  tasks. A tap opens the thing in its own tab. */
+ *  tasks, each on a card of its own. A tap opens the thing in its own tab. */
 @Composable
 private fun Home(go: (Tab) -> Unit, mail: MailViewModel, tock: TockViewModel, tasks: TasksViewModel) {
     val m by mail.ui.collectAsState()
@@ -133,75 +137,87 @@ private fun Home(go: (Tab) -> Unit, mail: MailViewModel, tock: TockViewModel, ta
     val t by tasks.state.collectAsState()
     val dim = MaterialTheme.colorScheme.onSurfaceVariant
     LazyColumn(
-        Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (m.drafts > 0) item { Head("Drafts  ${m.drafts}") { mail.wantDrafts(true); go(Tab.Mail) } }
-        item { Head(if (m.unread > 0) "Messages  ${m.unread} unread" else "Messages") { go(Tab.Mail) } }
-        if (m.inbox.isEmpty()) item { Text("Nothing unread", color = dim) }
-        items(m.inbox.take(MAIL_ROWS).size) { i ->
-            val e = m.inbox[i]
-            val who = e.from.substringBefore('<').trim().trim('"').ifEmpty { e.from.trim().trim('<', '>') }
-            Column(Modifier.fillMaxWidth().clickable { mail.pick(e); go(Tab.Mail) }.padding(vertical = 4.dp)) {
-                Text(who, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(e.subject, maxLines = 1, overflow = TextOverflow.Ellipsis, color = dim)
+        item { Spacer(Modifier.height(4.dp)) }
+        if (m.drafts > 0) item {
+            Card(Icons.Outlined.Edit, "Drafts", "${m.drafts} waiting", { mail.wantDrafts(true); go(Tab.Mail) }) {}
+        }
+        item {
+            Card(Tab.Mail.icon(), "Messages", if (m.unread > 0) "${m.unread} unread" else "", { go(Tab.Mail) }) {
+                if (m.inbox.isEmpty()) Text("Nothing unread", color = dim)
+                for (e in m.inbox.take(MAIL_ROWS)) {
+                    val who = e.from.substringBefore('<').trim().trim('"').ifEmpty { e.from.trim().trim('<', '>') }
+                    Column(Modifier.fillMaxWidth().clickable { mail.pick(e); go(Tab.Mail) }.padding(vertical = 4.dp)) {
+                        Text(who, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(e.subject, maxLines = 1, overflow = TextOverflow.Ellipsis, color = dim)
+                    }
+                }
+                if (m.inbox.size > MAIL_ROWS) More(m.inbox.size - MAIL_ROWS) { go(Tab.Mail) }
             }
         }
-        if (m.inbox.size > MAIL_ROWS) item { More(m.inbox.size - MAIL_ROWS) { go(Tab.Mail) } }
 
-        item { Head("Agenda") { go(Tab.Calendar) } }
-        if (!c.allowed) {
-            item { Text("Open Calendar once to let gluon read your calendars", color = dim) }
-        } else {
-            val zone = ZoneId.systemDefault()
-            val days = c.days.subMap(c.today, true, c.today.plusDays(AGENDA_DAYS), false)
-                .mapValues { (_, list) -> list.filter { it.calendarId in c.shown && !it.declined } }
-                .filterValues { it.isNotEmpty() }
-            if (days.isEmpty()) item { Text("Nothing in the coming week", color = dim) }
-            for ((day, list) in days) {
-                item { Text(dayTitle(day, c.today), style = MaterialTheme.typography.labelLarge, color = dim) }
-                items(list.size) { i ->
-                    val s = list[i]
-                    val (from, to) = times(s, day, zone)
-                    Row(
-                        Modifier.fillMaxWidth().clickable { tock.openFromOutside(s.eventId, s.begin, s.end); go(Tab.Calendar) }
-                            .padding(vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(Modifier.width(4.dp).height(32.dp).background(Color(c.colors[s.calendarId] ?: s.color)))
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            if (from.isEmpty()) "all day" else from,
-                            Modifier.width(56.dp), color = dim, style = MaterialTheme.typography.bodySmall,
-                        )
-                        Column(Modifier.weight(1f)) {
-                            Text(s.title.ifEmpty { "(no title)" }, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            val more = listOf(to, s.place).filter { it.isNotEmpty() }.joinToString(" · ")
-                            if (more.isNotEmpty()) Text(more, maxLines = 1, overflow = TextOverflow.Ellipsis, color = dim, style = MaterialTheme.typography.bodySmall)
+        val zone = ZoneId.systemDefault()
+        val days = if (!c.allowed) emptyMap() else c.days.subMap(c.today, true, c.today.plusDays(AGENDA_DAYS), false)
+            .mapValues { (_, list) -> list.filter { it.calendarId in c.shown && !it.declined } }
+            .filterValues { it.isNotEmpty() }
+        val events = days.values.sumOf { it.size }
+        item {
+            Card(Tab.Calendar.icon(), "Agenda", if (events > 0) "$events this week" else "", { go(Tab.Calendar) }) {
+                if (!c.allowed) Text("Open Calendar once to let gluon read your calendars", color = dim)
+                else if (days.isEmpty()) Text("Nothing in the coming week", color = dim)
+                for ((n, entry) in days.entries.withIndex()) {
+                    val (day, list) = entry
+                    if (n > 0) HorizontalDivider(Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    val today = day == c.today
+                    Text(
+                        dayTitle(day, c.today), Modifier.padding(bottom = 2.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = if (today) FontWeight.Bold else null,
+                        color = if (today) MaterialTheme.colorScheme.primary else dim,
+                    )
+                    for (s in list) {
+                        val (from, to) = times(s, day, zone)
+                        Row(
+                            Modifier.fillMaxWidth().clickable { tock.openFromOutside(s.eventId, s.begin, s.end); go(Tab.Calendar) }
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Bar(Color(c.colors[s.calendarId] ?: s.color))
+                            Text(
+                                if (from.isEmpty()) "all day" else from,
+                                Modifier.width(56.dp), color = dim, style = MaterialTheme.typography.bodySmall,
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(s.title.ifEmpty { "(no title)" }, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val more = listOf(to, s.place).filter { it.isNotEmpty() }.joinToString(" · ")
+                                if (more.isNotEmpty()) Text(more, maxLines = 1, overflow = TextOverflow.Ellipsis, color = dim, style = MaterialTheme.typography.bodySmall)
+                            }
                         }
                     }
                 }
             }
         }
 
-        item { Head("Tasks") { go(Tab.Tasks) } }
-        if (t.pickedUri == null) {
-            item { Text("Pick todo.hl in Tasks", color = dim) }
-        } else {
-            val cats = t.hyperlist.categories
-            for ((place, cat) in cats.withIndex()) {
-                if (cat.items.isEmpty() || cat.name in t.collapsed) continue
-                item {
-                    Text(
-                        cat.name, style = MaterialTheme.typography.labelLarge,
-                        color = Color(categoryColor(cat.name, place, t.widgetColors)),
-                    )
-                }
-                items(cat.items.size) { i ->
-                    Text(
-                        cat.items[i].text, Modifier.fillMaxWidth().clickable { go(Tab.Tasks) }.padding(vertical = 3.dp),
-                        maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    )
+        val cats = if (t.pickedUri == null) emptyList() else
+            t.hyperlist.categories.withIndex().filter { (_, cat) -> cat.items.isNotEmpty() && cat.name !in t.collapsed }
+        val open = cats.sumOf { it.value.items.size }
+        item {
+            Card(Tab.Tasks.icon(), "Tasks", if (open > 0) "$open open" else "", { go(Tab.Tasks) }) {
+                if (t.pickedUri == null) Text("Pick todo.hl in Tasks", color = dim)
+                for ((n, entry) in cats.withIndex()) {
+                    val (place, cat) = entry
+                    val colour = Color(categoryColor(cat.name, place, t.widgetColors))
+                    if (n > 0) HorizontalDivider(Modifier.padding(vertical = 6.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    Text(cat.name, Modifier.padding(bottom = 2.dp), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = colour)
+                    for (task in cat.items) Row(
+                        Modifier.fillMaxWidth().clickable { go(Tab.Tasks) }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Bar(colour)
+                        Text(task.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }
@@ -212,16 +228,34 @@ private fun Home(go: (Tab) -> Unit, mail: MailViewModel, tock: TockViewModel, ta
 private const val MAIL_ROWS = 8
 private const val AGENDA_DAYS = 7L
 
-/** A section's heading; a tap opens its tab. */
+/** A part of Home on a card a shade lighter than the page: its tab's icon, its name and a
+ *  count on top (a tap there opens the tab), and its rows below. */
 @Composable
-private fun Head(text: String, open: () -> Unit) {
-    Text(
-        text,
-        Modifier.fillMaxWidth().clickable(onClick = open).padding(top = 16.dp, bottom = 4.dp),
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.primary,
-    )
+private fun Card(icon: ImageVector, title: String, count: String, open: () -> Unit, rows: @Composable () -> Unit) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = RoundedCornerShape(16.dp)) {
+        Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 10.dp)) {
+            Row(
+                Modifier.fillMaxWidth().clickable(onClick = open).padding(top = 12.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(10.dp))
+                Text(
+                    title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
+                )
+                Text(count, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            rows()
+        }
+    }
+}
+
+/** The coloured mark in front of an event or a task. */
+@Composable
+private fun Bar(colour: Color) {
+    Box(Modifier.width(4.dp).height(32.dp).background(colour, RoundedCornerShape(2.dp)))
+    Spacer(Modifier.width(10.dp))
 }
 
 @Composable
