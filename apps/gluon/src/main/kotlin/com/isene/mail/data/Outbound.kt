@@ -29,6 +29,9 @@ import javax.mail.util.ByteArrayDataSource
  * user. Call on Dispatchers.IO.
  */
 object Outbound {
+    /** The Message-ID of the last mail built, for the copy in `sent/`. */
+    @Volatile var lastId: String = ""
+
     private const val SMTP_HOST = "smtp.gmail.com"
 
     /** Bytes to attach, already pulled out of the original by the core. */
@@ -120,6 +123,7 @@ object Outbound {
             setContent(parts)
         }
         saveChanges()
+        lastId = messageID.orEmpty()
     }
 
     private val http = OkHttpClient.Builder()

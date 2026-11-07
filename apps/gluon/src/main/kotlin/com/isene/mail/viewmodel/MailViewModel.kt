@@ -384,7 +384,12 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                     else -> "Nothing to reply to here"
                 }
             }
-            if (err == null && req.viaMail) settings.lastFrom = from.lowercase()
+            if (err == null && req.viaMail) {
+                settings.lastFrom = from.lowercase()
+                val date = java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", java.util.Locale.US).format(java.util.Date())
+                val copy = DraftsRepo.sentText(from, to, cc, subject, body, Outbound.lastId, req.draft.inReplyTo, date)
+                withContext(Dispatchers.IO) { DraftsRepo.keepSent(ctx, settings.syncTreeUri, copy, settings.days) }
+            }
             _ui.value = _ui.value.copy(
                 busy = false,
                 status = err ?: when {

@@ -55,8 +55,8 @@ object DraftsRepo {
 
     /** Every draft, newest first. Scheduled mail stays in the laptop's
      *  database and is not here. */
-    fun list(ctx: Context, treeUri: String): List<Draft> {
-        val d = dir(ctx, treeUri, "drafts") ?: return emptyList()
+    fun list(ctx: Context, treeUri: String, folder: String = "drafts"): List<Draft> {
+        val d = dir(ctx, treeUri, folder) ?: return emptyList()
         return d.listFiles().mapNotNull { f ->
             val name = f.name ?: return@mapNotNull null
             if (!f.isFile || name.startsWith(".")) return@mapNotNull null
@@ -122,12 +122,12 @@ object DraftsRepo {
 
     /** Write a new draft, for the laptop's `+` and this phone's Drafts.
      *  Null when written, else a line for the user. */
-    fun create(ctx: Context, treeUri: String, name: String, text: String): String? {
+    fun create(ctx: Context, treeUri: String, name: String, text: String, folder: String = "drafts"): String? {
         if (treeUri.isEmpty()) return "No shared folder; pick one in Settings"
         val root = runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri)) }.getOrNull()
             ?: return "The shared folder is gone"
-        val drafts = root.findFile("drafts")?.takeIf { it.isDirectory } ?: root.createDirectory("drafts")
-            ?: return "Could not make the drafts folder"
+        val drafts = root.findFile(folder)?.takeIf { it.isDirectory } ?: root.createDirectory(folder)
+            ?: return "Could not make the $folder folder"
         // octet-stream, so the provider keeps the name and adds no .txt.
         val f = drafts.createFile("application/octet-stream", name) ?: return "Could not write the draft"
         val ok = runCatching {
@@ -138,6 +138,32 @@ object DraftsRepo {
             return "Could not write the draft"
         }
         return null
+    }
+
+    /** A mail sent from here, for `sent/`: the draft's headers plus what
+     *  the laptop files in its Sent folder and threads by. */
+    fun sentText(
+        from: String, to: String, cc: String, subject: String, body: String,
+        messageId: String, inReplyTo: String, date: String,
+    ): String = buildString {
+        append("From: $from\nTo: $to\n")
+        if (cc.isNotBlank()) append("Cc: $cc\n")
+        append("Subject: $subject\nDate: $date\n")
+        if (messageId.isNotEmpty()) append("Message-ID: $messageId\n")
+        if (inReplyTo.isNotEmpty()) append("In-Reply-To: <$inReplyTo>\n")
+        append("MIME-Version: 1.0\nContent-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\n\n$body")
+        if (!body.endsWith("\n")) append("\n")
+    }
+
+    /** Keep a copy of a mail sent from here in `sent/`, where the laptop
+     *  files it in its Sent folder and both sides list it. This phone's
+     *  copies past the window go. */
+    fun keepSent(ctx: Context, treeUri: String, text: String, days: Int) {
+        val now = System.currentTimeMillis()
+        create(ctx, treeUri, "phone_${now / 1000}.eml", text, "sent")
+        dir(ctx, treeUri, "sent")?.listFiles()?.forEach { f ->
+            if (f.name?.startsWith("phone_") == true && f.lastModified() < now - days * 86_400_000L) runCatching { f.delete() }
+        }
     }
 
     private const val GONE = "The draft is gone; it may have been sent on the laptop"

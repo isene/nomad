@@ -37,4 +37,15 @@ class DraftsRepoTest {
         assertEquals("Re: Hi", d.title)
         assertEquals("a@x", d.to)
     }
+
+    @Test
+    fun a_sent_copy_carries_what_the_laptop_threads_by() {
+        val text = DraftsRepo.sentText("me@x", "a@x", "", "Re: Hi", "Yes", "<1.2@x>", "q@x", "Sat, 07 Nov 2026 15:00:00 +0100")
+        assert(text.contains("Message-ID: <1.2@x>\n"))
+        assert(text.contains("In-Reply-To: <q@x>\n"))
+        assert(text.endsWith("\n\nYes\n"))
+        val d = DraftsRepo.parse("phone_1.eml.filed", text, 0)
+        assertEquals("Mail", d.kind)
+        assertEquals("Re: Hi", d.title)
+    }
 }

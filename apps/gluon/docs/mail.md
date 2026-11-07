@@ -303,6 +303,14 @@ The drafts are the same on both sides:
   `phone_<time>.eml`, so the laptop's `+` lists it.
 - Scheduled mail stays in the laptop's database and is not listed.
 
+## Sent mail
+
+Menu, Sent lists the mail sent from either side in the fetch window, from
+`sent/` in the shared folder. Each side writes its own copy there as
+`<device>_<time>.eml` and removes its own past the window. kastrup
+(0.3.119 or later) files the phone's copies in its Sent folder, marks the
+mail they answer as answered, and renames them `….eml.filed`.
+
 ## Not yet
 
 A work chat with its own login is the obvious

@@ -56,7 +56,7 @@ import java.util.Locale
 /** The laptop's drafts: the list, one draft in full, and Send, Edit and Delete. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DraftsScreen(treeUri: String, onBack: () -> Unit) {
+fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var drafts by remember { mutableStateOf<List<Draft>?>(null) }
@@ -70,8 +70,8 @@ fun DraftsScreen(treeUri: String, onBack: () -> Unit) {
     var round by remember { mutableIntStateOf(0) }
     LaunchedEffect(round) {
         withContext(Dispatchers.IO) {
-            val l = DraftsRepo.list(ctx, treeUri)
-            val w = DraftsRepo.waiting(ctx, treeUri)
+            val l = DraftsRepo.list(ctx, treeUri, if (sent) "sent" else "drafts")
+            val w = if (sent) 0 else DraftsRepo.waiting(ctx, treeUri)
             withContext(Dispatchers.Main) { drafts = l; waiting = w }
         }
     }
@@ -87,7 +87,7 @@ fun DraftsScreen(treeUri: String, onBack: () -> Unit) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
-                title = { Text(shown?.title ?: "Laptop drafts", maxLines = 1, fontSize = 16.sp) },
+                title = { Text(shown?.title ?: if (sent) "Sent" else "Laptop drafts", maxLines = 1, fontSize = 16.sp) },
                 actions = {
                     if (shown == null) IconButton(onClick = { round++ }) { Icon(Icons.Filled.Refresh, "Again") }
                 },
@@ -121,10 +121,13 @@ fun DraftsScreen(treeUri: String, onBack: () -> Unit) {
                 }
             } else if (shown != null) {
                 Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp)) {
-                    Text("${shown.kind} draft from ${stamp(shown.time)}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
+                    Text(
+                        if (sent) "Sent ${stamp(shown.time)}" else "${shown.kind} draft from ${stamp(shown.time)}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp,
+                    )
                     Text(shown.text, fontFamily = FontFamily.Monospace, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
                 }
-                Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (!sent) Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { confirm = true }, Modifier.weight(1f)) { Text("Send") }
                     OutlinedButton(onClick = { status = null; editing = shown.text }, Modifier.weight(1f)) { Text("Edit") }
                     OutlinedButton(onClick = { confirmDelete = true }, Modifier.weight(1f)) { Text("Delete") }
@@ -140,7 +143,7 @@ fun DraftsScreen(treeUri: String, onBack: () -> Unit) {
                 when {
                     treeUri.isEmpty() -> Text("Pick the shared folder in Settings first.", Modifier.padding(16.dp))
                     list == null -> Text("Reading the drafts.", Modifier.padding(16.dp))
-                    list.isEmpty() -> Text("No drafts on the laptop.", Modifier.padding(16.dp))
+                    list.isEmpty() -> Text(if (sent) "Nothing sent in the fetch window." else "No drafts on the laptop.", Modifier.padding(16.dp))
                     else -> LazyColumn {
                         items(list, key = { it.name }) { d ->
                             Column(Modifier.fillMaxWidth().clickable { status = null; open = d }.padding(horizontal = 16.dp, vertical = 10.dp)) {

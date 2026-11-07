@@ -600,6 +600,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `mail-save-<device>.txt` (Message-ID, save key, time) to file a mail as
   `s` would. Its views file carries the save folders under "save".
   Not yet shared: star, snooze, unsubscribe, task or event from a mail.
+- Step 5, sent mail: both sides write `sent/<device>_<time>.eml`
+  (`DraftsRepo.keepSent`, kastrup `share_sent`); kastrup 0.3.119 files
+  the phone's in its Sent maildir and renames them `.eml.filed`. Menu,
+  Sent is `DraftsScreen(sent = true)`, read-only.
 
 ### fleet (com.isene.fleet)
 
