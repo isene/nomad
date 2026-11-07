@@ -137,8 +137,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `calendar` (tock); strings `mail_widget_label`, `tasks_widget_label`.
   Prefs files (`mail_prefs`, `tasks_prefs`, `tock`) and files in
   filesDir were already apart.
-- Home reads `MailViewModel.ui.inbox` (the unread through the scope, as
-  the widget has them), tock's `ui.days` for seven days and the tasks
+- Home reads `MailViewModel.ui.home` (the unread in the laptop's Home
+  views, each with its view's key and colour; the widget gets the same
+  list), tock's `ui.days` for seven days and the tasks
   hyperlist. A mail tapped there goes through `MailViewModel.pick`.
 - vox sends its RESCAN to `com.isene.gluon` since vox 0.2.3.
 
@@ -587,6 +588,13 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `LaptopViews.keys_for` in the core answers which views a message is in:
   the laptop's list first, then the view's rules. A view with a key
   matches by that alone (`Scope.matches`).
+- Step 2, Home: the laptop's `~/.gluon/views` is a link to
+  `home-views.txt` in the shared folder. `Settings.homeViews` takes those
+  keys (1 2 3 when none); Home lists the unread in them with a badge of
+  the view's key on its colour, as the laptop's Home does.
+- Step 3, drafts: kastrup 0.3.117 postpones mail to a file in `drafts/`
+  (`park_row`), and Back from a mail begun on the phone writes one
+  (`DraftsRepo.create`). Scheduled mail is not shared yet.
 
 ### fleet (com.isene.fleet)
 

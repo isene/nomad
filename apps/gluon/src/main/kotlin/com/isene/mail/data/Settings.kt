@@ -234,6 +234,20 @@ class Settings(ctx: Context) {
         get() = p.getLong("laptop_views_stamp", 0)
         set(v) = p.edit().putLong("laptop_views_stamp", v).apply()
 
+    /** The keys of the views at Home, as the laptop's `~/.gluon/views`
+     *  has them ("1 2 4"); kept from `home-views.txt` in the shared folder. */
+    var homeKeysText: String
+        get() = p.getString("home_views", "") ?: ""
+        set(v) = p.edit().putString("home_views", v).apply()
+
+    /** The views at Home: the keys the laptop's Home lists, 1 2 3 when it
+     *  names none, and the first three when the views have no keys. */
+    fun homeViews(): List<View> {
+        val all = views()
+        val keys = homeKeysText.split(Regex("[\\s,]+")).filter { it.isNotEmpty() }.ifEmpty { listOf("1", "2", "3") }
+        return keys.mapNotNull { k -> all.firstOrNull { it.key == k } }.ifEmpty { all.take(3) }
+    }
+
     /** The laptop's views when it has sent any, else the ones typed here. */
     fun views(): List<View> = laptop().views.ifEmpty { phoneViews() }
 

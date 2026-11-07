@@ -53,8 +53,8 @@ object DraftsRepo {
         return Draft(name, kind, title, to, text, time)
     }
 
-    /** Every draft, newest first. Postponed and scheduled mail stay in the
-     *  laptop's database and are not here. */
+    /** Every draft, newest first. Scheduled mail stays in the laptop's
+     *  database and is not here. */
     fun list(ctx: Context, treeUri: String): List<Draft> {
         val d = dir(ctx, treeUri, "drafts") ?: return emptyList()
         return d.listFiles().mapNotNull { f ->
@@ -109,6 +109,34 @@ object DraftsRepo {
         }
         // Left behind, it could go out a second time.
         if (!runCatching { src.delete() }.getOrDefault(false)) return "Sent, but the draft is still here; delete it"
+        return null
+    }
+
+    /** A mail begun here, as kastrup's drafts are written. */
+    fun mailText(from: String, to: String, cc: String, subject: String, body: String): String = buildString {
+        append("From: $from\nTo: $to\n")
+        if (cc.isNotBlank()) append("Cc: $cc\n")
+        append("Subject: $subject\n\n$body")
+        if (!body.endsWith("\n")) append("\n")
+    }
+
+    /** Write a new draft, for the laptop's `+` and this phone's Drafts.
+     *  Null when written, else a line for the user. */
+    fun create(ctx: Context, treeUri: String, name: String, text: String): String? {
+        if (treeUri.isEmpty()) return "No shared folder; pick one in Settings"
+        val root = runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri)) }.getOrNull()
+            ?: return "The shared folder is gone"
+        val drafts = root.findFile("drafts")?.takeIf { it.isDirectory } ?: root.createDirectory("drafts")
+            ?: return "Could not make the drafts folder"
+        // octet-stream, so the provider keeps the name and adds no .txt.
+        val f = drafts.createFile("application/octet-stream", name) ?: return "Could not write the draft"
+        val ok = runCatching {
+            ctx.contentResolver.openOutputStream(f.uri)?.use { it.write(text.toByteArray()) } != null
+        }.getOrDefault(false)
+        if (!ok) {
+            f.delete()
+            return "Could not write the draft"
+        }
         return null
     }
 

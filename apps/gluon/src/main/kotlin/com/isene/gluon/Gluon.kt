@@ -145,16 +145,35 @@ private fun Home(go: (Tab) -> Unit, mail: MailViewModel, tock: TockViewModel, ta
             Card(Icons.Outlined.Edit, "Drafts", "${m.drafts} waiting", { mail.wantDrafts(true); go(Tab.Mail) }) {}
         }
         item {
-            Card(Tab.Mail.icon(), "Messages", if (m.unread > 0) "${m.unread} unread" else "", { go(Tab.Mail) }) {
-                if (m.inbox.isEmpty()) Text("Nothing unread", color = dim)
-                for (e in m.inbox.take(MAIL_ROWS)) {
+            // The laptop's Home: the unread in its Home views, each row
+            // with its view's key on the view's colour.
+            val open = { mail.showHome(); go(Tab.Mail) }
+            Card(Tab.Mail.icon(), "Messages", if (m.home.isNotEmpty()) "${m.home.size} unread" else "", open) {
+                if (m.home.isEmpty()) Text("Nothing unread", color = dim)
+                for (r in m.home.take(MAIL_ROWS)) {
+                    val e = r.m
                     val who = e.from.substringBefore('<').trim().trim('"').ifEmpty { e.from.trim().trim('<', '>') }
-                    Column(Modifier.fillMaxWidth().clickable { mail.pick(e); go(Tab.Mail) }.padding(vertical = 4.dp)) {
-                        Text(who, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(e.subject, maxLines = 1, overflow = TextOverflow.Ellipsis, color = dim)
+                    Row(
+                        Modifier.fillMaxWidth().clickable { mail.pick(e); go(Tab.Mail) }.padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        if (r.key.isNotEmpty()) {
+                            Text(
+                                r.key, color = Color.White, fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelMedium,
+                                modifier = Modifier
+                                    .background(Color(0xFF000000.toInt() or (r.colour ?: 0x808080)), RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                            )
+                            Spacer(Modifier.width(10.dp))
+                        }
+                        Column(Modifier.weight(1f)) {
+                            Text(who, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(e.subject, maxLines = 1, overflow = TextOverflow.Ellipsis, color = dim)
+                        }
                     }
                 }
-                if (m.inbox.size > MAIL_ROWS) More(m.inbox.size - MAIL_ROWS) { go(Tab.Mail) }
+                if (m.home.size > MAIL_ROWS) More(m.home.size - MAIL_ROWS, open)
             }
         }
 

@@ -43,11 +43,11 @@ object Scope {
         else -> scope.replaceFirstChar { it.uppercase() }
     }
 
-    /** What the widget shows and what rings: the first three views
-     *  together, as the laptop's Home shows kastrup's views 1, 2 and 3.
-     *  Everything, when no view is saved. */
+    /** What Home and the widget show and what rings: the views the
+     *  laptop's Home lists (see [Settings.homeViews]). Everything, when no
+     *  view is saved. */
     fun home(settings: Settings): List<String> =
-        settings.views().take(3).map { "view:${it.name}" }.ifEmpty { listOf("") }
+        settings.homeViews().map { "view:${it.name}" }.ifEmpty { listOf("") }
 
     /** The widget's header: the views it shows, or "Messages" with none. */
     fun homeTitle(settings: Settings): String =

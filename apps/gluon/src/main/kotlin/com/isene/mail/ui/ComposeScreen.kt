@@ -1,5 +1,6 @@
 package com.isene.mail.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -59,12 +60,21 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
     // Cursor at the top: the quote sits below and the answer goes above it.
     var body by remember { mutableStateOf(TextFieldValue(req.draft.body, TextRange(0))) }
     val canSend = !ui.busy && body.text.isNotBlank() && (!mail || to.isNotBlank())
+    // Back from a mail with anything typed keeps it as a draft. A send
+    // that went through leaves by onDone and keeps nothing.
+    val changed = to != req.draft.to || cc != req.draft.cc || subject != req.draft.subject || body.text != req.draft.body
+    val leave = {
+        vm.clearStatus()
+        onDone()
+        if (mail && changed) vm.keepDraft(from, to, cc, subject, body.text)
+    }
+    BackHandler(onBack = leave)
 
     Scaffold(
         topBar = {
             TopAppBar(
                 navigationIcon = {
-                    IconButton(onClick = onDone) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                    IconButton(onClick = leave) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
                 },
                 title = { Text(req.title, fontSize = 16.sp) },
                 actions = {

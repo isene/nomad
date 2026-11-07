@@ -61,6 +61,9 @@ data class ComposeRequest(
     }.orEmpty()
 }
 
+/** A message at Home, with the key and colour (0xRRGGBB) of its view. */
+data class HomeRow(val m: Message, val key: String, val colour: Int?)
+
 data class UiState(
     val mails: List<Message> = emptyList(),
     /** Message-IDs everyone agrees are read. In the state, not behind a
@@ -90,8 +93,9 @@ data class UiState(
     /** Live search needle; empty means no search. */
     val query: String = "",
     val unread: Int = 0,
-    /** The unread ones themselves, newest first, for gluon's Home tab. */
-    val inbox: List<Message> = emptyList(),
+    /** The unread at Home, newest first, each with the key and colour of
+     *  the first Home view it is in, as the laptop's Home shows them. */
+    val home: List<HomeRow> = emptyList(),
     /** Laptop drafts waiting in the shared folder, for the Home tab. */
     val drafts: Int = 0,
     /** Held in the store but hidden by a swipe or Remove all. Counted so
@@ -526,6 +530,23 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
 
     fun setScope(s: String) { settings.scope = s; recompute() }
 
+    /** Back from a mail begun here: keep it in the shared drafts, where
+     *  the laptop's `+` and this phone's Drafts both list it. */
+    fun keepDraft(from: String, to: String, cc: String, subject: String, body: String) {
+        val ctx = getApplication<Application>()
+        viewModelScope.launch {
+            val err = withContext(Dispatchers.IO) {
+                val name = "phone_${System.currentTimeMillis() / 1000}.eml"
+                DraftsRepo.create(ctx, settings.syncTreeUri, name, DraftsRepo.mailText(from, to, cc, subject, body))
+            }
+            status(err ?: "Kept in the drafts")
+            countDrafts()
+        }
+    }
+
+    /** The mail list through the Home views, as Home shows them. */
+    fun showHome() = setScope(Scope.home(settings).joinToString("\t"))
+
     fun status(s: String?) { _ui.value = _ui.value.copy(status = s) }
 
     fun clearStatus() = status(null)
@@ -563,10 +584,17 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                     .any { f -> f.contains(query, ignoreCase = true) }
             }
         // The unread count for the chip, through the scope the list uses.
-        // The widget has its own: the first three views together.
+        // Home and the widget have their own list: the Home views.
         val unread = here
             .filter { inScope(it, scope) }
             .filter { it.messageId !in readIds }
+        // Home: everything unread when no view is saved.
+        val homeViews = settings.homeViews()
+        val home = here.filter { it.messageId !in readIds }.mapNotNull { m ->
+            if (homeViews.isEmpty()) HomeRow(m, "", null)
+            else homeViews.firstOrNull { inScope(m, "view:${it.name}") }
+                ?.let { HomeRow(m, it.key.ifEmpty { it.name.take(1) }, it.colour) }
+        }
         _ui.value = _ui.value.copy(
             mails = shown,
             readIds = readIds,
@@ -591,11 +619,10 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             filter = filter,
             query = query,
             unread = unread.size,
-            inbox = unread,
+            home = home,
             hidden = all.size - here.size,
         )
-        val home = Scope.home(settings)
-        publishWidget(here.filter { it.messageId !in readIds && Scope.atHome(it, home, settings) })
+        publishWidget(home.map { it.m })
     }
 
     /** Feed the home screen. Writes and redraws only when the summary

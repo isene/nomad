@@ -53,7 +53,7 @@ The Messages tab of [gluon](../README.md).
   Gmail on every account instead, in the words the Gmail app takes
   (`kvittering has:attachment after:2026/9/1`), and lists the 40 newest
   hits per account
-- A **Messages widget** on the home screen: the unread in the first three
+- A **Messages widget** on the home screen: the unread in the Home
   views together, tap to open
 
 ## Read state
@@ -125,9 +125,11 @@ and the file can always be written again.
 
 ## The widget
 
-The unread in the first three views, together, with senders and
-subjects, as the laptop's gluon shows kastrup's views 1, 2 and 3 at Home.
-With no views saved, it shows all. It reads a small summary
+The unread in the Home views, together, with senders and subjects: the
+same list as gluon's Home on the phone and on the laptop. The Home views
+are the keys in the laptop's `~/.gluon/views` (1 2 3 when it names none),
+a link to `home-views.txt` in the shared folder. With no views, it shows
+all. It reads a small summary
 file the app writes when the count moves, and declares no update period
 at all — a widget nobody looks at wakes nothing. The background fetch
 keeps it current; without one it is as fresh as the last time the app
@@ -178,7 +180,7 @@ Off by default. When on, a service keeps one line open to Gmail per
 account, waiting in IMAP IDLE on the INBOX. Gmail tells the phone the
 moment a mail lands, and the phone runs the same fetch as above.
 
-- Each new inbox mail that is unread and in the first three views gets
+- Each new inbox mail that is unread and in the Home views gets
   a notice: the sender, the subject and the account. Several stack under one summary,
   as in the Gmail app. A tap opens that mail; opening gluon clears them.
 - Android needs a notice, "Waiting for new mail", while the service runs.
@@ -284,11 +286,17 @@ one to read it as it will go out, then Send, Edit or Delete.
 Send moves it to
 `send/`, and kastrup on the laptop sends it within a minute, as it sends
 a scheduled message. Mail goes from the laptop's own account, so a reply
-threads and its original gets the ← mark. Postponed and scheduled mail
-stay in the laptop's database and are not listed.
+threads and its original gets the ← mark.
+
+The drafts are the same on both sides:
+- Mail postponed on the laptop (`p` after editing) is a file here
+  (kastrup 0.3.117 or later).
+- A mail begun on the phone and left with Back goes here as
+  `phone_<time>.eml`, so the laptop's `+` lists it.
+- Scheduled mail stays in the laptop's database and is not listed.
 
 ## Not yet
 
-No compose of new mail. A work chat with its own login is the obvious
+A work chat with its own login is the obvious
 next channel, and the only kind that needs something the phone cannot
 do alone: that login, or the laptop relaying into the shared folder.

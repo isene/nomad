@@ -34,6 +34,8 @@ object ReadStateRepo {
         val dir = tree(ctx, settings.syncTreeUri) ?: return emptyList()
         val all = dir.listFiles()
         takeViews(ctx, settings, all)
+        val home = all.firstOrNull { it.name == "home-views.txt" }?.let { text(ctx, it) } ?: ""
+        if (home != settings.homeKeysText) settings.homeKeysText = home
         val files = all.mapNotNull { f ->
             val name = f.name ?: return@mapNotNull null
             if (!f.isFile || !name.startsWith("mail-read-") || !name.endsWith(".json")) {
@@ -53,12 +55,13 @@ object ReadStateRepo {
             .maxByOrNull { it.lastModified() } ?: return
         val stamp = f.lastModified()
         if (stamp == settings.laptopViewsStamp) return
-        val text = runCatching {
-            ctx.contentResolver.openInputStream(f.uri)?.use { it.bufferedReader().readText() }
-        }.getOrNull() ?: return
-        settings.laptopViewsText = text
+        settings.laptopViewsText = text(ctx, f) ?: return
         settings.laptopViewsStamp = stamp
     }
+
+    private fun text(ctx: Context, f: DocumentFile): String? = runCatching {
+        ctx.contentResolver.openInputStream(f.uri)?.use { it.bufferedReader().readText() }
+    }.getOrNull()
 
     private const val MINE = "mail-read-phone.json"
     private const val DELETES = "mail-delete-phone.txt"

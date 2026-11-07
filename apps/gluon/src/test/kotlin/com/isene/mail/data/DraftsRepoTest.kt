@@ -27,4 +27,14 @@ class DraftsRepoTest {
         val d = DraftsRepo.parse("draft", "To: b@example.com\n\nBody\n", 5)
         assertEquals(listOf("Mail", "(no subject)"), listOf(d.kind, d.title))
     }
+
+    @Test
+    fun a_mail_begun_on_the_phone_reads_back_as_the_laptop_writes_it() {
+        val text = DraftsRepo.mailText("me@x", "a@x", "", "Re: Hi", "Yes")
+        assertEquals("From: me@x\nTo: a@x\nSubject: Re: Hi\n\nYes\n", text)
+        val d = DraftsRepo.parse("phone_1.eml", text, 0)
+        assertEquals("Mail", d.kind)
+        assertEquals("Re: Hi", d.title)
+        assertEquals("a@x", d.to)
+    }
 }
