@@ -577,6 +577,16 @@ when building the core. Same rule as the rest of Fe₂O₃.
   service), web pictures after one tap, read/archive/delete back to the
   laptop through the shared folder, compose from all five addresses,
   threads. He uses no labels, snooze or undo send.
+- gluon 0.17.0 (asked 2026-11-06): what he does on one gluon must show on
+  the other. Five steps: same views, same Home, same drafts, same actions
+  both ways, same sent mail. Each side writes its own file in the shared
+  folder and the other applies it; no new timers.
+- Step 1, views: kastrup 0.3.116 writes `mail-views-<host>.json` (views,
+  sources, and the view keys of each recent mail by Message-ID).
+  `ReadStateRepo.takeViews` keeps the newest in `Settings.laptopViewsText`.
+  `LaptopViews.keys_for` in the core answers which views a message is in:
+  the laptop's list first, then the view's rules. A view with a key
+  matches by that alone (`Scope.matches`).
 
 ### fleet (com.isene.fleet)
 

@@ -14,7 +14,7 @@ The Messages tab of [gluon](../README.md).
   phone captures them, picked up the moment the app is opened
 - **Discord DMs**, which belong to no channel, under **DMs** in the
   Discord group
-- **Views**: named lists saved in Settings, at the top of the scope menu
+- **Views**: the laptop's kastrup views, in their colours, at the top of the scope menu
 - One **scope menu**: All, a view, all mail or one mailbox, all feeds or
   one feed, all channels or one channel. Tick the box beside each view
   you want to see together, such as views 1 to 3
@@ -198,7 +198,15 @@ is down.
 
 ## Views
 
-A named list, in Settings, one per line:
+The phone shows the laptop's views: the same keys, names and colours.
+kastrup writes them to `mail-views-<host>.json` in the shared folder, with
+the view keys of each mail from the last fetch window. A mail named there
+goes in those views. A mail the laptop has not seen yet (a chat, a mail
+fetched here first) goes by the view's rules: sender, subject, platform,
+and the kind of source. A rule on a maildir folder never matches here,
+since the phone has none.
+
+With no views file, the views come from Settings, one per line:
 
 ```
 AcmeCo    | mail, match:acmeco.com

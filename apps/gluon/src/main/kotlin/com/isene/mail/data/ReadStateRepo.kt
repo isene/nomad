@@ -30,9 +30,11 @@ object ReadStateRepo {
         else runCatching { DocumentFile.fromTreeUri(ctx, Uri.parse(treeUri)) }.getOrNull()
 
     /** Everything every device has said, merged. */
-    fun loadAll(ctx: Context, treeUri: String): List<ReadMark> {
-        val dir = tree(ctx, treeUri) ?: return emptyList()
-        val files = dir.listFiles().mapNotNull { f ->
+    fun loadAll(ctx: Context, settings: Settings): List<ReadMark> {
+        val dir = tree(ctx, settings.syncTreeUri) ?: return emptyList()
+        val all = dir.listFiles()
+        takeViews(ctx, settings, all)
+        val files = all.mapNotNull { f ->
             val name = f.name ?: return@mapNotNull null
             if (!f.isFile || !name.startsWith("mail-read-") || !name.endsWith(".json")) {
                 return@mapNotNull null
@@ -42,6 +44,20 @@ object ReadStateRepo {
             }.getOrNull()
         }
         return mergeReadMarks(files)
+    }
+
+    /** kastrup's views (`mail-views-<host>.json`), read again only when
+     *  the newest one changed, so a refresh costs one stat per file. */
+    private fun takeViews(ctx: Context, settings: Settings, files: Array<DocumentFile>) {
+        val f = files.filter { it.name?.let { n -> n.startsWith("mail-views-") && n.endsWith(".json") } == true }
+            .maxByOrNull { it.lastModified() } ?: return
+        val stamp = f.lastModified()
+        if (stamp == settings.laptopViewsStamp) return
+        val text = runCatching {
+            ctx.contentResolver.openInputStream(f.uri)?.use { it.bufferedReader().readText() }
+        }.getOrNull() ?: return
+        settings.laptopViewsText = text
+        settings.laptopViewsStamp = stamp
     }
 
     private const val MINE = "mail-read-phone.json"

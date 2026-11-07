@@ -65,6 +65,8 @@ object Scope {
             val v = settings.views().firstOrNull { it.name == scope.removePrefix("view:") }
             when {
                 v == null -> true
+                // A laptop view: the laptop said which mail is in it.
+                v.key.isNotEmpty() -> v.key in settings.laptopKeys(m)
                 v.scopes.isNotEmpty() && v.scopes.none { matches(m, it, settings) } -> false
                 v.match.isEmpty() -> true
                 else -> listOf(m.from, m.to, m.subject, m.account)

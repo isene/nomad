@@ -78,6 +78,8 @@ data class UiState(
     val channels: List<Pair<String, String>> = emptyList(),
     /** Saved view names, for the top of the scope menu. */
     val views: List<String> = emptyList(),
+    /** A view's colour as 0xRRGGBB, for the laptop's views. */
+    val viewColours: Map<String, Int> = emptyMap(),
     /** Chat platforms the relay has actually captured. Which ones is
      *  relay's business, but whether to look at all is a setting — so
      *  the group appears as soon as the folder is picked, empty or not.
@@ -171,7 +173,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val (stored, marks) = withContext(Dispatchers.IO) {
                 (SyncEngine.chats(ctx) ?: Store.load(ctx)) to
-                    ReadStateRepo.loadAll(ctx, settings.syncTreeUri)
+                    ReadStateRepo.loadAll(ctx, settings)
             }
             all = stored
             laptopRead = marks.filter { it.read }.map { it.messageId }.toSet()
@@ -581,6 +583,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             feeds = settings.feeds().map { it.title to it.url }.sortedBy { it.first },
             channels = settings.channels().map { it.name to it.id }.sortedBy { it.first },
             views = settings.views().map { it.name },
+            viewColours = settings.views().mapNotNull { v -> v.colour?.let { v.name to it } }.toMap(),
             chats = all.map { it.source }
                 .filter { it != "mail" && it != "rss" && it != "discord" }
                 .distinct().sorted(),

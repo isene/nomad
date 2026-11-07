@@ -15,7 +15,7 @@ import android.content.Context
  */
 object ReadState {
     fun effective(ctx: Context, settings: Settings = Settings(ctx)): Set<String> {
-        val laptop = ReadStateRepo.loadAll(ctx, settings.syncTreeUri)
+        val laptop = ReadStateRepo.loadAll(ctx, settings)
             .filter { it.read }.map { it.messageId }.toSet()
         return merge(laptop, settings.localMarks)
     }

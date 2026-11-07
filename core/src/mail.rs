@@ -11,6 +11,7 @@
 // is all the list and the widget ever ask of it.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// One message as the phone stores and shows it, whatever channel it
 /// came from. Bodies are kept raw so the decode happens on display and a
@@ -474,9 +475,205 @@ pub fn compose_forward(m: Message, date: String) -> Draft {
     Draft { subject, body, ..Default::default() }
 }
 
+// ---------- the laptop's views ----------
+
+/// One of kastrup's views, as the phone shows it.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct LaptopView {
+    /// The key that opens it on the laptop, "1" to "9" or "0".
+    pub key: String,
+    pub name: String,
+    /// The laptop's 256-colour number for its top bar; empty for none.
+    pub colour: String,
+}
+
+/// kastrup's views, from the `mail-views-<host>.json` it writes in the
+/// shared folder. Mail goes by the laptop's own list, which knows the
+/// folders the phone never sees. What the phone fetches itself (chats,
+/// feeds, mail the laptop has not seen yet) goes by the view's rules,
+/// read here the way kastrup reads them.
+#[derive(uniffi::Object)]
+pub struct LaptopViews {
+    views: Vec<LaptopView>,
+    /// Per view, its branches; a branch is rules that all apply.
+    branches: Vec<Vec<Vec<serde_json::Value>>>,
+    /// Source id → kastrup plugin type ("maildir", "rss", "gateway", …).
+    sources: HashMap<i64, String>,
+    /// Message-ID → the keys of the views the laptop files it under.
+    mail: HashMap<String, Vec<String>>,
+}
+
+#[uniffi::export]
+impl LaptopViews {
+    /// Nothing at all from a file that does not parse, so the phone falls
+    /// back to its own views rather than showing empty ones.
+    #[uniffi::constructor]
+    pub fn new(json: String) -> Arc<Self> {
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap_or_default();
+        let mut views = Vec::new();
+        let mut branches = Vec::new();
+        for item in v["views"].as_array().into_iter().flatten() {
+            let text = |k: &str| item[k].as_str().unwrap_or("").to_string();
+            let key = text("key");
+            if key.is_empty() { continue; }
+            views.push(LaptopView { key, name: text("name"), colour: text("colour") });
+            let f = &item["filters"];
+            // kastrup's rule: branches win over a plain rule list.
+            let rules = |b: &serde_json::Value| b["rules"].as_array().cloned().unwrap_or_default();
+            branches.push(match f["branches"].as_array() {
+                Some(bs) => bs.iter().map(rules).collect(),
+                None => vec![rules(f)],
+            });
+        }
+        let sources = v["sources"].as_object().into_iter().flatten()
+            .filter_map(|(id, kind)| Some((id.parse().ok()?, kind.as_str()?.to_string())))
+            .collect();
+        let mail = v["mail"].as_object().into_iter().flatten()
+            .map(|(mid, keys)| (mid.clone(), keys.as_array().into_iter().flatten()
+                .filter_map(|k| k.as_str().map(str::to_string)).collect()))
+            .collect();
+        Arc::new(LaptopViews { views, branches, sources, mail })
+    }
+
+    pub fn views(&self) -> Vec<LaptopView> {
+        self.views.clone()
+    }
+
+    /// The keys of the views a message is in. Mail the laptop knows goes
+    /// by its list; anything else by the rules.
+    pub fn keys_for(&self, message_id: String, source: String, from: String, subject: String) -> Vec<String> {
+        if let Some(keys) = self.mail.get(&message_id) {
+            return keys.clone();
+        }
+        let m = Facts { message_id: &message_id, source: &source, from: &from, subject: &subject };
+        self.views.iter().zip(&self.branches)
+            .filter(|(_, bs)| bs.iter().any(|rules| rules.iter().all(|r| self.rule_holds(r, &m))))
+            .map(|(v, _)| v.key.clone())
+            .collect()
+    }
+}
+
+/// A terminal's 256-colour number as 0xRRGGBB, the way xterm draws it:
+/// 16 base colours, a 6×6×6 cube, then 24 greys. None for an empty or
+/// unknown number, so a view without a colour gets the default.
+#[uniffi::export]
+pub fn xterm_colour(code: String) -> Option<u32> {
+    const BASE: [u32; 16] = [
+        0x000000, 0x800000, 0x008000, 0x808000, 0x000080, 0x800080, 0x008080, 0xc0c0c0,
+        0x808080, 0xff0000, 0x00ff00, 0xffff00, 0x0000ff, 0xff00ff, 0x00ffff, 0xffffff,
+    ];
+    let n: u32 = code.trim().parse().ok().filter(|n| *n < 256)?;
+    Some(match n {
+        0..=15 => BASE[n as usize],
+        16..=231 => {
+            let level = |v: u32| if v == 0 { 0 } else { 55 + 40 * v };
+            let i = n - 16;
+            (level(i / 36) << 16) | (level(i / 6 % 6) << 8) | level(i % 6)
+        }
+        _ => { let g = 8 + 10 * (n - 232); (g << 16) | (g << 8) | g }
+    })
+}
+
+/// What the phone knows of a message that a view's rules can ask about.
+struct Facts<'a> {
+    message_id: &'a str,
+    source: &'a str,
+    from: &'a str,
+    subject: &'a str,
+}
+
+impl LaptopViews {
+    /// One rule, as kastrup's SQL reads it. A folder the phone cannot know
+    /// never matches; read state is the Unread chip's business, so it is
+    /// left out; a field kastrup ignores is ignored here too.
+    fn rule_holds(&self, rule: &serde_json::Value, m: &Facts) -> bool {
+        let value = &rule["value"];
+        let words = || value.as_str().unwrap_or("").split('|')
+            .map(|w| w.trim().to_lowercase()).filter(|w| !w.is_empty()).collect::<Vec<_>>();
+        let has_any = |text: &str| { let t = text.to_lowercase(); words().iter().any(|w| t.contains(w)) };
+        match rule["field"].as_str().unwrap_or("") {
+            "folder" | "starred" => false,
+            "read" => true,
+            "sender" => has_any(m.from),
+            "subject" => has_any(m.subject),
+            "platform" => value.as_str() == Some(m.source),
+            "source_id" => value.as_i64().and_then(|id| self.sources.get(&id))
+                .is_some_and(|kind| came_by(kind, m)),
+            "source_type" => value.as_str().is_some_and(|kind| came_by(kind, m)),
+            _ => true,
+        }
+    }
+}
+
+/// Whether a message on the phone came the way a kastrup source of this
+/// plugin type brings it. A relayed chat's id starts with "gw_", which is
+/// how a Discord DM from the relay is told from the bot's channels.
+fn came_by(kind: &str, m: &Facts) -> bool {
+    let relayed = m.message_id.starts_with("gw_");
+    match kind {
+        "maildir" => m.source == "mail",
+        "rss" => m.source == "rss",
+        "gateway" => relayed,
+        "discord" => m.source == "discord" && !relayed,
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const VIEWS: &str = r#"{
+      "views": [
+        {"key":"1","name":"Me","colour":"130","filters":{"rules":[{"field":"folder","op":"=","value":"Me"}]}},
+        {"key":"4","name":"Phone","colour":"129","filters":{"rules":[{"field":"source_id","op":"=","value":11}]}},
+        {"key":"5","name":"Family","colour":"53","filters":{"rules":[{"field":"sender","op":"like","value":"Alice|Bob "}]}},
+        {"key":"6","name":"Messenger","colour":"33","filters":{"branches":[
+          {"rules":[{"field":"platform","op":"=","value":"messenger"}]},
+          {"rules":[{"field":"subject","op":"like","value":"ping"},{"field":"source_id","op":"=","value":4}]}]}}
+      ],
+      "sources": {"4":"rss","11":"gateway"},
+      "mail": {"a@x":["1","5"]}
+    }"#;
+
+    fn keys(v: &LaptopViews, id: &str, source: &str, from: &str, subject: &str) -> Vec<String> {
+        v.keys_for(id.into(), source.into(), from.into(), subject.into())
+    }
+
+    #[test]
+    fn mail_the_laptop_knows_goes_by_its_list() {
+        let v = LaptopViews::new(VIEWS.into());
+        assert_eq!(v.views().iter().map(|x| x.name.as_str()).collect::<Vec<_>>(), ["Me", "Phone", "Family", "Messenger"]);
+        assert_eq!(keys(&v, "a@x", "mail", "Bob <b@x>", "Hi"), ["1", "5"]);
+    }
+
+    #[test]
+    fn what_the_laptop_has_not_seen_goes_by_the_rules() {
+        let v = LaptopViews::new(VIEWS.into());
+        // A folder rule cannot match on the phone; a sender rule can.
+        assert!(keys(&v, "new@x", "mail", "Carol <c@x>", "Hi").is_empty());
+        assert_eq!(keys(&v, "new@x", "mail", "alice <a@x>", "Hi"), ["5"]);
+        // A relayed chat: the Phone view by source, Messenger by platform.
+        assert_eq!(keys(&v, "gw_123", "messenger", "Alice", "hei"), ["4", "5", "6"]);
+        // The second branch needs both its rules.
+        assert_eq!(keys(&v, "f1", "rss", "Blog", "a ping"), ["6"]);
+        assert!(keys(&v, "f2", "rss", "Blog", "nothing").is_empty());
+    }
+
+    #[test]
+    fn a_256_colour_comes_out_as_xterm_draws_it() {
+        assert_eq!(xterm_colour("130".into()), Some(0xaf5f00), "view 1, dark orange");
+        assert_eq!(xterm_colour("24".into()), Some(0x005f87));
+        assert_eq!(xterm_colour("9".into()), Some(0xff0000));
+        assert_eq!(xterm_colour("244".into()), Some(0x808080));
+        assert_eq!(xterm_colour("".into()), None);
+        assert_eq!(xterm_colour("300".into()), None);
+    }
+
+    #[test]
+    fn a_file_that_does_not_parse_gives_no_views() {
+        assert!(LaptopViews::new("not json".into()).views().is_empty());
+    }
 
     #[test]
     fn a_mail_round_trips() {

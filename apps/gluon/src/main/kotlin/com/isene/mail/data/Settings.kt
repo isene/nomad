@@ -5,6 +5,9 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import org.json.JSONArray
 import org.json.JSONObject
+import uniffi.fe2o3_mobile_core.LaptopViews
+import uniffi.fe2o3_mobile_core.Message
+import uniffi.fe2o3_mobile_core.xtermColour
 
 private const val PREFS = "mail_prefs"
 
@@ -44,7 +47,15 @@ data class Feed(val url: String, val title: String)
  * phone reads one INBOX and has none of the laptop's maildir folders to
  * filter on.
  */
-data class View(val name: String, val scopes: List<String>, val match: String)
+data class View(
+    val name: String,
+    val scopes: List<String>,
+    val match: String,
+    /** The laptop's key for it ("1" to "9", "0"); empty for a view made here. */
+    val key: String = "",
+    /** Its colour as 0xRRGGBB, from the laptop; null for none. */
+    val colour: Int? = null,
+)
 
 /**
  * Config, kept on the phone only. Credentials are pasted in once and
@@ -52,6 +63,14 @@ data class View(val name: String, val scopes: List<String>, val match: String)
  * folder, which is a shared surface and has no business holding a
  * refresh token.
  */
+/** The laptop's views, parsed once per file and shared by every
+ *  [Settings], with the keys each message was found to have. */
+private class Laptop(val text: String, val core: LaptopViews?, val views: List<View>) {
+    val keys = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
+}
+
+@Volatile private var laptopCache: Laptop? = null
+
 class Settings(ctx: Context) {
     private val p = ctx.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
@@ -206,7 +225,37 @@ class Settings(ctx: Context) {
         get() = p.getString("views", "") ?: ""
         set(v) = p.edit().putString("views", v).apply()
 
-    fun views(): List<View> = viewsText.lines().mapNotNull { line ->
+    /** kastrup's views file, as the laptop last wrote it, and the time
+     *  stamp of the file it came from. Read by [ReadStateRepo.loadAll]. */
+    var laptopViewsText: String
+        get() = p.getString("laptop_views", "") ?: ""
+        set(v) = p.edit().putString("laptop_views", v).apply()
+    var laptopViewsStamp: Long
+        get() = p.getLong("laptop_views_stamp", 0)
+        set(v) = p.edit().putLong("laptop_views_stamp", v).apply()
+
+    /** The laptop's views when it has sent any, else the ones typed here. */
+    fun views(): List<View> = laptop().views.ifEmpty { phoneViews() }
+
+    /** The keys of the laptop views a message is in. */
+    fun laptopKeys(m: Message): List<String> = laptop().let { l ->
+        l.keys.getOrPut(m.messageId) {
+            l.core?.keysFor(m.messageId, m.source, m.from, m.subject) ?: emptyList()
+        }
+    }
+
+    private fun laptop(): Laptop {
+        val text = laptopViewsText
+        laptopCache?.takeIf { it.text == text }?.let { return it }
+        val core = text.takeIf { it.isNotBlank() }?.let { LaptopViews(it) }
+        val views = core?.views().orEmpty().map {
+            View(it.name, emptyList(), "", key = it.key, colour = xtermColour(it.colour)?.toInt())
+        }
+        return Laptop(text, core, views).also { laptopCache = it }
+    }
+
+    /** The views typed in Settings, one per line. */
+    private fun phoneViews(): List<View> = viewsText.lines().mapNotNull { line ->
         val t = line.trim()
         if (t.isEmpty() || t.startsWith("#") || !t.contains('|')) return@mapNotNull null
         val name = t.substringBefore('|').trim()

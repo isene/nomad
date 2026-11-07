@@ -316,6 +316,7 @@ private fun ScopeMenu(ui: com.isene.mail.viewmodel.UiState, onPick: (String) -> 
                     val me = "view:$v"
                     DropdownMenuItem(
                         text = { Text(v) },
+                        leadingIcon = ui.viewColours[v]?.let { c -> { Text("●", color = Color(0xFF000000.toInt() or c)) } },
                         onClick = { open = false; onPick(me) },
                         trailingIcon = {
                             Checkbox(checked = me in picked, onCheckedChange = {
