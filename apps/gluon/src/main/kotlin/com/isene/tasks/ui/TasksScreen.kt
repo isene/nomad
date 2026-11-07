@@ -232,6 +232,7 @@ fun TasksScreen(vm: TasksViewModel) {
                                 if (cat != null) {
                                     CategoryHeader(
                                         category = cat,
+                                        colour = Color(categoryColor(cat.name, row.catIdx, state.widgetColors)),
                                         collapsed = state.collapsed.contains(cat.name),
                                         onToggle = { vm.toggleCollapse(cat.name) },
                                         onAddItem = { addItemUnderCat = row.catIdx },
@@ -620,6 +621,7 @@ private fun EmptyState(onPick: () -> Unit, modifier: Modifier = Modifier) {
 @Composable
 private fun CategoryHeader(
     category: RustCategory,
+    colour: Color,
     collapsed: Boolean,
     onToggle: () -> Unit,
     onAddItem: () -> Unit,
@@ -645,6 +647,8 @@ private fun CategoryHeader(
             Spacer(Modifier.width(8.dp))
             Text(
                 text = category.name,
+                // The widget's colour for it, so both show the same.
+                color = colour,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 modifier = Modifier.weight(1f),
                 maxLines = 1,

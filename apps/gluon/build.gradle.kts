@@ -150,8 +150,8 @@ android {
         applicationId = "com.isene.gluon"
         minSdk = 33
         targetSdk = 35
-        versionCode = 27
-        versionName = "0.21.0"
+        versionCode = 28
+        versionName = "0.21.1"
         ndk { abiFilters += androidAbis.keys }
     }
 
