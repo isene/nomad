@@ -21,8 +21,8 @@ shows up on the other — no Google account, no cloud middleman.
   colour behind it, as solid as you like. Each line has its category's
   colour; "Widget text" sets the colours, the text size, and whether the
   category's name stands in front. Type six hex digits for a colour, or
-  tap its square to pick one. A category's heading in the list takes the
-  same colour
+  tap its square to pick one. A category's heading in the list has the
+  same colour behind it
 - Storage Access Framework: point it at the synced `~/.tasks/` folder
 - About screen; Material 3; adaptive icon
 

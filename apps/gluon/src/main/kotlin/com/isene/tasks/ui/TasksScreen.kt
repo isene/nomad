@@ -102,6 +102,7 @@ import androidx.compose.foundation.background
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import kotlin.math.roundToInt
 import androidx.compose.material.icons.filled.FormatSize
 import androidx.compose.material3.Checkbox
@@ -630,7 +631,9 @@ private fun CategoryHeader(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        // The widget's colour for the category, with text that reads on it.
+        color = colour,
+        contentColor = if (colour.luminance() > 0.4f) Color.Black else Color.White,
         shape = RoundedCornerShape(8.dp),
     ) {
         Row(
@@ -647,8 +650,6 @@ private fun CategoryHeader(
             Spacer(Modifier.width(8.dp))
             Text(
                 text = category.name,
-                // The widget's colour for it, so both show the same.
-                color = colour,
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
