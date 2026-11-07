@@ -6,6 +6,7 @@ import android.provider.DocumentsContract
 import org.json.JSONArray
 import org.json.JSONObject
 import uniffi.fe2o3_mobile_core.LaptopViews
+import uniffi.fe2o3_mobile_core.SaveFolder
 import uniffi.fe2o3_mobile_core.Message
 import uniffi.fe2o3_mobile_core.xtermColour
 
@@ -251,6 +252,10 @@ class Settings(ctx: Context) {
     /** The laptop's views when it has sent any, else the ones typed here. */
     fun views(): List<View> = laptop().views.ifEmpty { phoneViews() }
 
+    /** The laptop's save folders (`s1`, `s2`, …), empty before its views
+     *  file has come. */
+    fun saveFolders(): List<SaveFolder> = laptop().core?.saveFolders().orEmpty()
+
     /** The keys of the laptop views a message is in. */
     fun laptopKeys(m: Message): List<String> = laptop().let { l ->
         l.keys.getOrPut(m.messageId) {
@@ -373,6 +378,19 @@ class Settings(ctx: Context) {
         get() = p.getString("dismissed", "")?.takeIf { it.isNotEmpty() }?.split("\n")?.toSet()
             ?: emptySet()
         set(v) = p.edit().putString("dismissed", v.joinToString("\n")).apply()
+
+    /** Mail deleted on the laptop, from its `mail-delete-<host>.txt`, and
+     *  the stamp of the files it came from. Kept by [ReadStateRepo.loadAll]. */
+    var laptopGone: Set<String>
+        get() = p.getString("laptop_gone", "")?.takeIf { it.isNotEmpty() }?.split("\n")?.toSet()
+            ?: emptySet()
+        set(v) = p.edit().putString("laptop_gone", v.joinToString("\n")).apply()
+    var laptopGoneStamp: Long
+        get() = p.getLong("laptop_gone_stamp", 0)
+        set(v) = p.edit().putLong("laptop_gone_stamp", v).apply()
+
+    /** Off the list: archived here or deleted on either side. */
+    fun gone(): Set<String> = dismissed + laptopGone
 
     /**
      * The accounts, parsed. A malformed paste yields none rather than a

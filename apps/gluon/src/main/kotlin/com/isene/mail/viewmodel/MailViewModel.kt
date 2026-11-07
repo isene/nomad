@@ -196,7 +196,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Hand the mail among these to the laptop, through the shared folder. */
-    private fun publish(ms: List<Message>, read: Boolean, delete: Boolean = false) {
+    private fun publish(ms: List<Message>, read: Boolean, delete: Boolean = false, saveKey: String = "") {
         val ids = ms.filter { it.source == "mail" }.map { it.messageId }
         val tree = settings.syncTreeUri
         if (ids.isEmpty() || tree.isEmpty()) return
@@ -204,7 +204,8 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         val days = settings.days
         viewModelScope.launch(Dispatchers.IO) {
             val ok = ReadStateRepo.publish(ctx, tree, ids, read, days) &&
-                (!delete || ReadStateRepo.delete(ctx, tree, ids, days))
+                (!delete || ReadStateRepo.delete(ctx, tree, ids, days)) &&
+                (saveKey.isEmpty() || ReadStateRepo.save(ctx, tree, ids, saveKey, days))
             if (!ok) status("Could not write to the shared folder; the laptop did not get this")
         }
     }
@@ -430,6 +431,19 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         status((if (ids.size == 1) "Archived" else "${ids.size} archived") + " — tap to undo")
     }
 
+    fun saveFolders() = settings.saveFolders()
+
+    /** Off this phone's list, marked read, and filed in the laptop's save
+     *  folder `key`, as `s` and that key would file it there. */
+    fun saveTo(m: Message, key: String, name: String) {
+        settings.dismissed = settings.dismissed + m.messageId
+        settings.localMarks = settings.localMarks + (m.messageId to true)
+        undoable = emptySet()
+        recompute()
+        publish(listOf(m), read = true, saveKey = key)
+        status(if (settings.syncTreeUri.isEmpty()) "Pick the shared folder to reach the laptop" else "Saved to $name on the laptop")
+    }
+
     /** Off this phone's list, and deleted from kastrup on the laptop. Gmail
      *  keeps its copy. */
     fun delete(m: Message) {
@@ -565,7 +579,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         val filter = settings.filter
         // The laptop's view, with this phone's own overrides on top.
         val readIds = ReadState.merge(laptopRead, settings.localMarks)
-        val gone = settings.dismissed
+        val gone = settings.gone()
         val here = all.filter { it.messageId !in gone }
         // The removed view is the same list read the other way round: it
         // is the only one that looks at what a swipe hid. Everything else

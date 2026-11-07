@@ -34,6 +34,7 @@ object ReadStateRepo {
         val dir = tree(ctx, settings.syncTreeUri) ?: return emptyList()
         val all = dir.listFiles()
         takeViews(ctx, settings, all)
+        takeDeletes(ctx, settings, all)
         val home = all.firstOrNull { it.name == "home-views.txt" }?.let { text(ctx, it) } ?: ""
         if (home != settings.homeKeysText) settings.homeKeysText = home
         val files = all.mapNotNull { f ->
@@ -59,12 +60,24 @@ object ReadStateRepo {
         settings.laptopViewsStamp = stamp
     }
 
+    /** The laptop's deletions (`mail-delete-<host>.txt`, a Message-ID per
+     *  line), read again only when one of the files changed. */
+    private fun takeDeletes(ctx: Context, settings: Settings, files: Array<DocumentFile>) {
+        val lists = files.filter { it.name?.let { n -> n.startsWith("mail-delete-") && n.endsWith(".txt") && n != DELETES } == true }
+        val stamp = lists.sumOf { it.lastModified() }
+        if (stamp == settings.laptopGoneStamp) return
+        settings.laptopGone = lists.flatMap { text(ctx, it).orEmpty().lines() }
+            .mapNotNull { it.trim().split(Regex("\\s+")).first().takeIf { id -> id.isNotEmpty() } }.toSet()
+        settings.laptopGoneStamp = stamp
+    }
+
     private fun text(ctx: Context, f: DocumentFile): String? = runCatching {
         ctx.contentResolver.openInputStream(f.uri)?.use { it.bufferedReader().readText() }
     }.getOrNull()
 
     private const val MINE = "mail-read-phone.json"
     private const val DELETES = "mail-delete-phone.txt"
+    private const val SAVES = "mail-save-phone.txt"
 
     /** Tell the laptop these were marked read or unread here. False if the file could not be written. */
     fun publish(ctx: Context, treeUri: String, ids: Collection<String>, read: Boolean, days: Int): Boolean {
@@ -81,6 +94,24 @@ object ReadStateRepo {
         if (ids.isEmpty()) return true
         val old = readText(ctx, treeUri, DELETES) ?: ""
         return writeText(ctx, treeUri, DELETES, "text/plain", deleteList(old, ids, System.currentTimeMillis() / 1000, days))
+    }
+
+    /** Ask the laptop to file these in its save folder `key` (as `s1` is 1). */
+    fun save(ctx: Context, treeUri: String, ids: Collection<String>, key: String, days: Int): Boolean {
+        if (ids.isEmpty()) return true
+        val old = readText(ctx, treeUri, SAVES) ?: ""
+        return writeText(ctx, treeUri, SAVES, "text/plain", saveList(old, ids, key, System.currentTimeMillis() / 1000, days))
+    }
+
+    /** The save list with these added and lines older than the window cut.
+     *  A line is the Message-ID, the key and when; one line per mail. */
+    fun saveList(old: String, ids: Collection<String>, key: String, now: Long, days: Int): String {
+        val kept = old.lines().mapNotNull { line ->
+            val parts = line.trim().split(Regex("\\s+"))
+            val ts = parts.getOrNull(2)?.toLongOrNull() ?: return@mapNotNull null
+            if (parts[0] in ids || ts <= now - days * 86_400L) null else "${parts[0]}\t${parts[1]}\t$ts"
+        }
+        return (kept + ids.map { "$it\t$key\t$now" }).joinToString("\n", postfix = "\n")
     }
 
     /** The delete list with these added and lines older than the window cut. */

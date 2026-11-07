@@ -595,6 +595,11 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - Step 3, drafts: kastrup 0.3.117 postpones mail to a file in `drafts/`
   (`park_row`), and Back from a mail begun on the phone writes one
   (`DraftsRepo.create`). Scheduled mail is not shared yet.
+- Step 4, actions: kastrup 0.3.118 writes `mail-delete-<host>.txt`
+  (the phone hides those, `Settings.laptopGone`) and reads
+  `mail-save-<device>.txt` (Message-ID, save key, time) to file a mail as
+  `s` would. Its views file carries the save folders under "save".
+  Not yet shared: star, snooze, unsubscribe, task or event from a mail.
 
 ### fleet (com.isene.fleet)
 

@@ -501,6 +501,15 @@ pub struct LaptopViews {
     sources: HashMap<i64, String>,
     /// Message-ID → the keys of the views the laptop files it under.
     mail: HashMap<String, Vec<String>>,
+    /// The laptop's save folders (`s1`, `s2`, …), sorted by key.
+    save: Vec<SaveFolder>,
+}
+
+/// A folder the laptop's `s` saves to: its key ("1") and short name.
+#[derive(Debug, Clone, PartialEq, uniffi::Record)]
+pub struct SaveFolder {
+    pub key: String,
+    pub name: String,
 }
 
 #[uniffi::export]
@@ -532,11 +541,19 @@ impl LaptopViews {
             .map(|(mid, keys)| (mid.clone(), keys.as_array().into_iter().flatten()
                 .filter_map(|k| k.as_str().map(str::to_string)).collect()))
             .collect();
-        Arc::new(LaptopViews { views, branches, sources, mail })
+        let mut save: Vec<SaveFolder> = v["save"].as_object().into_iter().flatten()
+            .filter_map(|(k, n)| Some(SaveFolder { key: k.clone(), name: n.as_str()?.to_string() }))
+            .collect();
+        save.sort_by(|a, b| a.key.cmp(&b.key));
+        Arc::new(LaptopViews { views, branches, sources, mail, save })
     }
 
     pub fn views(&self) -> Vec<LaptopView> {
         self.views.clone()
+    }
+
+    pub fn save_folders(&self) -> Vec<SaveFolder> {
+        self.save.clone()
     }
 
     /// The keys of the views a message is in. Mail the laptop knows goes
@@ -633,7 +650,8 @@ mod tests {
           {"rules":[{"field":"subject","op":"like","value":"ping"},{"field":"source_id","op":"=","value":4}]}]}}
       ],
       "sources": {"4":"rss","11":"gateway"},
-      "mail": {"a@x":["1","5"]}
+      "mail": {"a@x":["1","5"]},
+      "save": {"2":"Work.Archive","1":"Personal"}
     }"#;
 
     fn keys(v: &LaptopViews, id: &str, source: &str, from: &str, subject: &str) -> Vec<String> {
@@ -658,6 +676,14 @@ mod tests {
         // The second branch needs both its rules.
         assert_eq!(keys(&v, "f1", "rss", "Blog", "a ping"), ["6"]);
         assert!(keys(&v, "f2", "rss", "Blog", "nothing").is_empty());
+    }
+
+    #[test]
+    fn the_save_folders_come_in_key_order() {
+        let v = LaptopViews::new(VIEWS.into());
+        let got: Vec<(String, String)> = v.save_folders().into_iter().map(|f| (f.key, f.name)).collect();
+        assert_eq!(got, [("1".into(), "Personal".into()), ("2".into(), "Work.Archive".into())]);
+        assert!(LaptopViews::new("{}".into()).save_folders().is_empty());
     }
 
     #[test]

@@ -21,4 +21,15 @@ class DeleteListTest {
         val once = ReadStateRepo.deleteList("", listOf("<a@example.com>"), 10, 30)
         assertEquals("<a@example.com>\t20\n", ReadStateRepo.deleteList(once, listOf("<a@example.com>"), 20, 30))
     }
+
+    @Test
+    fun a_save_names_its_folder_and_the_latest_choice_wins() {
+        val day = 86_400L
+        val now = 100 * day
+        val old = "a@x\t1\t${now - 40 * day}\nb@x\t2\t${now - day}\n"
+        assertEquals(
+            "b@x\t3\t$now\n",
+            ReadStateRepo.saveList(old, listOf("b@x"), "3", now, 30),
+        )
+    }
 }

@@ -48,6 +48,8 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import uniffi.fe2o3_mobile_core.mailHtml
 import androidx.compose.runtime.remember
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -281,6 +283,20 @@ fun MessageScreen(
                 if (mail.source == "mail") {
                     OutlinedButton(onClick = { vm.delete(mail); vm.closeBody(); onBack() }) {
                         Text("Delete")
+                    }
+                    // The laptop's `s` folders, named as its hint names them.
+                    val folders = remember { vm.saveFolders() }
+                    if (folders.isNotEmpty()) Box {
+                        var open by remember { mutableStateOf(false) }
+                        OutlinedButton(onClick = { open = true }) { Text("Save") }
+                        DropdownMenu(open, { open = false }) {
+                            folders.forEach { f ->
+                                DropdownMenuItem(text = { Text("s${f.key}  ${f.name}") }, onClick = {
+                                    open = false
+                                    vm.saveTo(mail, f.key, f.name); vm.closeBody(); onBack()
+                                })
+                            }
+                        }
                     }
                 }
             }

@@ -65,14 +65,22 @@ mark wins (merged by the Rust core).
 | Event | Effect |
 |---|---|
 | Read on the laptop | Read here too |
-| Deleted on the laptop | Read here too |
+| Deleted on the laptop | Off the list here |
+| Saved to a folder on the laptop | Out of the views it left |
 | Read, Unread or Archive here | The same on the laptop |
 | Delete here | Deleted on the laptop too |
+| Save here (s1, s2, …) | Filed in that folder on the laptop |
 
 The phone writes only what a button or a swipe chose; opening a mail
-marks nothing. The phone's files are `mail-read-phone.json` and
-`mail-delete-phone.txt` (a Message-ID and a time per line). Both keep
-only the fetch window.
+marks nothing. The phone's files are `mail-read-phone.json`,
+`mail-delete-phone.txt` (a Message-ID and a time per line) and
+`mail-save-phone.txt` (a Message-ID, the save key and a time). All keep
+only the fetch window. The laptop's deletions come in
+`mail-delete-<host>.txt` (kastrup 0.3.118 or later).
+
+Save lists the laptop's `s` folders, by the names its hint shows. The
+mail leaves the list here at once and is filed on the laptop at its next
+pass.
 
 Feeds and chats stay on this phone: kastrup's feed rows have no
 Message-ID to match.

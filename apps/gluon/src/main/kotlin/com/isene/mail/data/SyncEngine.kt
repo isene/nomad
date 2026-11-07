@@ -179,9 +179,10 @@ object SyncEngine {
         // unread and in view. Not while gluon is open: the list shows it.
         if (settings.instant && !MailNotices.inFront) {
             val readIds = ReadState.effective(ctx, settings)
+            val gone = settings.gone()
             val home = Scope.home(settings)
             MailNotices.post(ctx, arrived.filter {
-                it.messageId !in readIds && it.messageId !in settings.dismissed && Scope.atHome(it, home, settings)
+                it.messageId !in readIds && it.messageId !in gone && Scope.atHome(it, home, settings)
             })
         }
 
@@ -197,7 +198,7 @@ object SyncEngine {
      */
     fun summarize(ctx: Context, out: List<Message>, settings: Settings = Settings(ctx)): Pair<Int, Boolean> {
         val readIds = ReadState.effective(ctx, settings)
-        val gone = settings.dismissed
+        val gone = settings.gone()
         val home = Scope.home(settings)
         val unread = out
             .filter { it.messageId !in gone }
