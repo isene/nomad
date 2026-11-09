@@ -289,11 +289,11 @@ private fun Message(tag: String, close: () -> Unit) {
 private fun Sessions(scroll: ScrollState, hold: (String) -> Unit) {
     val list = Board.sessions.value
     val dim = MaterialTheme.colorScheme.onSurfaceVariant
-    if (Board.fault.value) Text("No answer from the server.", color = MaterialTheme.colorScheme.error)
     if (Board.written.value == 0L) {
-        if (!Board.fault.value) Text("Asking the laptop's fleet for its sessions.", color = dim)
+        if (Board.fault.value) LaptopLine() else Text("Asking the laptop's fleet for its sessions.", color = dim)
         return
     }
+    LaptopLine()
     Text("Tap a session for its last answer, hold it to write to it. List from ${clock(Board.written.value)}.",
         style = MaterialTheme.typography.bodySmall, color = dim)
     Board.week.value?.let { w ->
@@ -336,6 +336,7 @@ private fun Seat(s: Session, scroll: ScrollState, open: () -> Unit, hold: () -> 
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             val tag = buildAnnotatedString {
+                reach(s)?.let { withStyle(SpanStyle(color = it)) { append("● ") } }
                 append(s.tag)
                 if (s.auto) withStyle(SpanStyle(color = Color(0xFFFF8700))) { append(" »") }
             }
@@ -346,6 +347,7 @@ private fun Seat(s: Session, scroll: ScrollState, open: () -> Unit, hold: () -> 
             if (s.eta.isNotEmpty()) Text("ETA ${s.eta}", color = if (past(s.eta)) Color(0xFFFF0000) else dim)
             Text(s.state, color = stateColor(s.state), fontWeight = FontWeight.Bold)
         }
+        MessageLine(s)
         if (now) {
             val about = listOfNotNull(s.ws?.let { "WS $it" }, clock(s.at), s.ctx?.let { "${it}k" }, s.model.ifEmpty { null })
             Text(about.joinToString("   "), style = small, color = dim)
@@ -355,6 +357,60 @@ private fun Seat(s: Session, scroll: ScrollState, open: () -> Unit, hold: () -> 
             if (text.isNotEmpty()) Text(text, style = small, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
     }
+}
+
+private val green = Color(0xFF00D700)
+private val red = Color(0xFFFF5F5F)
+private val orange = Color(0xFFFF8700)
+
+/** Whether a message reaches the session now: green while the laptop is
+ *  online and the session runs, grey for a closed one (it reads it when it
+ *  starts again), red with the laptop offline. Null when not known. */
+private fun reach(s: Session): Color? {
+    if (Board.fault.value) return null
+    return when (Board.link.value?.up) {
+        true -> if (s.state == "off" || s.state == "older") stateColor("off") else green
+        false -> red
+        null -> null
+    }
+}
+
+/** Whether the phone reaches the relay server, and the server the laptop.
+ *  Nothing from a server too old to say. */
+@Composable
+fun LaptopLine(always: Boolean = true) {
+    val l = Board.link.value
+    val (text, colour) = when {
+        Board.fault.value -> "No answer from the relay server: the phone is offline, or the server is down." to red
+        l == null -> return
+        l.up == true -> if (always) "● Laptop online" to green else return
+        l.up == false -> "● Laptop offline" + (if (l.seen > 0) " since ${clock(l.seen)}" else "") +
+            ". Messages wait on the server until it is back." to red
+        else -> "● The relay server cannot tell whether the laptop is online." to orange
+    }
+    Text(text, color = colour, style = MaterialTheme.typography.bodyMedium)
+}
+
+/** How far your last message to a session got, or a message on its way
+ *  from elsewhere: sent, on the server, on the laptop, picked up. */
+@Composable
+fun MessageLine(s: Session) {
+    val trip = Board.trips.value[s.tag]
+    val q = if (trip == null) Board.queue.value.firstOrNull { it.tag == s.tag } else null
+    val stage = trip?.stage ?: q?.on ?: return
+    val at = clock(trip?.t ?: q!!.t)
+    val who = if (trip != null) "Your message of $at" else "A message of $at"
+    val dim = MaterialTheme.colorScheme.onSurfaceVariant
+    val (text, colour) = when (stage) {
+        "sending" -> "Sending your message…" to dim
+        "failed" -> "Your message of $at was not sent: ${trip!!.why}" to red
+        "server" -> if (Board.link.value?.up == false) "$who waits on the server: the laptop is offline." to red
+            else "$who is on the server, on its way to the laptop." to dim
+        "laptop" -> if (s.state == "working") "$who is on the laptop; the session reads it when this turn ends." to dim
+            else "$who is on the laptop, waiting for the session to take it." to orange
+        else -> "$who was picked up by the session." to green
+    }
+    Text(text, style = MaterialTheme.typography.bodySmall, color = colour)
 }
 
 /** fleet's colours: 196, 46, 208, 69, 60, 240 and 245 of the 256. */

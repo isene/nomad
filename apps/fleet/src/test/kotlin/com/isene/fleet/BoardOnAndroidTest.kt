@@ -75,6 +75,46 @@ class BoardOnAndroidTest {
     }
 
     @Test
+    fun a_message_goes_from_sent_to_the_laptop_to_picked_up() {
+        val t = Trips()
+        val ci = yours(100)
+        t.sending("ci", 100)
+        t.sent("ci", "ci/100-phone.msg", 101, ms = 5_000)
+        // An answer to a request from before the server had it says nothing.
+        t.seen(listOf(ci), emptyList(), asked = 4_000, now = 102)
+        assertEquals("server", t.all()["ci"]!!.stage)
+        t.seen(listOf(ci), listOf(Queued("ci", "ci/100-phone.msg", 100, "laptop")), 4_000, 103)
+        assertEquals("laptop", t.all()["ci"]!!.stage)
+        // The laptop deleted it as the session took it.
+        t.seen(listOf(ci), emptyList(), asked = 6_000, now = 110)
+        assertEquals("read" to 110L, t.all()["ci"]!!.let { it.stage to it.at })
+        // Shown while the session works on it, gone once that turn ended.
+        t.seen(listOf(yours(115, state = "working")), emptyList(), 7_000, 115)
+        assertEquals("read", t.all()["ci"]!!.stage)
+        t.seen(listOf(yours(130)), emptyList(), 8_000, 130)
+        assertNull(t.all()["ci"])
+        // Not sent: shown for ten minutes.
+        t.sending("ci", 200)
+        t.failed("ci", "no answer from the server", 201)
+        t.seen(listOf(ci), emptyList(), 9_000, 700)
+        assertEquals("failed", t.all()["ci"]!!.stage)
+        t.seen(listOf(ci), emptyList(), 9_000, 802)
+        assertNull(t.all()["ci"])
+    }
+
+    @Test
+    fun the_list_says_whether_the_laptop_is_online() {
+        val a = parseBoard("""{"stamp": 9, "t": 1, "sessions": [], "laptop": {"up": false, "seen": 1794247271},
+            "queue": [{"tag": "ci", "name": "ci/1-phone.msg", "t": 1, "on": "server"}]}""")!!
+        assertEquals(Link(false, 1794247271), a.link)
+        assertEquals(listOf(Queued("ci", "ci/1-phone.msg", 1, "server")), a.queue)
+        assertNull("a server too old to say", parseBoard(list)!!.link)
+        assertEquals(Link(null), parseBoard("""{"stamp": 9, "sessions": [], "laptop": {"up": null}}""")!!.link)
+        assertEquals("ci/1-phone.msg", messageName("""{"result": {"content": [], "_meta": {"name": "ci/1-phone.msg"}}}"""))
+        assertNull(messageName("""{"result": {"content": []}}"""))
+    }
+
+    @Test
     fun the_screen_asks_from_the_stamp_and_a_message_goes_to_its_session() {
         val asked = Collections.synchronizedList(mutableListOf<String>())
         val server = ServerSocket(0, 5, InetAddress.getLoopbackAddress())

@@ -37,13 +37,29 @@ data class Session(
 /** A session's last answer in full: HyperList with the laptop's colours. */
 data class Full(val tag: String, val t: Long, val text: String)
 
+/** Whether the laptop is online, as Syncthing on the relay server sees it:
+ *  `up` is null when the server cannot tell, `seen` when it last was. */
+data class Link(val up: Boolean?, val seen: Long = 0)
+
+/** A message from the phone still on the server: `on` is "laptop" once the
+ *  laptop has its file, else "server". `name` is the file's. */
+data class Queued(val tag: String, val name: String, val t: Long, val on: String)
+
 /** The server's answer to ?sessions: the file time to ask from next, when
  *  fleet wrote the list, and the list itself, or null when unchanged. */
 /** The weekly limit as the laptop's fleet header shows it: percent used,
  *  the Fable share, and when it resets (unix seconds, 0 when unknown). */
 data class Week(val pct: Int, val fable: Int?, val resets: Long)
 
-data class Answer(val stamp: Long, val t: Long, val sessions: List<Session>?, val week: Week? = null)
+data class Answer(
+    val stamp: Long,
+    val t: Long,
+    val sessions: List<Session>?,
+    val week: Week? = null,
+    /** Null from a server too old to say. */
+    val link: Link? = null,
+    val queue: List<Queued> = emptyList(),
+)
 
 private fun week(o: JSONObject?): Week? = o?.takeUnless { it.isNull("week") }?.let {
     Week(it.optInt("week"), if (it.isNull("fable")) null else it.optInt("fable"), it.optLong("resets"))
@@ -53,7 +69,11 @@ private fun week(o: JSONObject?): Week? = o?.takeUnless { it.isNull("week") }?.l
 fun parseBoard(body: String): Answer? = try {
     val o = JSONObject(body)
     val list = o.optJSONArray("sessions")?.let { a -> List(a.length()) { session(a.getJSONObject(it)) } }
-    Answer(o.getLong("stamp"), o.optLong("t"), list, week(o.optJSONObject("usage")))
+    val link = o.optJSONObject("laptop")?.let { Link(if (it.isNull("up")) null else it.optBoolean("up"), it.optLong("seen")) }
+    val queue = o.optJSONArray("queue")?.let { a ->
+        List(a.length()) { i -> a.getJSONObject(i).let { Queued(it.optString("tag"), it.optString("name"), it.optLong("t"), it.optString("on")) } }
+    }.orEmpty()
+    Answer(o.getLong("stamp"), o.optLong("t"), list, week(o.optJSONObject("usage")), link, queue)
 } catch (_: Exception) {
     null
 }
@@ -174,6 +194,77 @@ fun dropBody(tag: String, num: Int, text: String): String = JSONObject()
         .put("arguments", JSONObject().put("tag", tag).put("num", num).put("text", text)))
     .toString()
 
+/** The file the server wrote a message to, or null from a server too old
+ *  to say. */
+fun messageName(body: String): String? = try {
+    JSONObject(body).getJSONObject("result").optJSONObject("_meta")?.optString("name")?.ifEmpty { null }
+} catch (_: Exception) {
+    null
+}
+
+/** A message sent from this phone and how far it got: "sending", "failed",
+ *  "server", "laptop" or "read". `t` is when it was sent and `at` when it
+ *  reached its stage, unix seconds; `sent` is the phone's clock in ms when
+ *  the server took it; `why` says why it was not sent. */
+data class Trip(val name: String, val t: Long, val stage: String, val at: Long, val sent: Long = 0, val why: String = "")
+
+/** The last message to each session, followed from Send until the session
+ *  has ended a turn after it was picked up. */
+class Trips {
+    private val last = mutableMapOf<String, Trip>()
+
+    @Synchronized
+    fun all(): Map<String, Trip> = last.toMap()
+
+    @Synchronized
+    fun sending(tag: String, now: Long) {
+        last[tag] = Trip("", now, "sending", now)
+    }
+
+    /** The server took it as the file `name`, at `ms` on the phone's clock. */
+    @Synchronized
+    fun sent(tag: String, name: String, now: Long, ms: Long) {
+        last[tag]?.let { last[tag] = it.copy(name = name, stage = "server", at = now, sent = ms) }
+    }
+
+    @Synchronized
+    fun failed(tag: String, why: String, now: Long) {
+        last[tag]?.let { last[tag] = it.copy(stage = "failed", at = now, why = why) }
+    }
+
+    /** Followed no further: a server too old to name the file. */
+    @Synchronized
+    fun forget(tag: String) {
+        last.remove(tag)
+    }
+
+    /** A list answer to a request started at `asked` (phone ms). The laptop
+     *  deletes a message as its session takes it, so one that left the queue
+     *  was picked up, if the request started after the server had it. A
+     *  trip is dropped once its session has ended a turn after it was
+     *  picked up, or ten minutes after it was picked up or failed. */
+    @Synchronized
+    fun seen(list: List<Session>, queue: List<Queued>, asked: Long, now: Long) {
+        for ((tag, trip) in last.toMap()) {
+            val q = queue.find { it.name == trip.name }
+            val moving = trip.stage == "server" || trip.stage == "laptop"
+            last[tag] = when {
+                moving && q != null -> if (q.on == trip.stage) trip else trip.copy(stage = q.on, at = now)
+                moving && asked > trip.sent -> trip.copy(stage = "read", at = now)
+                else -> trip
+            }
+            val cur = last.getValue(tag)
+            val s = list.find { it.tag == tag }
+            val over = when (cur.stage) {
+                "read" -> now - cur.at > 600 || s != null && s.state != "working" && s.at > cur.at
+                "failed" -> now - cur.at > 600
+                else -> false
+            }
+            if (over) last.remove(tag)
+        }
+    }
+}
+
 /** The server's words on a sent message, or null when it gave none. */
 fun messageReply(body: String): String? = try {
     JSONObject(body).getJSONObject("result").getJSONArray("content").getJSONObject(0).getString("text")
@@ -192,6 +283,12 @@ object Board {
     val written = mutableStateOf(0L)
     val fault = mutableStateOf(false)
     val week = mutableStateOf<Week?>(null)
+    /** Whether the laptop is online, or null from a server too old to say. */
+    val link = mutableStateOf<Link?>(null)
+    /** The phone's messages still on the server, from any phone or app. */
+    val queue = mutableStateOf<List<Queued>>(emptyList())
+    /** How far the last message to each session got. */
+    val trips = mutableStateOf<Map<String, Trip>>(emptyMap())
     /** The session a tapped notice named: the list scrolls to it once. */
     val jump = mutableStateOf<String?>(null)
     /** The same session, shown marked until the screen is left. */
@@ -201,8 +298,13 @@ object Board {
     /** The list as the server last gave it, before `answered` takes from it. */
     @Volatile private var raw: List<Session> = emptyList()
     private val answered = Answered()
+    private val tracker = Trips()
     @Volatile private var worker: Thread? = null
     @Volatile private var call: HttpURLConnection? = null
+    /** Set by a sent message: the request it cut asks again at once. */
+    @Volatile private var again = false
+
+    private fun now() = System.currentTimeMillis() / 1000
 
     fun start(ctx: Context) {
         val address = Store(ctx).address
@@ -211,8 +313,14 @@ object Board {
             var stamp = -1L
             try {
                 while (!Thread.currentThread().isInterrupted) {
+                    again = false
+                    val asked = System.currentTimeMillis()
                     val got = get(board(address, stamp, if (stamp < 0) 0 else 80))?.let(::parseBoard)
                     if (Thread.currentThread().isInterrupted) break
+                    if (got == null && again) {
+                        stamp = -1
+                        continue
+                    }
                     fault.value = got == null
                     if (got == null) {
                         Thread.sleep(30_000)
@@ -224,6 +332,10 @@ object Board {
                         sessions.value = answered.shown(it)
                         written.value = got.t
                         week.value = got.week
+                        link.value = got.link
+                        queue.value = got.queue
+                        if (got.link != null) tracker.seen(it, got.queue, asked, now())
+                        trips.value = tracker.all()
                     }
                 }
             } catch (_: InterruptedException) {
@@ -237,8 +349,9 @@ object Board {
         worker = null
     }
 
-    /** Sends `text` to the session `tag`, and says in a toast how it went.
-     *  The items it answers leave the list at once. */
+    /** Sends `text` to the session `tag`. A line under the session shows
+     *  how far it got; a toast says why when it was not sent. The items it
+     *  answers leave the list at once. */
     fun send(ctx: Context, tag: String, text: String) {
         val address = Store(ctx).address
         val app = ctx.applicationContext
@@ -247,14 +360,30 @@ object Board {
             answered.sent(it, nums)
             sessions.value = answered.shown(raw)
         }
+        tracker.sending(tag, now())
+        trips.value = tracker.all()
         thread(name = "send") {
-            val said = post(address, messageBody(tag, text))?.let(::messageReply)
+            val body = post(address, messageBody(tag, text))
+            val said = body?.let(::messageReply)
+            val name = body?.let(::messageName)
             Handler(Looper.getMainLooper()).post {
-                if (said?.startsWith("Delivered") != true && nums.isNotEmpty()) {
+                val ok = said?.startsWith("Delivered") == true
+                when {
+                    ok && name != null -> tracker.sent(tag, name, now(), System.currentTimeMillis())
+                    ok -> tracker.forget(tag)
+                    else -> tracker.failed(tag, said ?: "no answer from the server", now())
+                }
+                trips.value = tracker.all()
+                if (!ok && nums.isNotEmpty()) {
                     answered.failed(tag, nums)
                     sessions.value = answered.shown(raw)
                 }
-                Toast.makeText(app, said ?: "Not sent: no answer from the server.", Toast.LENGTH_LONG).show()
+                if (!ok || name == null) Toast.makeText(app, said ?: "Not sent: no answer from the server.", Toast.LENGTH_LONG).show()
+                // A fresh list at once, with the message in it.
+                if (ok) {
+                    again = true
+                    call?.disconnect()
+                }
             }
         }
     }

@@ -52,6 +52,12 @@ phone twin of [fleet](https://github.com/isene/fleet).
   items.
 - Hold a session to write it a message. fleet on the laptop wakes the
   session with it once the session waits at its prompt.
+- A line above the list says whether the laptop is online, or since when
+  it is offline. A red line about the relay server means the phone does
+  not reach it. The dot before a session is green when a message reaches
+  it now, grey for a closed session and red with the laptop offline.
+- Under a session, a line follows your last message to it: on the
+  server, on the laptop, or picked up by the session.
 - Paste the address of your fleet connector once. It stays on the phone, and
   the app keeps no backup of it.
 - With all switches off nothing runs. With one on, the app keeps one request
