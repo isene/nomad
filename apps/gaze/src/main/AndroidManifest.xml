@@ -54,6 +54,9 @@
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
+                <!-- An HTML file shared from another app, such as pointer. -->
+                <data android:mimeType="text/html" />
+                <data android:mimeType="application/xhtml+xml" />
             </intent-filter>
         </activity>
     </application>

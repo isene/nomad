@@ -472,9 +472,13 @@ class MainActivity : ComponentActivity() {
     private fun handle(intent: Intent?): Boolean {
         val url = when (intent?.action) {
             Intent.ACTION_VIEW -> intent.dataString
-            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
-                Regex("https?://\\S+").find(text)?.value ?: gazeToUri(text, prefs.search)
-            }
+            // A shared HTML file comes as a stream; only another app's
+            // provider may hand one over, never a file:// path.
+            Intent.ACTION_SEND -> intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                ?.takeIf { it.scheme == "content" }?.toString()
+                ?: intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
+                    Regex("https?://\\S+").find(text)?.value ?: gazeToUri(text, prefs.search)
+                }
             else -> null
         } ?: return false
         setIntent(Intent())

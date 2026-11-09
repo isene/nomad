@@ -18,7 +18,7 @@ The laptop browser's best parts on the phone, around Android's own WebView.
 - **Desktop sites:** *Desktop here*, under *This page ›*, gets a site's desktop page, 1024 pixels wide and shown whole. *Phone here* turns it back.
 - **Ask Claude** hands the page, its title, address and text, to the Claude app. You ask there, on your own plan; no API key.
 - **Pull down** at the top of a page to reload it. A map or a scrolling panel keeps its drag.
-- **Share** from the menu sends the page to any app. Links from other apps open here, and links shared to gaze open too. An HTML file on the phone opens in gaze from a file manager such as pointer: tap it and pick gaze.
+- **Share** from the menu sends the page to any app. Links from other apps open here, and links shared to gaze open too. An HTML file on the phone opens in gaze from a file manager such as pointer: open it in another app, or share it, and pick gaze.
 
 ## Setup
 
