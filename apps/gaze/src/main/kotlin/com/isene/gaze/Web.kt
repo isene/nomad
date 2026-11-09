@@ -214,7 +214,8 @@ private fun WebView.setUp(a: MainActivity, tab: Tab) {
                         false
                     }
                 }
-                "about", "data", "blob", "javascript" -> {
+                // "content" is a file another app gave gaze, and its links.
+                "about", "data", "blob", "javascript", "content" -> {
                     if (req.isForMainFrame) a.darken(view, req.url.toString())
                     false
                 }
