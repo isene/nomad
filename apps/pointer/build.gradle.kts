@@ -125,8 +125,8 @@ android {
         applicationId = "com.isene.pointer"
         minSdk = 33
         targetSdk = 35
-        versionCode = 9
-        versionName = "0.4.2"
+        versionCode = 10
+        versionName = "0.4.3"
         ndk { abiFilters += androidAbis.keys }
     }
 

@@ -33,7 +33,7 @@ taken back.
 - **Search.** Typing narrows the folder on screen. One more tap searches
   every folder below it, by name or for words inside the text files.
 - **Pictures and text open in the app.** Swipe through the pictures of a
-  folder, double-tap to zoom. Hold a finger on a word in a text file to
+  folder, pinch or double-tap to zoom. Hold a finger on a word in a text file to
   mark it, drag the two handles, and copy. Everything else opens in the
   app the phone picks for it; an APK goes to the installer. Pictures and
   videos show what is in them right in the list.

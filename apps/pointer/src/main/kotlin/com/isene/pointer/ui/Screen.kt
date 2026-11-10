@@ -15,8 +15,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -124,6 +127,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -1105,8 +1109,8 @@ private fun ViewerActions(entry: Entry, vm: PointerViewModel, ctx: Context) {
     }
 }
 
-/** The pictures of the folder, one per page. A double tap zooms in; a
- *  zoomed picture is moved with one finger and sized with two. */
+/** The pictures of the folder, one per page. Two fingers size a picture,
+ *  and a double tap zooms in; a zoomed picture is moved with one finger. */
 @Composable
 private fun Pictures(entry: Entry, shown: List<Entry>, vm: PointerViewModel, ctx: Context) {
     // A picture copied out of an archive is not among the items on screen,
@@ -1154,13 +1158,12 @@ private fun Picture(path: String, onZoom: (Boolean) -> Unit) {
         // The picture as first read, shown while the sharper one loads.
         var first by remember { mutableStateOf<MemoryCache.Key?>(null) }
         val big = zoom > 1f
-        val set = { z: Float, by: Offset ->
-            zoom = z.coerceIn(1f, 8f)
-            // The picture cannot be pushed off the screen.
-            val x = w * (zoom - 1f) / 2f
-            val y = h * (zoom - 1f) / 2f
-            shift = Offset((shift.x + by.x).coerceIn(-x, x), (shift.y + by.y).coerceIn(-y, y))
-            onZoom(zoom > 1f)
+        val take = { step: Pair<Float, Offset>? ->
+            step?.let { (z, s) ->
+                zoom = z
+                shift = s
+                onZoom(z > 1f)
+            }
         }
         val ctx = LocalContext.current
         AsyncImage(
@@ -1178,11 +1181,26 @@ private fun Picture(path: String, onZoom: (Boolean) -> Unit) {
             onSuccess = { if (!big) first = it.result.memoryCacheKey },
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize()
-                .pointerInput(Unit) {
-                    detectTapGestures(onDoubleTap = { set(if (zoom > 1f) 1f else 3f, Offset.Zero) })
+                .pointerInput(w, h) {
+                    detectTapGestures(onDoubleTap = {
+                        take(pinchStep(1f, Offset.Zero, 2, if (zoom > 1f) 1f else 3f, Offset.Zero, w, h))
+                    })
                 }
-                .pointerInput(big) {
-                    if (big) detectTransformGestures { _, pan, change, _ -> set(zoom * change, pan) }
+                .pointerInput(w, h) {
+                    // Each move of the fingers, taken from the pager only
+                    // when pinchStep says it is the picture's.
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        do {
+                            val event = awaitPointerEvent()
+                            val fingers = event.changes.count { it.pressed }
+                            val step = pinchStep(zoom, shift, fingers, event.calculateZoom(), event.calculatePan(), w, h)
+                            if (step != null) {
+                                take(step)
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        } while (event.changes.any { it.pressed })
+                    }
                 }
                 .graphicsLayer {
                     scaleX = zoom
@@ -1192,6 +1210,19 @@ private fun Picture(path: String, onZoom: (Boolean) -> Unit) {
                 },
         )
     }
+}
+
+/** One move of the fingers on a picture: its new size and shift, or null
+ *  when the move is the pager's, as one finger on a picture at its own
+ *  size is. Two fingers size it at any size; one moves a zoomed one. The
+ *  picture stays between its own size and 8 times it, and cannot be
+ *  pushed off a screen `w` by `h`. */
+internal fun pinchStep(zoom: Float, shift: Offset, fingers: Int, change: Float, pan: Offset, w: Int, h: Int): Pair<Float, Offset>? {
+    if (fingers < 2 && zoom <= 1f) return null
+    val z = (zoom * change).coerceIn(1f, 8f)
+    val x = w * (z - 1f) / 2f
+    val y = h * (z - 1f) / 2f
+    return z to Offset((shift.x + pan.x).coerceIn(-x, x), (shift.y + pan.y).coerceIn(-y, y))
 }
 
 @Composable
