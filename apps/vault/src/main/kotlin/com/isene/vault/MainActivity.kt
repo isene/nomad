@@ -111,6 +111,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        // Back from Android's settings: the file access may be allowed now.
+        version++
         if (!vault.unlocked) return
         if (leftAt != 0L && SystemClock.elapsedRealtime() - leftAt > AWAY_MS) {
             lock()
@@ -129,6 +131,10 @@ class MainActivity : ComponentActivity() {
 
     fun unlock(master: String) {
         if (busy) return
+        if (!Environment.isExternalStorageManager()) {
+            message = "vault may not read files yet. Tap Allow file access, switch vault on there, and come back."
+            return
+        }
         busy = true
         message = ""
         lifecycleScope.launch {
@@ -213,6 +219,7 @@ private fun Note(a: MainActivity) {
 private fun Locked(a: MainActivity) {
     var master by remember { mutableStateOf("") }
     var folder by remember { mutableStateOf(a.prefs.syncDir) }
+    a.version
     val go = {
         if (master.isNotEmpty()) {
             a.unlock(master)
@@ -229,7 +236,7 @@ private fun Locked(a: MainActivity) {
         OutlinedTextField(
             value = master,
             onValueChange = { master = it },
-            label = { Text("Master password") },
+            label = { Text("Master password, as in gaze on the laptop") },
             singleLine = true,
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
