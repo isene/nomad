@@ -263,10 +263,10 @@ private fun Locked(a: MainActivity) {
 @Composable
 private fun Listing(a: MainActivity) {
     var find by remember { mutableStateOf("") }
-    var tab by remember { mutableStateOf("Web") }
+    var tab by remember { mutableStateOf("Other") }
     val logins = a.vault.logins
     val tabs = remember(a.version) { vaultTabs(logins) }
-    if (tab !in tabs) tab = "Web"
+    if (tab !in tabs) tab = "Other"
     val rows = remember(a.version, tab, find) { vaultRows(logins, tab, find) }
     Column(Modifier.fillMaxSize()) {
         Bar("vault", "Lock") { a.lock() }

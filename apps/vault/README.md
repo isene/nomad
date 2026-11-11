@@ -7,7 +7,7 @@ Your passwords on the phone, from the same encrypted file as [vault](https://git
 - **Open** with the master password you use on the laptop.
 - **Find:** type a few letters, and the list narrows. The list never shows a password.
 - **Tap** an entry to copy its password. The clipboard is emptied 30 seconds later.
-- **Tabs:** `Web` for entries with a site, `Other` for the rest, and one for each tag.
+- **Tabs:** `Other` for entries with no site, one for each tag, and `Web` last.
 - **Open ›** shows every field of an entry. Change them, make a new password, or delete the entry.
 - **New entry** adds one. The laptop has it at the next sync.
 - **Lock:** the app locks when the screen goes dark, and after five minutes away.

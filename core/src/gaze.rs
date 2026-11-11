@@ -617,7 +617,7 @@ mod tests {
         let door = Login { title: "Office door".into(), group: "work keys".into(), password: "1234".into(), ..Login::default() };
         let web = Login { origin: "https://a.no".into(), username: "u".into(), password: "pw".into(), ..Login::default() };
         let all = vec![door.clone(), web.clone()];
-        assert_eq!(vault_tabs(all.clone()), ["Web", "Other", "keys", "work"]);
+        assert_eq!(vault_tabs(all.clone()), ["Other", "keys", "work", "Web"]);
         assert_eq!(vault_rows(all.clone(), "work".into(), "".into()), vec![door.clone()]);
         assert_eq!(vault_rows(all.clone(), "Web".into(), "office".into()), vec![door.clone()], "typing looks in every tab");
         // A changed password lands on the same entry.
