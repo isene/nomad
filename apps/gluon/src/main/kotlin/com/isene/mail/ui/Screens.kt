@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -255,18 +256,22 @@ fun MessageScreen(
         bottomBar = {
             // Scaffold insets its content but not its bars, so this is
             // what keeps the buttons clear of the system navigation.
+            val tight = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp, vertical = 8.dp)
             Row(
-                Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),
+                // Five buttons can be wider than the screen: they keep their
+                // size and the row scrolls sideways. A button that shared
+                // out the space left over was squeezed to a tall sliver.
+                Modifier.fillMaxWidth().navigationBarsPadding().horizontalScroll(rememberScrollState()).padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 // Opening a mail publishes nothing; these buttons do, so
                 // the laptop hears only what you chose.
-                Button(onClick = { vm.setRead(mail, !read) }, modifier = Modifier.weight(1f)) {
+                Button(onClick = { vm.setRead(mail, !read) }, contentPadding = tight) {
                     Text(if (read) "Unread" else "Read")
                 }
                 if (mail.link.isNotEmpty()) {
                     val ctx = LocalContext.current
-                    OutlinedButton(onClick = {
+                    OutlinedButton(contentPadding = tight, onClick = {
                         runCatching {
                             ctx.startActivity(
                                 android.content.Intent(
@@ -277,18 +282,18 @@ fun MessageScreen(
                         }
                     }) { Text("Open") }
                 }
-                OutlinedButton(onClick = { vm.dismiss(mail); vm.closeBody(); onBack() }) {
+                OutlinedButton(onClick = { vm.dismiss(mail); vm.closeBody(); onBack() }, contentPadding = tight) {
                     Text("Archive")
                 }
                 if (mail.source == "mail") {
-                    OutlinedButton(onClick = { vm.delete(mail); vm.closeBody(); onBack() }) {
+                    OutlinedButton(onClick = { vm.delete(mail); vm.closeBody(); onBack() }, contentPadding = tight) {
                         Text("Delete")
                     }
                     // The laptop's `s` folders, named as its hint names them.
                     val folders = remember { vm.saveFolders() }
                     if (folders.isNotEmpty()) Box {
                         var open by remember { mutableStateOf(false) }
-                        OutlinedButton(onClick = { open = true }) { Text("Save") }
+                        OutlinedButton(onClick = { open = true }, contentPadding = tight) { Text("Save") }
                         DropdownMenu(open, { open = false }) {
                             folders.forEach { f ->
                                 DropdownMenuItem(text = { Text("s${f.key}  ${f.name}") }, onClick = {
