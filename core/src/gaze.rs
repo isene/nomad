@@ -206,6 +206,54 @@ pub fn gaze_forget(logins: Vec<Login>, uri: String, username: String) -> Vec<Log
     logins.into_iter().filter(|l| !(is_web(l) && site_key(&l.origin) == site && l.username == username)).collect()
 }
 
+// ---------- the vault app ----------
+
+fn to_vault(logins: Vec<Login>) -> Vec<vault::Login> {
+    logins.into_iter().map(Into::into).collect()
+}
+
+/// The tabs of the vault app: Web, Other, then a tab per tag.
+#[uniffi::export]
+pub fn vault_tabs(logins: Vec<Login>) -> Vec<String> {
+    vault::tabs(&to_vault(logins))
+}
+
+/// The entries of a tab by name, or with letters typed, every entry
+/// that has them in any field but the password.
+#[uniffi::export]
+pub fn vault_rows(logins: Vec<Login>, tab: String, find: String) -> Vec<Login> {
+    vault::rows(&to_vault(logins), &tab, &find).into_iter().map(Login::from).collect()
+}
+
+/// The entries with `entry` put in: in the place of `old`, or as a new
+/// one. None when another entry already has its name, user and tags.
+#[uniffi::export]
+pub fn vault_put(logins: Vec<Login>, old: Option<Login>, entry: Login) -> Option<Vec<Login>> {
+    let new: vault::Login = Login { changed: now(), ..entry }.into();
+    let old: Option<vault::Login> = old.map(Into::into);
+    let mut all = to_vault(logins);
+    let at = old.as_ref().and_then(|o| all.iter().position(|l| vault::same_entry(l, o)));
+    if all.iter().enumerate().any(|(i, l)| Some(i) != at && vault::same_entry(l, &new)) { return None; }
+    match at {
+        Some(i) => all[i] = new,
+        None => all.push(new),
+    }
+    Some(all.into_iter().map(Login::from).collect())
+}
+
+/// The entries without `entry`.
+#[uniffi::export]
+pub fn vault_drop(logins: Vec<Login>, entry: Login) -> Vec<Login> {
+    let gone: vault::Login = entry.into();
+    to_vault(logins).into_iter().filter(|l| !vault::same_entry(l, &gone)).map(Login::from).collect()
+}
+
+/// A new password of `len` characters.
+#[uniffi::export]
+pub fn vault_new_password(len: u32) -> String {
+    vault::new_password(len as usize)
+}
+
 fn now() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
@@ -562,6 +610,26 @@ mod tests {
         assert_eq!(gaze_logins_for_site(back.clone(), "https://a.no/login".into()), vec![web.clone()]);
         assert!(gaze_logins_for_site(back.clone(), "".into()).is_empty());
         assert_eq!(gaze_login_name(door), "Office door");
+    }
+
+    #[test]
+    fn the_vault_app_lists_changes_and_drops_entries() {
+        let door = Login { title: "Office door".into(), group: "work keys".into(), password: "1234".into(), ..Login::default() };
+        let web = Login { origin: "https://a.no".into(), username: "u".into(), password: "pw".into(), ..Login::default() };
+        let all = vec![door.clone(), web.clone()];
+        assert_eq!(vault_tabs(all.clone()), ["Web", "Other", "keys", "work"]);
+        assert_eq!(vault_rows(all.clone(), "work".into(), "".into()), vec![door.clone()]);
+        assert_eq!(vault_rows(all.clone(), "Web".into(), "office".into()), vec![door.clone()], "typing looks in every tab");
+        // A changed password lands on the same entry.
+        let changed = vault_put(all.clone(), Some(door.clone()), Login { password: "9999".into(), ..door.clone() }).unwrap();
+        assert_eq!(changed.len(), 2);
+        assert_eq!(changed[0].password, "9999");
+        assert!(changed[0].changed > 0);
+        // A second entry of the same name, user and tags is refused.
+        assert!(vault_put(all.clone(), None, door.clone()).is_none());
+        assert_eq!(vault_put(all.clone(), None, Login { title: "Bike".into(), ..Login::default() }).unwrap().len(), 3);
+        assert_eq!(vault_drop(all, door), vec![web]);
+        assert_eq!(vault_new_password(24).chars().count(), 24);
     }
 
     #[test]
