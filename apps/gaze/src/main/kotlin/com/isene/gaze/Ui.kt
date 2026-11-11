@@ -71,6 +71,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import uniffi.fe2o3_mobile_core.Login
 
 val Accent = Color(0xFFF74C00)
 val Panel = Color(0xFF14131F)
@@ -409,9 +410,28 @@ private fun PasswordsScreen(a: MainActivity) {
             TextButton(onClick = { a.askMaster = true }) { Text("Unlock", color = Accent) }
             return@Sheet
         }
-        val logins = a.vault.logins.sortedWith(compareBy({ it.origin }, { it.username }))
+        var find by remember { mutableStateOf("") }
+        var gone by remember { mutableStateOf<Login?>(null) }
+        OutlinedTextField(find, { find = it }, label = { Text("Find") }, singleLine = true, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp))
+        // Web logins by site, then the rest (a server, a door) by name.
+        val name = { l: Login -> l.title.ifEmpty { shown(l.origin) } }
+        val logins = a.vault.logins
+            .filter { l -> find.isBlank() || listOf(l.title, l.origin, l.username, l.group, l.note).any { it.contains(find.trim(), ignoreCase = true) } }
+            .sortedWith(compareBy({ it.origin.isEmpty() }, { name(it).lowercase() }, { it.username }))
         LazyColumn(Modifier.weight(1f)) {
-            items(logins) { l -> Row2(shown(l.origin), l.username.ifEmpty { "(no username)" }, false, {}) { a.forget(l) } }
+            items(logins) { l ->
+                val sub = listOf(l.username, l.group).filter { it.isNotEmpty() }.joinToString(" · ").ifEmpty { "(no username)" }
+                Row2(name(l), sub, false, { a.copyPassword(l) }) { gone = l }
+            }
+        }
+        gone?.let { l ->
+            AlertDialog(
+                onDismissRequest = { gone = null },
+                title = { Text("Forget ${name(l)}?") },
+                text = { Text("It is removed on the laptop too.") },
+                confirmButton = { TextButton(onClick = { a.forget(l); gone = null }) { Text("Forget", color = Accent) } },
+                dismissButton = { TextButton(onClick = { gone = null }) { Text("Keep", color = Accent) } },
+            )
         }
         TextButton(onClick = { a.lock() }, modifier = Modifier.fillMaxWidth()) { Text("Lock", color = Accent) }
     }

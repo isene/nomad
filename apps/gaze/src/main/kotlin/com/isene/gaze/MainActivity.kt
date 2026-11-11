@@ -57,7 +57,7 @@ import uniffi.fe2o3_mobile_core.AdList
 import uniffi.fe2o3_mobile_core.Login
 import uniffi.fe2o3_mobile_core.LoginChange
 import uniffi.fe2o3_mobile_core.Places
-import uniffi.fe2o3_mobile_core.gazeForget
+import uniffi.fe2o3_mobile_core.gazeLoginName
 import uniffi.fe2o3_mobile_core.gazeRemember
 import uniffi.fe2o3_mobile_core.gazeSiteKey
 import uniffi.fe2o3_mobile_core.gazeTabParse
@@ -611,12 +611,31 @@ class MainActivity : ComponentActivity() {
     fun forget(l: Login) {
         lifecycleScope.launch {
             val err = withContext(Dispatchers.IO) {
-                runCatching { vault.change { gazeForget(it, l.origin, l.username) } }.getOrElse { writeProblem() }
+                // The laptop may have filled it since, so match on what names an entry.
+                runCatching {
+                    vault.change { all -> all.filterNot { it.origin == l.origin && it.username == l.username && it.title == l.title && it.group == l.group } }
+                }.getOrElse { writeProblem() }
             }
             vaultVersion++
-            say(err ?: "Forgot ${l.username} on ${l.origin}")
+            say(err ?: "Forgot ${gazeLoginName(l)}")
         }
     }
+
+    /**
+     * The password on the clipboard for half a minute, marked so the
+     * keyboard and the system do not show it. One timer, set by the tap.
+     */
+    fun copyPassword(l: Login) {
+        val board = getSystemService(ClipboardManager::class.java)
+        val clip = ClipData.newPlainText("password", l.password)
+        clip.description.extras = android.os.PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE", true) }
+        board.setPrimaryClip(clip)
+        clearClip.removeCallbacksAndMessages(null)
+        clearClip.postDelayed({ runCatching { board.clearPrimaryClip() } }, 30_000)
+        say("Password copied, gone in 30 seconds")
+    }
+
+    private val clearClip = android.os.Handler(android.os.Looper.getMainLooper())
 
     fun unlock(master: String) {
         unlocking = true

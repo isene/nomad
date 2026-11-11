@@ -8,10 +8,6 @@
 //
 // Kotlin owns every file. These functions take and give bytes and text.
 
-use argon2::Argon2;
-use chacha20poly1305::aead::{Aead, KeyInit};
-use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
@@ -75,19 +71,41 @@ fn site_key(uri: &str) -> String {
 }
 
 // ---------- passwords ----------
+//
+// The file and its rules live in the `vault` crate, which the laptop's
+// gaze and the vault program use too, so the three cannot drift.
 
-const MAGIC: &[u8] = b"GAZE1";
-const SALT_LEN: usize = 16;
-const NONCE_LEN: usize = 12;
-
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, uniffi::Record)]
+/// One entry of the password file. A web login has an `origin`; a
+/// password for anything else has a `title` and no origin.
+#[derive(Clone, Debug, PartialEq, Default, uniffi::Record)]
 pub struct Login {
     pub origin: String,
     pub username: String,
     pub password: String,
-    /// Seconds since the epoch of the last fill or change; the latest first.
-    #[serde(default)]
+    /// Seconds since the epoch of the last fill; the latest first.
     pub used: u64,
+    #[uniffi(default = "")]
+    pub title: String,
+    /// The tab the entry sits under in vault. Empty for a plain web login.
+    #[uniffi(default = "")]
+    pub group: String,
+    #[uniffi(default = "")]
+    pub note: String,
+    /// Seconds since the epoch of the last change.
+    #[uniffi(default = 0)]
+    pub changed: u64,
+}
+
+impl From<vault::Login> for Login {
+    fn from(l: vault::Login) -> Login {
+        Login { origin: l.origin, username: l.username, password: l.password, used: l.used, title: l.title, group: l.group, note: l.note, changed: l.changed }
+    }
+}
+
+impl From<Login> for vault::Login {
+    fn from(l: Login) -> vault::Login {
+        vault::Login { origin: l.origin, username: l.username, password: l.password, used: l.used, title: l.title, group: l.group, note: l.note, changed: l.changed }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, uniffi::Enum)]
@@ -103,72 +121,60 @@ pub struct Remembered {
     pub change: LoginChange,
 }
 
-/// The salt a password file was sealed with, or None when it is no gaze
+/// The salt a password file was sealed with, or None when it is no
 /// password file.
 #[uniffi::export]
 pub fn gaze_vault_salt(file: Vec<u8>) -> Option<Vec<u8>> {
-    if file.len() < MAGIC.len() + SALT_LEN + NONCE_LEN || &file[..MAGIC.len()] != MAGIC {
-        return None;
-    }
-    Some(file[MAGIC.len()..MAGIC.len() + SALT_LEN].to_vec())
+    vault::salt_of(&file).map(|s| s.to_vec())
 }
 
 /// A salt for a new password file.
 #[uniffi::export]
 pub fn gaze_vault_new_salt() -> Vec<u8> {
-    let mut salt = vec![0u8; SALT_LEN];
-    getrandom::getrandom(&mut salt).expect("the system gives random bytes");
-    salt
+    vault::new_salt().to_vec()
 }
 
 /// The key a master password and a salt make. Slow on purpose (Argon2id,
 /// 19 MB), so call it off the main thread.
 #[uniffi::export]
 pub fn gaze_vault_key(master: String, salt: Vec<u8>) -> Vec<u8> {
-    let mut key = vec![0u8; 32];
-    Argon2::default()
-        .hash_password_into(master.as_bytes(), &salt, &mut key)
-        .expect("a 16-byte salt and a 32-byte key are valid");
-    key
+    vault::derive(&master, &salt).expect("a 16-byte salt and a 32-byte key are valid").to_vec()
 }
 
-/// The logins in a password file, or None when the key is wrong.
+/// The entries in a password file, or None when the key is wrong.
 #[uniffi::export]
 pub fn gaze_vault_open(file: Vec<u8>, key: Vec<u8>) -> Option<Vec<Login>> {
-    gaze_vault_salt(file.clone())?;
-    if key.len() != 32 {
-        return None;
-    }
-    let nonce = &file[MAGIC.len() + SALT_LEN..MAGIC.len() + SALT_LEN + NONCE_LEN];
-    let sealed = &file[MAGIC.len() + SALT_LEN + NONCE_LEN..];
-    let plain = ChaCha20Poly1305::new(Key::from_slice(&key)).decrypt(Nonce::from_slice(nonce), sealed).ok()?;
-    serde_json::from_slice(&plain).ok()
+    let key: [u8; 32] = key.try_into().ok()?;
+    Some(vault::open(&file, &key)?.into_iter().map(Login::from).collect())
 }
 
 /// The password file for `logins`, sealed under `key` with a fresh nonce.
 #[uniffi::export]
 pub fn gaze_vault_seal(logins: Vec<Login>, key: Vec<u8>, salt: Vec<u8>) -> Vec<u8> {
-    let mut nonce = [0u8; NONCE_LEN];
-    getrandom::getrandom(&mut nonce).expect("the system gives random bytes");
-    let plain = serde_json::to_vec(&logins).expect("logins serialize");
-    let sealed = ChaCha20Poly1305::new(Key::from_slice(&key))
-        .encrypt(Nonce::from_slice(&nonce), plain.as_ref())
-        .expect("sealing cannot fail");
-    let mut out = Vec::with_capacity(MAGIC.len() + SALT_LEN + NONCE_LEN + sealed.len());
-    out.extend_from_slice(MAGIC);
-    out.extend_from_slice(&salt);
-    out.extend_from_slice(&nonce);
-    out.extend_from_slice(&sealed);
-    out
+    let key: [u8; 32] = key.try_into().expect("a 32-byte key");
+    let salt: [u8; vault::SALT_LEN] = salt.try_into().expect("a 16-byte salt");
+    let logins: Vec<vault::Login> = logins.into_iter().map(Into::into).collect();
+    vault::seal(&logins, &key, &salt).expect("sealing cannot fail")
 }
 
-/// The logins for the site of `uri`, the last used first.
+/// The logins for the site of `uri`, the last used first. An entry with
+/// no site (a server, a door) fills no page.
 #[uniffi::export]
 pub fn gaze_logins_for_site(logins: Vec<Login>, uri: String) -> Vec<Login> {
     let site = site_key(&uri);
-    let mut out: Vec<Login> = logins.into_iter().filter(|l| site_key(&l.origin) == site).collect();
+    let mut out: Vec<Login> = logins.into_iter().filter(|l| is_web(l) && site_key(&l.origin) == site).collect();
     out.sort_by(|a, b| b.used.cmp(&a.used).then(a.username.cmp(&b.username)));
     out
+}
+
+fn is_web(l: &Login) -> bool {
+    !l.origin.trim().is_empty()
+}
+
+/// What to call an entry in a list: its title, or the site.
+#[uniffi::export]
+pub fn gaze_login_name(login: Login) -> String {
+    vault::Login::from(login).name()
 }
 
 /// Keep a login the page just sent. A known username on the site gets its
@@ -177,15 +183,16 @@ pub fn gaze_logins_for_site(logins: Vec<Login>, uri: String) -> Vec<Login> {
 pub fn gaze_remember(logins: Vec<Login>, login: Login) -> Remembered {
     let mut logins = logins;
     let site = site_key(&login.origin);
-    let change = match logins.iter_mut().find(|l| site_key(&l.origin) == site && l.username == login.username) {
+    let change = match logins.iter_mut().find(|l| is_web(l) && site_key(&l.origin) == site && l.username == login.username) {
         Some(l) if l.password == login.password => LoginChange::Same,
         Some(l) => {
             l.password = login.password;
             l.used = now();
+            l.changed = now();
             LoginChange::Updated
         }
         None => {
-            logins.push(Login { used: now(), ..login });
+            logins.push(Login { used: now(), changed: now(), ..login });
             LoginChange::New
         }
     };
@@ -196,7 +203,7 @@ pub fn gaze_remember(logins: Vec<Login>, login: Login) -> Remembered {
 #[uniffi::export]
 pub fn gaze_forget(logins: Vec<Login>, uri: String, username: String) -> Vec<Login> {
     let site = site_key(&uri);
-    logins.into_iter().filter(|l| !(site_key(&l.origin) == site && l.username == username)).collect()
+    logins.into_iter().filter(|l| !(is_web(l) && site_key(&l.origin) == site && l.username == username)).collect()
 }
 
 fn now() -> u64 {
@@ -530,7 +537,7 @@ mod tests {
     fn the_password_file_is_the_laptops() {
         let salt = gaze_vault_new_salt();
         let key = gaze_vault_key("hunter2".into(), salt.clone());
-        let login = Login { origin: "https://www.example.com".into(), username: "alice".into(), password: "pw".into(), used: 7 };
+        let login = Login { origin: "https://www.example.com".into(), username: "alice".into(), password: "pw".into(), used: 7, ..Login::default() };
         let file = gaze_vault_seal(vec![login.clone()], key.clone(), salt.clone());
         assert_eq!(&file[..5], b"GAZE1");
         assert_eq!(gaze_vault_salt(file.clone()).unwrap(), salt);
@@ -540,9 +547,26 @@ mod tests {
         assert!(gaze_vault_salt(b"not a gaze file at all, no".to_vec()).is_none());
     }
 
+    /// An entry with no site keeps every field through a save, makes the
+    /// file the newer kind, and fills no page.
+    #[test]
+    fn an_entry_without_a_site_is_kept_and_fills_nothing() {
+        let salt = gaze_vault_new_salt();
+        let key = gaze_vault_key("hunter2".into(), salt.clone());
+        let door = Login { title: "Office door".into(), group: "Work".into(), note: "side entrance".into(), password: "1234".into(), changed: 9, ..Login::default() };
+        let web = Login { origin: "https://a.no".into(), username: "u".into(), password: "pw".into(), ..Login::default() };
+        let file = gaze_vault_seal(vec![door.clone(), web.clone()], key.clone(), salt);
+        assert_eq!(&file[..5], b"GAZE2");
+        let back = gaze_vault_open(file, key).unwrap();
+        assert_eq!(back, vec![door.clone(), web.clone()]);
+        assert_eq!(gaze_logins_for_site(back.clone(), "https://a.no/login".into()), vec![web.clone()]);
+        assert!(gaze_logins_for_site(back.clone(), "".into()).is_empty());
+        assert_eq!(gaze_login_name(door), "Office door");
+    }
+
     #[test]
     fn a_login_is_new_then_the_same_then_updated_then_forgotten() {
-        let l = |pw: &str| Login { origin: "https://a.no".into(), username: "u".into(), password: pw.into(), used: 0 };
+        let l = |pw: &str| Login { origin: "https://a.no".into(), username: "u".into(), password: pw.into(), used: 0, ..Login::default() };
         let r = gaze_remember(vec![], l("one"));
         assert_eq!(r.change, LoginChange::New);
         let r = gaze_remember(r.logins, l("one"));

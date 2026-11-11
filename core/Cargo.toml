@@ -22,6 +22,8 @@ orbit = { path = "../../orbit", package = "fe2o3-orbit" }
 mail = { path = "../../mail", package = "fe2o3-mail" }
 # RSS/Atom parsing, shared with desktop kastrup.
 feed = { path = "../../feed", package = "fe2o3-feed" }
+# The password file, shared with desktop gaze and the vault program.
+vault = { path = "../../vault", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
@@ -38,10 +40,6 @@ sha2 = "0.10"
 base64 = "0.22"
 getrandom = "0.2"
 
-# gaze: the laptop's password file, byte for byte (Argon2id key,
-# ChaCha20-Poly1305 seal). Pure Rust, cross-compiles as is.
-argon2 = "0.5"
-chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
 zip = { version = "8.6.0", default-features = false, features = ["deflate-flate2"] }
 flate2 = "1.1.10"
 tar = { version = "0.4.46", default-features = false }
