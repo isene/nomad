@@ -8,6 +8,7 @@ object Prefs {
     private const val KEY_HOME_BUTTON = "home_button"
     private const val KEY_PANEL_PLACE = "panel_place"
     private const val KEY_PANEL_GAP = "panel_gap"
+    private const val KEY_FOLDER_COLS = "folder_cols"
     private const val KEY_QUIET = "quiet_apps"
     private const val KEY_EDGE_PAUSED = "edge_paused"
 
@@ -47,6 +48,16 @@ object Prefs {
     fun setPanelGap(c: Context, v: Boolean) {
         c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit().putBoolean(KEY_PANEL_GAP, v).apply()
+    }
+
+    /** How many icons wide a folder of the panel is. Four unless the
+     *  user chose another width. */
+    fun folderCols(c: Context): Int =
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_FOLDER_COLS, 4)
+
+    fun setFolderCols(c: Context, v: Int) {
+        c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit().putInt(KEY_FOLDER_COLS, v).apply()
     }
 
     /** The apps, by package, that start with the swipe strip's service

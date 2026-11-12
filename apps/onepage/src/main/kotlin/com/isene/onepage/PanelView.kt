@@ -156,8 +156,14 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
         maxLines = 1
     }
-    private val folderGrid = GridLayout(context).apply { columnCount = FOLDER_COLS }
+    private val folderGrid = GridLayout(context)
     private val folderHint = line(FAINT).apply { text = "Drag an icon to move it. Tap one for more." }
+    private val folderWide = line(LINK).apply {
+        setOnClickListener {
+            Prefs.setFolderCols(context, nextFolderColumns(folderCols(), folderRoom(), pitch))
+            render()
+        }
+    }
 
     private val folderBox = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -167,7 +173,6 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
         }
         val p = dp(PAD)
         setPadding(p, p, p, p)
-        minimumWidth = pitch * FOLDER_COLS + 2 * p
         val plus = TextView(context).apply {
             text = "+"
             setTextColor(Color.WHITE)
@@ -190,9 +195,9 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
             addView(plus, LinearLayout.LayoutParams(dp(32), dp(32)))
         }
         addView(head, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, wrap))
-        // As wide as the icons, so the line folds and the card stays narrow.
-        addView(folderHint, LinearLayout.LayoutParams(pitch * FOLDER_COLS, wrap))
+        addView(folderHint)
         addView(folderGrid)
+        addView(folderWide)
         setOnClickListener { }
         visibility = View.GONE
     }
@@ -320,7 +325,14 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
             folderBox.visibility = View.GONE
         } else {
             folderTitle.text = open.name
+            val wide = folderCols()
+            folderGrid.columnCount = wide
+            folderBox.minimumWidth = pitch * wide + 2 * dp(PAD)
+            // As wide as the icons, so a line folds and the card stays narrow.
+            for (v in listOf(folderHint, folderWide)) v.layoutParams = LinearLayout.LayoutParams(pitch * wide, wrap)
             folderHint.visibility = if (edit) View.VISIBLE else View.GONE
+            folderWide.visibility = if (edit) View.VISIBLE else View.GONE
+            folderWide.text = "Folders are $wide icons wide. Tap here for ${nextFolderColumns(wide, folderRoom(), pitch)}."
             open.items.forEachIndexed { n, target ->
                 val v = icon(target, pitch, wanted)
                 v.background = ripple()
@@ -481,6 +493,16 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
             }
         }
     }
+
+    /** The room a folder's icons have: the short side of the screen,
+     *  less the card's own edges. */
+    private fun folderRoom(): Int {
+        val metrics = resources.displayMetrics
+        return min(metrics.widthPixels, metrics.heightPixels) - 4 * dp(PAD)
+    }
+
+    /** How many icons wide a folder is now. */
+    private fun folderCols(): Int = folderColumns(Prefs.folderCols(context), folderRoom(), pitch)
 
     /** The slot of `on` under the finger. In a folder that may be a free
      *  place after its last icon. */
@@ -825,8 +847,6 @@ class PanelView(context: Context, startEditing: Boolean, private val close: () -
     }
 
     private companion object {
-        const val FOLDER_COLS = 4
-
         /** Free rows shown below the last icon while editing. */
         const val SPARE = 2
 

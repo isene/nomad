@@ -40,6 +40,20 @@ fun nextPlace(place: String): String = when (place) {
 fun columns(place: String, room: Int, pitch: Int): Int =
     if (place == BOTTOM && pitch > 0) maxOf(3, room / pitch) else 3
 
+/** How many icons wide a folder is: what the user chose, but never
+ *  under three and never more than fit in `room`. */
+fun folderColumns(chosen: Int, room: Int, pitch: Int): Int {
+    val fit = if (pitch > 0) maxOf(3, room / pitch) else 3
+    return chosen.coerceIn(3, minOf(6, fit))
+}
+
+/** The folder width after this one, as the user steps through them:
+ *  three to six, as far as they fit, then three again. */
+fun nextFolderColumns(now: Int, room: Int, pitch: Int): Int {
+    val most = folderColumns(6, room, pitch)
+    return if (now >= most) 3 else now + 1
+}
+
 /** The slot under a point of the panel's grid, counted from the grid's top
  *  left corner. Null outside the grid. */
 fun slotAt(x: Float, y: Float, cellW: Int, cellH: Int, cols: Int, rows: Int): Int? {

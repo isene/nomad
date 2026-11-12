@@ -417,6 +417,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - An empty row below the last icons is a setting too (`Prefs.panelGap`), switched by
   the line under that one. Geir asked for it on 2026-10-26, so no unused icon
   has to pad the bottom row.
+- How wide a folder is, is a setting as well (`Prefs.folderCols`, 0.13.0): three
+  to six icons, four at first, never more than fit the screen (`folderColumns`
+  in `Rules.kt`). The line that steps it is the last one in an open folder while
+  editing. Geir asked for five, "or even better" a setting, on 2026-11-12.
 - The panel is a window of its own (`PanelWindow`,
   `TYPE_APPLICATION_OVERLAY`), so it comes up over any app, and the app
   below keeps running. It is built on open and dropped on close. Keep it

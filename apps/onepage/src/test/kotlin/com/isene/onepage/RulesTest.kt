@@ -53,6 +53,26 @@ class RulesTest {
         assertEquals(BOTTOM, nextPlace("top"))
     }
 
+    @Test fun a_folder_is_as_wide_as_chosen_where_it_fits() {
+        // Icons 138 apart on a screen with room for seven.
+        assertEquals(4, folderColumns(4, 1020, 138))
+        assertEquals(5, folderColumns(5, 1020, 138))
+        assertEquals(6, folderColumns(9, 1020, 138))
+        assertEquals(3, folderColumns(1, 1020, 138))
+        // A narrow screen holds four: five is cut to four.
+        assertEquals(4, folderColumns(5, 600, 138))
+        assertEquals(3, folderColumns(5, 600, 0))
+    }
+
+    @Test fun a_tap_steps_the_folder_width_and_starts_over() {
+        assertEquals(5, nextFolderColumns(4, 1020, 138))
+        assertEquals(6, nextFolderColumns(5, 1020, 138))
+        assertEquals(3, nextFolderColumns(6, 1020, 138))
+        assertEquals(4, nextFolderColumns(3, 1020, 138))
+        // Where only four fit, four is followed by three.
+        assertEquals(3, nextFolderColumns(4, 600, 138))
+    }
+
     @Test fun a_finger_over_the_grid_is_over_one_slot() {
         // Slots 145 wide and 138 tall, seven a row, three rows.
         assertEquals(0, slotAt(0f, 0f, 145, 138, 7, 3))
