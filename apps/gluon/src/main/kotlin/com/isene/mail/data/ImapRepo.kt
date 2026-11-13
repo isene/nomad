@@ -27,7 +27,8 @@ import uniffi.fe2o3_mobile_core.mailDecodeHeader
  * (The flags would be useless anyway: the laptop's fetcher marks
  * everything seen as it delivers.)
  *
- * Bodies are fetched one at a time, when a message is opened. Pulling a
+ * New mail comes whole with the fetch that finds it, when it is small.
+ * Any other body is fetched when its message is opened. Pulling a
  * month of full bodies on every sync would cost minutes of radio for
  * mail that mostly never gets read on the phone.
  */
@@ -169,7 +170,13 @@ object ImapRepo {
         }
 
         inbox.fetch(found, profile())
-        val mails = found.mapNotNull { envelope(inbox, it, a) }.sortedByDescending { it.date }
+        // New mail comes with its text, on the line that is open anyway,
+        // so it opens at once. Only what is new, never the whole window,
+        // and never a big one: its attachment waits until it is opened.
+        val texts = if (incremental) {
+            found.takeLast(PREFETCH).filter { it.size in 1..PREFETCH_BYTES }.associate { inbox.getUID(it) to source(it) }
+        } else emptyMap()
+        val mails = found.mapNotNull { envelope(inbox, it, a, texts[inbox.getUID(it)] ?: "") }.sortedByDescending { it.date }
         val maxUid = maxOf(cursor?.lastUid ?: 0L, mails.maxOfOrNull { it.uid.toLong() } ?: 0L)
         Fetched(mails, Cursor(validity, maxUid), incremental)
     }
@@ -214,11 +221,12 @@ object ImapRepo {
     private fun profile() = javax.mail.FetchProfile().apply {
         add(javax.mail.FetchProfile.Item.ENVELOPE)
         add(javax.mail.FetchProfile.Item.CONTENT_INFO)
+        add(javax.mail.FetchProfile.Item.SIZE)
         add("Message-ID")
     }
 
     /** One message's headers as the list shows them. */
-    private fun envelope(f: IMAPFolder, msg: javax.mail.Message, a: Account): Message? = runCatching {
+    private fun envelope(f: IMAPFolder, msg: javax.mail.Message, a: Account, raw: String = ""): Message? = runCatching {
         val uid = f.getUID(msg)
         // Bare, without the angle brackets — the form kastrup
         // stores, and read state is keyed on it at both ends.
@@ -238,7 +246,7 @@ object ImapRepo {
                 ?.joinToString(", ") { it.toString() }?.let(::mailDecodeHeader) ?: "",
             subject = msg.subject?.let(::mailDecodeHeader) ?: "(no subject)",
             date = (when_?.time ?: 0L) / 1000,
-            raw = "",
+            raw = raw,
             html = "",
             hasAttachments = runCatching {
                 msg.contentType?.contains("multipart/mixed", ignoreCase = true) == true
@@ -266,8 +274,17 @@ object ImapRepo {
             ?: inbox.search(MessageIDTerm(messageId)).firstOrNull()
             ?: return@withFolder null
 
-        val out = ByteArrayOutputStream()
-        (hit as MimeMessage).writeTo(out)
-        out.toString("UTF-8")
+        source(hit).ifEmpty { null }
     }
+
+    /** A message as Gmail holds it, or nothing when it would not come. */
+    private fun source(msg: javax.mail.Message): String = runCatching {
+        val out = ByteArrayOutputStream()
+        (msg as MimeMessage).writeTo(out)
+        out.toString("UTF-8")
+    }.getOrDefault("")
+
+    /** How many new messages a fetch brings whole, and the biggest of them. */
+    private const val PREFETCH = 20
+    private const val PREFETCH_BYTES = 256 * 1024
 }

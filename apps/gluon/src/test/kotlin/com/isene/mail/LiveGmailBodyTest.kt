@@ -42,6 +42,12 @@ class LiveGmailBodyTest {
             println("message size: ${cold?.length} bytes")
             assertNotNull(cold)
             assertEquals(cold, warm)
+            // A fetch of what is new brings the small ones whole.
+            val c = list.cursor
+            val fresh = timed("what is new, with its text") { ImapRepo.headers(a, 3, ImapRepo.Cursor(c.uidValidity, c.lastUid - 3)) }
+            assertNotNull(fresh)
+            println("new: ${fresh!!.mails.size}, whole: ${fresh.mails.count { it.raw.isNotEmpty() }}, incremental: ${fresh.incremental}")
+            fresh.mails.firstOrNull { it.messageId == m.messageId && it.raw.isNotEmpty() }?.let { assertEquals(cold, it.raw) }
             // With the lines closed, a message opens on a new one.
             ImapRepo.drop()
             assertEquals(cold, timed("after the lines were closed") { ImapRepo.body(a, m.messageId, m.uid.toLong(), m.folder) })
