@@ -43,6 +43,9 @@ object ImapRepo {
             put("mail.imaps.auth.mechanisms", "XOAUTH2")
             put("mail.imaps.connectiontimeout", "20000")
             put("mail.imaps.timeout", "30000")
+            // A message in one answer. The library's own way is 16 KB a
+            // round trip, which is 60 trips for a megabyte.
+            put("mail.imaps.partialfetch", "false")
         }
         return Session.getInstance(props)
     }
@@ -53,24 +56,62 @@ object ImapRepo {
     /** Why the last call for an account failed, for the status line. */
     val errors = java.util.concurrent.ConcurrentHashMap<String, String>()
 
+    /** A line to Gmail that stays open: the store, and the folder open on it. */
+    private class Line(val address: String, val store: Store, var folder: IMAPFolder? = null, var name: String = "")
+
+    /** One line per account, kept while the app is on screen. */
+    private val lines = java.util.concurrent.ConcurrentHashMap<String, Line>()
+    private val locks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+
+    /** Whether a line stays open after a call. True while the app is on
+     *  screen: the fetch of the list then leaves its line for the first
+     *  message opened, which skips the connect, the login and the folder.
+     *  A background fetch closes its line as before. */
+    @Volatile var keep = false
+
+    /** Close every kept line. Talks to the network: not for the main thread. */
+    fun drop() {
+        for (address in lines.keys.toList()) lines.remove(address)?.let(::close)
+    }
+
+    private fun close(l: Line) {
+        runCatching { l.folder?.takeIf { it.isOpen }?.close(false) }
+        runCatching { l.store.close() }
+    }
+
     /** The same for any folder; an empty name is All Mail. */
     private fun <T> withFolder(a: Account, name: String, block: (IMAPFolder) -> T): T? {
         val token = Oauth.accessToken(a) ?: return null.also { errors[a.address] = "no access token" }
-        return runCatching {
-            val store = session().getStore("imaps")
-            store.connect(HOST, a.address, token)
-            try {
-                val inbox = (if (name.isEmpty()) allMail(store) else store.getFolder(name)) as IMAPFolder
-                inbox.open(Folder.READ_ONLY)
-                try {
-                    block(inbox)
-                } finally {
-                    inbox.close(false)
-                }
-            } finally {
-                store.close()
+        return synchronized(locks.getOrPut(a.address) { Any() }) {
+            runCatching {
+                val kept = lines.remove(a.address)
+                // A kept line may have died since (a new network, Gmail's
+                // own time limit): then once more on a fresh one.
+                val first = kept?.let { runCatching { on(it, name, block) } }
+                if (first != null && first.isSuccess) first.getOrThrow()
+                else on(Line(a.address, session().getStore("imaps").apply { connect(HOST, a.address, token) }), name, block)
+            }.onFailure { errors[a.address] = it.toString() }.getOrNull()
+        }
+    }
+
+    /** Run `block` on the line's folder `name`, opening it if another one
+     *  is open. The line is kept or closed after; a line that failed is closed. */
+    private fun <T> on(l: Line, name: String, block: (IMAPFolder) -> T): T {
+        try {
+            if (l.folder?.isOpen != true || l.name != name) {
+                runCatching { l.folder?.takeIf { it.isOpen }?.close(false) }
+                val f = (if (name.isEmpty()) allMail(l.store) else l.store.getFolder(name)) as IMAPFolder
+                f.open(Folder.READ_ONLY)
+                l.folder = f
+                l.name = name
             }
-        }.onFailure { errors[a.address] = it.toString() }.getOrNull()
+            val result = block(l.folder!!)
+            if (keep) lines[l.address] = l else close(l)
+            return result
+        } catch (e: Throwable) {
+            close(l)
+            throw e
+        }
     }
 
     /** An open, read-only INBOX that the caller keeps and closes (with its

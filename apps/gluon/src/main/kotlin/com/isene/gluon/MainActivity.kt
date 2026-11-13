@@ -120,6 +120,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         tock.resume()
+        com.isene.mail.data.ImapRepo.keep = true
     }
 
     /** Syncthing may have dropped in a new read-state file, and the
@@ -140,6 +141,9 @@ class MainActivity : ComponentActivity() {
      *  something it shows has changed. */
     override fun onStop() {
         super.onStop()
+        // The lines to Gmail close when the app leaves the screen.
+        com.isene.mail.data.ImapRepo.keep = false
+        Thread { com.isene.mail.data.ImapRepo.drop() }.start()
         com.isene.mail.widget.WidgetPush.durably(this)
         if (tock.pause()) AgendaWidget.refresh(this)
         tasks.pokeWidget()
