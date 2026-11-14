@@ -27,6 +27,7 @@ class AnswerOnAndroidTest {
         assertEquals(Full("ci", 9, "Done.\n"), parseFull("""{"tag": "ci", "t": 9, "text": "Done.\n"}"""))
         assertNull("a 404 page is no answer", parseFull("<html>Not found</html>"))
         assertEquals("https://example.com/x?k=1&answer=ci", answerAddress("https://example.com/x?k=1", "ci"))
+        assertEquals("https://example.com/x?k=1&earlier=ci", answerAddress("https://example.com/x?k=1", "ci", "earlier"))
     }
 
     @Test

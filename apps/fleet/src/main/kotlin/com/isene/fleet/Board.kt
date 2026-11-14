@@ -100,8 +100,8 @@ fun parseFull(body: String): Full? = try {
     null
 }
 
-fun answerAddress(address: String, tag: String): String =
-    address + (if ('?' in address) "&" else "?") + "answer=" + java.net.URLEncoder.encode(tag, "UTF-8")
+fun answerAddress(address: String, tag: String, key: String = "answer"): String =
+    address + (if ('?' in address) "&" else "?") + key + "=" + java.net.URLEncoder.encode(tag, "UTF-8")
 
 /** The message the answer screen sends, one line per answered item as you
  *  would type it on the laptop ("3 yes", "5 no: not today", "7 done"),
@@ -409,12 +409,13 @@ object Board {
         }
     }
 
-    /** A session's last answer, handed to `done` on the main thread: null
-     *  when the server keeps none or gives no answer. */
-    fun fetch(ctx: Context, tag: String, done: (Full?) -> Unit) {
+    /** A session's last answer, or with `earlier` the ten before it, handed
+     *  to `done` on the main thread: null when the server keeps none or
+     *  gives no answer. */
+    fun fetch(ctx: Context, tag: String, earlier: Boolean = false, done: (Full?) -> Unit) {
         val address = Store(ctx).address
         thread(name = "answer") {
-            val got = get(answerAddress(address, tag), long = false)?.let(::parseFull)
+            val got = get(answerAddress(address, tag, if (earlier) "earlier" else "answer"), long = false)?.let(::parseFull)
             Handler(Looper.getMainLooper()).post { done(got) }
         }
     }

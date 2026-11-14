@@ -692,6 +692,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
   text. fleet deletes it while the number still names that text.
 - 0.4.9: About links to isene.org/nomad. The first version on the
   download page (published 2026-10-26).
+- 0.5.1: Earlier in the answer screen's top row asks
+  `GET <address>?earlier=TAG` (laptop fleet 0.3.102), once per tap.
+  The laptop hook moves the last turn's answer to `answer-<tag>.log`
+  at a new turn's first answer, keeping ten, newest first.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`

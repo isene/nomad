@@ -149,7 +149,8 @@ private fun shade(rgb: Int, dark: Boolean): Color {
 }
 
 /** A session's last answer in full, drawn as the laptop draws it, then
- *  Y, N, Rec, Info and Done for each open item and a box for words of your own. */
+ *  Y, N, Rec, Info and Done for each open item and a box for words of your own.
+ *  Earlier at the top shows the ten answers before it, asked for on the tap. */
 @Composable
 fun Answer(tag: String, close: () -> Unit) {
     val ctx = LocalContext.current
@@ -164,6 +165,9 @@ fun Answer(tag: String, close: () -> Unit) {
             if (got != null) full = got
         }
     }
+    var earlier by remember(tag) { mutableStateOf(false) }
+    var past by remember(tag) { mutableStateOf<Full?>(null) }
+    var pastNone by remember(tag) { mutableStateOf(false) }
     val choice = remember(tag) { mutableStateMapOf<Int, String>() }
     val notes = remember(tag) { mutableStateMapOf<Int, String>() }
     var free by remember(tag) { mutableStateOf("") }
@@ -179,6 +183,17 @@ fun Answer(tag: String, close: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextButton(onClick = close) { Text("‹ List") }
                 Text(tag, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                TextButton(onClick = {
+                    earlier = !earlier
+                    if (earlier) {
+                        past = null
+                        pastNone = false
+                        Board.fetch(ctx, tag, earlier = true) { got ->
+                            pastNone = got == null
+                            past = got
+                        }
+                    }
+                }) { Text(if (earlier) "Last" else "Earlier") }
                 s?.let { Text(it.state, color = stateColor(it.state), fontWeight = FontWeight.Bold) }
             }
             LaptopLine(always = false)
@@ -187,10 +202,11 @@ fun Answer(tag: String, close: () -> Unit) {
                 Text("Waits for your yes on the laptop: $it", color = Color(0xFFFF8700), fontWeight = FontWeight.Bold)
             }
             s?.let { Permission(it) }
-            val shown = full
+            val shown = if (earlier) past else full
             when {
                 shown != null -> {
-                    Text("Answer from ${clock(shown.t)}", style = MaterialTheme.typography.bodySmall, color = dim)
+                    Text(if (earlier) "Earlier answers, newest first" else "Answer from ${clock(shown.t)}",
+                        style = MaterialTheme.typography.bodySmall, color = dim)
                     // Hold a word to select it, and drag across lines to copy them.
                     SelectionContainer {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -200,6 +216,8 @@ fun Answer(tag: String, close: () -> Unit) {
                         }
                     }
                 }
+                earlier && pastNone -> Text("No earlier answers kept for this session, or no word from the server.", color = dim)
+                earlier -> Text("Asking for the earlier answers.", color = dim)
                 none -> Text("No answer kept for this session, or no word from the server.", color = dim)
                 else -> Text("Asking for the answer.", color = dim)
             }
