@@ -28,6 +28,14 @@ class BoardOnAndroidTest {
     ]}"""
 
     @Test
+    fun each_row_shows_the_model_its_session_runs() {
+        val (ci, di) = parseBoard(list)!!.sessions!!
+        assertEquals(listOf("WS 3", clock(990), "120k", "opus"), about(ci, true).split("   "))
+        assertEquals(listOf("Fable 5.2", clock(5)), about(di.copy(model = "Fable 5.2"), false).split("   "))
+        assertEquals(clock(5), about(di, false))
+    }
+
+    @Test
     fun the_list_is_read_and_an_unchanged_one_is_kept() {
         val a = parseBoard(list)!!
         assertEquals(7L to 1000L, a.stamp to a.t)

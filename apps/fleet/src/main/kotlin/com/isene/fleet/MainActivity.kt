@@ -314,6 +314,17 @@ private fun Sessions(scroll: ScrollState, hold: (String) -> Unit) {
 /** The sessions you or Claude are busy with now: they show more. */
 private fun current(s: Session) = s.state == "YOURS" || s.state == "working" || s.state == "CAPPED"
 
+/** The dim words on a session's row. A current one has its workspace, time,
+ *  context and model on a line of their own; the others have the model and
+ *  the time beside the state. */
+fun about(s: Session, now: Boolean): String = listOfNotNull(
+    s.ws?.takeIf { now }?.let { "WS $it" },
+    s.model.ifEmpty { null }.takeIf { !now },
+    clock(s.at),
+    s.ctx?.takeIf { now }?.let { "${it}k" },
+    s.model.ifEmpty { null }.takeIf { now },
+).joinToString("   ")
+
 /** One session. A current one shows the start of its last answer (or,
  *  while it works, your prompt); the others take one line. */
 @OptIn(ExperimentalFoundationApi::class)
@@ -343,14 +354,13 @@ private fun Seat(s: Session, scroll: ScrollState, open: () -> Unit, hold: () -> 
             Text(tag, style = if (now) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             if (s.moves.isNotEmpty()) Text("${s.moves.size} open", style = small, color = Color(0xFFFF8700))
-            if (!now) Text(clock(s.at), style = small, color = dim)
+            if (!now) Text(about(s, false), style = small, color = dim)
             if (s.eta.isNotEmpty()) Text("ETA ${s.eta}", color = if (past(s.eta)) Color(0xFFFF0000) else dim)
             Text(s.state, color = stateColor(s.state), fontWeight = FontWeight.Bold)
         }
         MessageLine(s)
         if (now) {
-            val about = listOfNotNull(s.ws?.let { "WS $it" }, clock(s.at), s.ctx?.let { "${it}k" }, s.model.ifEmpty { null })
-            Text(about.joinToString("   "), style = small, color = dim)
+            Text(about(s, true), style = small, color = dim)
             if (s.ask.isNotEmpty()) Text("Waits for your yes: ${s.ask}", style = small, color = Color(0xFFFF8700), maxLines = 2, overflow = TextOverflow.Ellipsis)
             Permission(s)
             val text = if (s.state == "working" || s.answer.isEmpty()) s.prompt else s.answer.lines().joinToString("\n") { it.trim() }

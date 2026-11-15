@@ -50,6 +50,7 @@ phone twin of [fleet](https://github.com/isene/fleet).
   "Run on the laptop: /tmp/deploy.sh?" and sends "! /tmp/deploy.sh" to the
   session. The laptop runs it only while it is one of that session's open
   items.
+- Each session's row shows the model it runs.
 - Earlier at the top of an answer shows the session's ten answers before
   it, newest first, each with its time. Last goes back.
 - Hold a session to write it a message. fleet on the laptop wakes the

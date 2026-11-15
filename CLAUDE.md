@@ -696,6 +696,8 @@ when building the core. Same rule as the rest of Fe₂O₃.
   `GET <address>?earlier=TAG` (laptop fleet 0.3.102), once per tap.
   The laptop hook moves the last turn's answer to `answer-<tag>.log`
   at a new turn's first answer, keeping ten, newest first.
+- 0.5.2: every row shows its session's model (`model` in sessions.json),
+  not only the current ones. `about()` gives a row's dim words.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`
