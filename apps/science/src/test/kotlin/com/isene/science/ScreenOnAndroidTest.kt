@@ -61,6 +61,57 @@ class ScreenOnAndroidTest {
         assertTrue(has("79 protons · 119 neutrons"))
     }
 
+    /** Each of the other tabs opens, shows its data and answers a tap. Writes a picture of each. */
+    @Test fun the_other_four_tabs() {
+        root = Robolectric.buildActivity(MainActivity::class.java).setup().get().window.decorView
+        settle()
+
+        tapOn("Particles")
+        val grid = nodes().first { it.config.getOrNull(SemanticsProperties.TestTag) == "particles" }.boundsInWindow
+        tap(grid.left + grid.width / 12, grid.top + grid.height / 8)      // the first cell: the up quark
+        shot("particles")
+        assertTrue(has("Up quark"))
+        assertTrue(has("2.16 MeV/c²"))
+
+        tapOn("Stars")
+        val stars = nodes().first { it.config.getOrNull(SemanticsProperties.TestTag) == "stars" }.boundsInWindow
+        tap(stars.left + hrX(5772.0) * stars.width, stars.top + hrY(1.0) * stars.height)
+        shot("stars")
+        assertTrue(has("Sun"))
+        assertTrue(has("5772 K"))
+
+        tapOn("Planets")
+        val planets = nodes().first { it.config.getOrNull(SemanticsProperties.TestTag) == "planets" }.boundsInWindow
+        tap(planets.left + orbitX(30.07) * planets.width, planets.top + radiusY(3.88) * planets.height)
+        shot("planets")
+        assertTrue(has("Neptune"))
+        assertTrue(has("Planets of the Sun"))
+
+        swipeTabs()
+        tapOn("Universe")
+        // In this test the row is still gliding after the swipe, and the first tap only stops it.
+        if (!has("Human body")) tapOn("Universe")
+        shot("universe")
+        assertTrue(has("Human body"))
+        tapOn("Larger")
+        assertTrue(has("Blue whale"))
+        val ruler = nodes().first { it.config.getOrNull(SemanticsProperties.TestTag) == "ruler" }.boundsInWindow
+        tap(ruler.right - 1, ruler.center.y)
+        assertTrue(has("The observable universe"))
+    }
+
+    /** Drag the row of tabs to the left, so the last tab is on the screen. */
+    private fun swipeTabs() {
+        val row = nodes().last { "Planets" in texts(it) }.boundsInWindow
+        val t = SystemClock.uptimeMillis()
+        val y = row.center.y
+        root.dispatchTouchEvent(MotionEvent.obtain(t, t, MotionEvent.ACTION_DOWN, row.center.x, y, 0))
+        for (i in 1..10) root.dispatchTouchEvent(MotionEvent.obtain(t, t + i * 16L, MotionEvent.ACTION_MOVE, row.center.x - i * 60f, y, 0))
+        root.dispatchTouchEvent(MotionEvent.obtain(t, t + 200, MotionEvent.ACTION_UP, row.center.x - 600f, y, 0))
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofSeconds(3))
+        settle()
+    }
+
     private fun settle() = shadowOf(Looper.getMainLooper()).idle()
 
     private fun nodes(): List<SemanticsNode> {

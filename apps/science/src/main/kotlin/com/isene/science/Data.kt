@@ -201,3 +201,197 @@ data class Piece(val heading: Boolean, val text: String)
 fun articlePieces(text: String): List<Piece> = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.map {
     if (it.startsWith("==")) Piece(true, it.trim('=', ' ')) else Piece(false, it)
 }.filter { it.text.isNotEmpty() }.toList()
+
+// ── particles ───────────────────────────────────────────────────────────
+
+/** A row of assets/particles.tsv: the Standard Model, plus the proton and the neutron. */
+data class Particle(
+    val symbol: String, val name: String, val kind: String, val generation: Int, val mass: String,
+    val charge: String, val spin: String, val colorCharge: String, val forces: String,
+    val discovered: String, val antiparticle: String, val blurb: String, val wiki: String,
+    /** Column 0..5 and row 0..3 in the chart. */
+    val col: Int, val row: Int,
+)
+
+fun parseParticles(tsv: String): List<Particle> = tsv.lineSequence().filter { it.isNotBlank() }.map {
+    val c = it.split('\t')
+    Particle(c[0], c[1], c[2], c[3].toInt(), c[4], c[5], c[6], c[7], c[8], c[9], c[10], c[11], c[12], c[13].toInt(), c[14].toInt())
+}.toList()
+
+/** The kinds of particle: the name in the data, the name shown, the colour. */
+val KINDS: List<Triple<String, String, Int>> = listOf(
+    Triple("Quark", "quark", rgb(255, 140, 90)),
+    Triple("Lepton", "lepton", rgb(120, 200, 255)),
+    Triple("Gauge", "gauge boson", rgb(255, 200, 90)),
+    Triple("Scalar", "scalar boson", rgb(200, 140, 255)),
+    Triple("Composite", "composite", rgb(150, 220, 150)),
+)
+
+fun kindOf(kind: String): Triple<String, String, Int> = KINDS.firstOrNull { it.first == kind } ?: KINDS.last()
+
+// ── stars ───────────────────────────────────────────────────────────────
+
+/** A row of assets/stars.tsv. Luminosity, radius and mass are in Suns. */
+data class Star(
+    val name: String, val designation: String, val constellation: String, val spectral: String,
+    val distPc: Double?, val mag: Double?, val absmag: Double?, val teff: Double?, val lum: Double?,
+    val radius: Double?, val mass: Double?, val wiki: String, val summary: String,
+) {
+    /** The letter of its spectral class (O B A F G K M), or "?". */
+    val letter: String get() = spectral.firstOrNull { it in "OBAFGKMWLTYSCR" }?.toString() ?: "?"
+}
+
+fun parseStars(tsv: String): List<Star> = tsv.lineSequence().filter { it.isNotBlank() }.map {
+    val c = it.split('\t')
+    fun d(i: Int) = c.getOrElse(i) { "" }.toDoubleOrNull()
+    Star(c[0], c[1], c[2], c[3], d(5), d(6), d(7), d(8), d(9), d(10), d(11), c.getOrElse(12) { "" }.ifEmpty { c[0] }, c.getOrElse(13) { "" })
+}.toList()
+
+private val STAR_STOPS = listOf(
+    40000.0 to Triple(120, 150, 255), 20000.0 to Triple(160, 195, 255), 9700.0 to Triple(225, 235, 255),
+    7200.0 to Triple(255, 245, 200), 5800.0 to Triple(255, 215, 90), 4400.0 to Triple(255, 150, 60),
+    3000.0 to Triple(255, 90, 60),
+)
+
+/** A star's colour from its temperature, the scale the whole suite uses. */
+fun starColor(teff: Double): Int {
+    val t = teff.coerceIn(3000.0, 40000.0)
+    for (i in 0 until STAR_STOPS.size - 1) {
+        val (t0, a) = STAR_STOPS[i]
+        val (t1, b) = STAR_STOPS[i + 1]
+        if (t <= t0 && t >= t1) {
+            val f = (Math.log(t0) - Math.log(t)) / (Math.log(t0) - Math.log(t1))
+            fun mix(x: Int, y: Int) = (x + (y - x) * f).toInt()
+            return rgb(mix(a.first, b.first), mix(a.second, b.second), mix(a.third, b.third))
+        }
+    }
+    return rgb(120, 150, 255)
+}
+
+/** Where a temperature sits across the HR diagram, 0 at the left: hot stars are to the left. */
+fun hrX(teff: Double): Float = ((Math.log10(45000.0) - Math.log10(teff)) / (Math.log10(45000.0) - Math.log10(2400.0))).toFloat()
+
+/** Where a luminosity sits down the HR diagram, 0 at the top: bright stars are at the top. */
+fun hrY(lum: Double): Float = ((6.5 - Math.log10(lum)) / 11.0).toFloat()
+
+// ── exoplanets ──────────────────────────────────────────────────────────
+
+/** How a planet was found, as the diagram colours it. */
+enum class Method(val label: String, val color: Int) {
+    Transit("transit", rgb(105, 175, 255)),
+    RadialVelocity("radial velocity", rgb(255, 175, 80)),
+    Microlensing("microlensing", rgb(190, 130, 255)),
+    Imaging("direct imaging", rgb(120, 230, 150)),
+    Timing("timing", rgb(255, 120, 170)),
+    Astrometry("astrometry", rgb(110, 230, 225)),
+    Other("other", rgb(170, 170, 175)),
+    Home("our own", rgb(255, 255, 255)),
+}
+
+fun methodOf(s: String): Method = when {
+    s == "Transit" -> Method.Transit
+    s == "Radial Velocity" -> Method.RadialVelocity
+    s == "Microlensing" -> Method.Microlensing
+    s == "Imaging" -> Method.Imaging
+    s == "Astrometry" -> Method.Astrometry
+    s.contains("Timing") -> Method.Timing
+    else -> Method.Other
+}
+
+/** A planet. Orbit in AU, radius and mass in Earths, the star in Suns. */
+data class Planet(
+    val name: String, val host: String, val method: Method, val year: Int?, val period: Double?,
+    val orbit: Double, val radius: Double?, val mass: Double?, val temperature: Double?,
+    val starTeff: Double?, val starRadius: Double?, val spectype: String, val distPc: Double?,
+) {
+    /** Bulk density in g/cm³: Earth is 5.51, Saturn 0.69. */
+    val density: Double? get() = if (mass != null && radius != null && radius > 0) 5.513 * mass / (radius * radius * radius) else null
+
+    /** Gravity at the surface, in Earths. */
+    val gravity: Double? get() = if (mass != null && radius != null && radius > 0) mass / (radius * radius) else null
+
+    /** What kind of world the size suggests. */
+    val kind: String
+        get() = when {
+            radius != null -> when {
+                radius < 1.25 -> "Earth-sized"
+                radius < 2.0 -> "super-Earth"
+                radius < 6.0 -> "Neptune-like"
+                radius < 15.0 -> "gas giant"
+                else -> "very large"
+            }
+            mass == null -> "unknown"
+            mass < 2.0 -> "Earth-mass"
+            mass < 10.0 -> "super-Earth"
+            mass < 50.0 -> "Neptune-mass"
+            else -> "giant"
+        }
+
+    /** The size it is drawn at: its radius, or one worked out from its mass. */
+    val plotRadius: Double get() = radius ?: mass?.let(::massToRadius) ?: 1.0
+
+    /** The star's light in Suns, from its size and temperature. */
+    val starLight: Double? get() = if (starRadius != null && starTeff != null && starRadius > 0 && starTeff > 0) starRadius * starRadius * Math.pow(starTeff / 5772.0, 4.0) else null
+
+    /** The habitable zone in AU: between 1.1 and 0.53 times the sunlight Earth gets. */
+    val zone: Pair<Double, Double>? get() = starLight?.let { Math.sqrt(it / 1.1) to Math.sqrt(it / 0.53) }
+    val inZone: Boolean get() = zone?.let { orbit >= it.first && orbit <= it.second } ?: false
+
+    /** Sunlight on the planet, in Earths. */
+    val sunlight: Double? get() = starLight?.let { it / (orbit * orbit) }
+}
+
+/** A radius from a mass, by the rule of Chen and Kipping (2017). */
+fun massToRadius(m: Double): Double = when {
+    m < 2.04 -> 1.008 * Math.pow(m, 0.279)
+    m < 132.0 -> 0.808 * Math.pow(m, 0.589)
+    else -> 17.74 * Math.pow(m, -0.044)
+}
+
+private val HOME = listOf(
+    listOf("Mercury", 87.97, 0.387, 0.383, 0.055, 440.0), listOf("Venus", 224.7, 0.723, 0.949, 0.815, 232.0),
+    listOf("Earth", 365.26, 1.0, 1.0, 1.0, 255.0), listOf("Mars", 686.98, 1.524, 0.532, 0.107, 210.0),
+    listOf("Jupiter", 4332.6, 5.204, 11.21, 317.8, 122.0), listOf("Saturn", 10759.0, 9.583, 9.45, 95.16, 90.0),
+    listOf("Uranus", 30687.0, 19.19, 4.01, 14.54, 64.0), listOf("Neptune", 60190.0, 30.07, 3.88, 17.15, 51.0),
+)
+
+/** The NASA table, with our own eight planets added for scale. A planet with no orbit, or with neither size nor mass, stays out. */
+fun parsePlanets(csv: String): List<Planet> {
+    val all = ArrayList<Planet>(6400)
+    for (line in csv.lineSequence()) {
+        if (line.isBlank() || line.startsWith("#")) continue
+        val f = line.split(',')
+        if (f.size < 19) continue
+        fun d(i: Int) = f[i].trim().toDoubleOrNull()
+        val orbit = d(6) ?: continue
+        if (d(7) == null && d(8) == null) continue
+        all += Planet(f[0], f[1], methodOf(f[3]), f[4].toIntOrNull(), d(5), orbit, d(7), d(8), d(9), d(11), d(12), f[14], d(15))
+    }
+    for (h in HOME) all += Planet(
+        h[0] as String, "the Sun", Method.Home, null, h[1] as Double, h[2] as Double, h[3] as Double,
+        h[4] as Double, h[5] as Double, 5772.0, 1.0, "G2V", 0.0,
+    )
+    return all
+}
+
+/** Where an orbit sits across the diagram, 0 at the left: 0.002 AU to 30,000 AU. */
+fun orbitX(au: Double): Float = ((Math.log10(au) + 2.7) / 7.2).toFloat()
+
+/** Where a radius sits down the diagram, 0 at the top: a quarter of an Earth to a hundred. */
+fun radiusY(earths: Double): Float = ((2.0 - Math.log10(earths)) / 2.6).toFloat()
+
+// ── the universe ────────────────────────────────────────────────────────
+
+/** A rung of the ladder, a row of assets/rungs.tsv. Its picture is rung/NN.jpg, counted from 01. */
+data class Rung(val name: String, val size: Double, val sizeText: String, val blurb: String)
+
+fun parseRungs(tsv: String): List<Rung> = tsv.lineSequence().filter { it.isNotBlank() }.map {
+    val c = it.split('\t')
+    Rung(c[0], c[1].toDouble(), c[2], c[3])
+}.toList()
+
+/** Where a size in metres sits on the ruler, 0 at 10⁻³⁵ m and 1 at 10²⁷ m. */
+fun rulerAt(metres: Double): Float = ((Math.log10(metres) + 35) / 62).toFloat()
+
+/** The rung nearest a place on the ruler. */
+fun rungNear(rungs: List<Rung>, at: Float): Int = rungs.indices.minByOrNull { Math.abs(rulerAt(rungs[it].size) - at) } ?: 0

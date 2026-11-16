@@ -1,5 +1,6 @@
 package com.isene.science
 
+import android.content.res.AssetManager
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.os.Bundle
@@ -12,6 +13,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,11 +70,11 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-private val Rust = Color(0xFFF74C00)
-private val Ink = Color(0xFF0A0A14)
-private val Dim = Color(0xFF9A9AAC)
-private val Gold = Color(familyColor("transition metal"))
-private val Blue = Color(Decay.BetaMinus.color)
+internal val Rust = Color(0xFFF74C00)
+internal val Ink = Color(0xFF0A0A14)
+internal val Dim = Color(0xFF9A9AAC)
+internal val Gold = Color(familyColor("transition metal"))
+internal val Blue = Color(Decay.BetaMinus.color)
 
 private val Colors = darkColorScheme(
     primary = Rust,
@@ -83,23 +85,39 @@ private val Colors = darkColorScheme(
     onSurface = Color(0xFFE8E8F0),
 )
 
+/** The data of each subject, read from the app's own files when its tab is first opened. */
+internal class Library(val assets: AssetManager) {
+    private fun text(name: String) = assets.open(name).bufferedReader().use { it.readText() }
+    val elements by lazy { parseElements(text("elements.tsv")) }
+    val nuclides by lazy { parseNuclides(text("isotopes.csv")) }
+    val particles by lazy { parseParticles(text("particles.tsv")) }
+    val stars by lazy { parseStars(text("stars.tsv")) }
+    val planets by lazy { parsePlanets(text("exoplanets.csv")) }
+    val rungs by lazy { parseRungs(text("rungs.tsv")) }
+}
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        val elements = parseElements(assets.open("elements.tsv").bufferedReader().use { it.readText() })
-        // The isotopes are read when their tab is first opened.
-        val nuclides by lazy { parseNuclides(assets.open("isotopes.csv").bufferedReader().use { it.readText() }) }
-        setContent { MaterialTheme(colorScheme = Colors) { App(elements, { nuclides }, filesDir) } }
+        val library = Library(assets)
+        setContent { MaterialTheme(colorScheme = Colors) { App(library, filesDir) } }
     }
 }
 
+/** The step of the universe ladder the app opens on: a person. */
+private const val HUMAN = 14
+
 @Composable
-private fun App(elements: List<Element>, nuclides: () -> List<Nuclide>, dir: File) {
+private fun App(lib: Library, dir: File) {
     var tab by rememberSaveable { mutableIntStateOf(0) }
     var z by rememberSaveable { mutableIntStateOf(0) }        // the element picked, 0 for none
     var nuc by rememberSaveable { mutableIntStateOf(-1) }     // the nuclide picked, as z * 1000 + n
     var jump by rememberSaveable { mutableStateOf(false) }    // move the chart to the nuclide picked
+    var particle by rememberSaveable { mutableIntStateOf(-1) }
+    var star by rememberSaveable { mutableIntStateOf(-1) }
+    var planet by rememberSaveable { mutableIntStateOf(-1) }
+    var rung by rememberSaveable { mutableIntStateOf(HUMAN) }
     var article by rememberSaveable { mutableStateOf<String?>(null) }
     BackHandler(enabled = article != null) { article = null }
     Scaffold(containerColor = Ink) { pad ->
@@ -109,17 +127,27 @@ private fun App(elements: List<Element>, nuclides: () -> List<Nuclide>, dir: Fil
                 Article(open, dir) { article = null }
                 return@Column
             }
-            Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
                 Tab("Elements", Gold, tab == 0) { tab = 0 }
                 Tab("Isotopes", Blue, tab == 1) { tab = 1 }
+                Tab("Particles", Orange, tab == 2) { tab = 2 }
+                Tab("Stars", Pale, tab == 3) { tab = 3 }
+                Tab("Planets", Green, tab == 4) { tab = 4 }
+                Tab("Universe", Purple, tab == 5) { tab = 5 }
             }
-            if (tab == 0) {
-                Elements(elements, z, { z = it }, { article = it }) { e ->
-                    mainIsotope(nuclides(), e.number)?.let { nuc = it.z * 1000 + it.n; jump = true }
+            when (tab) {
+                0 -> Elements(lib.elements, z, { z = it }, { article = it }) { e ->
+                    mainIsotope(lib.nuclides, e.number)?.let { nuc = it.z * 1000 + it.n; jump = true }
                     tab = 1
                 }
-            } else {
-                Isotopes(nuclides(), elements, nuc, jump, { jump = false }, { n, move -> nuc = n; jump = move }) { article = it }
+                1 -> Isotopes(lib.nuclides, lib.elements, nuc, jump, { jump = false }, { n, move -> nuc = n; jump = move }) { article = it }
+                2 -> Particles(lib.particles, particle, { particle = it }) { article = it }
+                3 -> Stars(lib.stars, star, { star = it }) { article = it }
+                4 -> Planets(lib.planets, planet) { planet = it }
+                else -> Universe(lib.rungs, rung, lib.assets) { rung = it }
             }
         }
     }
@@ -133,12 +161,12 @@ private fun Tab(name: String, color: Color, on: Boolean, pick: () -> Unit) {
         fontWeight = FontWeight.Bold,
         fontSize = 16.sp,
         modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(if (on) color else Color.Transparent)
-            .clickable(onClick = pick).padding(horizontal = 14.dp, vertical = 8.dp),
+            .clickable(onClick = pick).padding(horizontal = 10.dp, vertical = 8.dp),
     )
 }
 
 /** A drawing that two fingers zoom and one finger moves. It never leaves its frame. */
-private class Zoom {
+internal class Zoom {
     var scale by mutableFloatStateOf(1f)
     var x by mutableFloatStateOf(0f)
     var y by mutableFloatStateOf(0f)
@@ -162,7 +190,7 @@ private class Zoom {
     }
 }
 
-private fun paint(color: Int, size: Float, bold: Boolean = true) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+internal fun paint(color: Int, size: Float, bold: Boolean = true) = Paint(Paint.ANTI_ALIAS_FLAG).apply {
     this.color = color
     textSize = size
     textAlign = Paint.Align.CENTER
@@ -317,7 +345,7 @@ private fun Isotopes(
 }
 
 @Composable
-private fun Head(symbol: String, color: Color, name: String, under: String) {
+internal fun Head(symbol: String, color: Color, name: String, under: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(56.dp).clip(RoundedCornerShape(6.dp)).background(color), contentAlignment = Alignment.Center) {
             Text(symbol, color = Ink, fontWeight = FontWeight.Bold, fontSize = 24.sp)
@@ -330,7 +358,7 @@ private fun Head(symbol: String, color: Color, name: String, under: String) {
 }
 
 @Composable
-private fun Action(name: String, color: Color, run: () -> Unit) {
+internal fun Action(name: String, color: Color, run: () -> Unit) {
     Text(
         name,
         color = Ink,
@@ -343,7 +371,7 @@ private fun Action(name: String, color: Color, run: () -> Unit) {
 
 /** A line of the card. A fact that is not known leaves no line. */
 @Composable
-private fun Fact(name: String, value: String?, color: Color) {
+internal fun Fact(name: String, value: String?, color: Color) {
     if (value.isNullOrEmpty()) return
     Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
         Text(name, Modifier.width(150.dp), color = color, fontSize = 15.sp)
@@ -353,7 +381,7 @@ private fun Fact(name: String, value: String?, color: Color) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun Legend(items: List<Pair<String, Color>>) {
+internal fun Legend(items: List<Pair<String, Color>>) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         for ((name, color) in items) Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(12.dp).background(color))
@@ -363,7 +391,7 @@ private fun Legend(items: List<Pair<String, Color>>) {
 }
 
 @Composable
-private fun Hint(text: String) {
+internal fun Hint(text: String) {
     Text(text, Modifier.padding(top = 14.dp), color = Dim, fontSize = 15.sp)
 }
 

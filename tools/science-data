@@ -8,10 +8,19 @@
   get it), with the title of its Wikipedia page and a short summary. The
   full article stays out: the app asks Wikipedia when one is opened.
 - isotopes.csv: the IAEA table, as the laptop's isotopes app ships it.
+- particles.tsv: the table in the source of the laptop's particles app.
+- stars.tsv: the stars the laptop's stars app keeps (~/.stars/stars.json),
+  with the opening of each article.
+- exoplanets.csv: the NASA table, as the laptop's exoplanets app ships it.
+- rungs.tsv and rung/NN.jpg: the ladder of the laptop's universe app. The
+  names and sizes come from `universe --list`, the texts from its source,
+  and each picture from `universe --png`.
 """
 import json
 import os
+import re
 import shutil
+import subprocess
 
 here = os.path.dirname(os.path.abspath(__file__))
 out = os.path.join(here, "..", "apps", "science", "src", "main", "assets")
@@ -42,3 +51,67 @@ with open(os.path.join(out, "elements.tsv"), "w") as f:
     f.write("\n".join(rows) + "\n")
 shutil.copy(os.path.join(here, "..", "..", "isotopes", "data", "isotopes.csv"), os.path.join(out, "isotopes.csv"))
 print(f"{len(rows)} elements, isotopes.csv copied")
+
+
+def lead(text, most=700):
+    """The opening paragraph of an article, cut at a sentence."""
+    first = (text or "").strip().split("\n")[0]
+    if len(first) <= most:
+        return first
+    cut = first[:most]
+    return cut[:cut.rfind(". ") + 1] or cut
+
+
+def write(name, rows):
+    with open(os.path.join(out, name), "w") as f:
+        f.write("\n".join("\t".join(cell(v) for v in r) for r in rows) + "\n")
+
+
+suite = os.path.join(here, "..", "..")
+
+# particles: every `key: "value"` of each Particle { ... } in the source
+src = open(os.path.join(suite, "particles", "src", "data.rs")).read()
+rows = []
+for body in re.findall(r"Particle \{(.*?)\n    \},", src, re.S):
+    f = dict(re.findall(r'(\w+): "((?:[^"\\]|\\.)*)"', body))
+    if "symbol" not in f:
+        continue
+    kind = re.search(r"kind: Kind::(\w+)", body).group(1)
+    gen = re.search(r"generation: (\d)", body).group(1)
+    forces = re.search(r"Forces::new\((\w+), (\w+), (\w+)\)", body).groups()
+    col, row = re.search(r"pos: \((\d+), (\d+)\)", body).groups()
+    names = [n for n, on in zip(("strong", "electromagnetic", "weak"), forces) if on == "true"] + ["gravity"]
+    rows.append((f["symbol"], f["name"], kind, gen, f["mass"], f["charge"], f["spin"], f["color_charge"],
+                 ", ".join(names), f["discovered"], f["antiparticle"], f["blurb"], f["wiki"], col, row))
+write("particles.tsv", rows)
+print(f"{len(rows)} particles")
+
+stars = json.load(open(os.path.expanduser("~/.stars/stars.json")))
+write("stars.tsv", [(
+    e["name"], e.get("designation"), e.get("constellation"), e.get("spectral"), e.get("lum_class"),
+    e.get("dist_pc"), e.get("mag"), e.get("absmag"), e.get("teff"), e.get("lum"), e.get("radius"), e.get("mass"),
+    (e.get("source") or "").rsplit("/wiki/", 1)[-1], lead(e.get("article")),
+) for e in stars])
+print(f"{len(stars)} stars")
+
+shutil.copy(os.path.join(suite, "exoplanets", "data", "exoplanets.csv"), os.path.join(out, "exoplanets.csv"))
+
+# universe: one picture per rung, 1080 pixels square, as JPEG
+tool = os.path.expanduser("~/bin/universe")
+texts = dict(re.findall(r'Rung \{ name: "([^"]+)", size: [^,]+,\s*blurb: "((?:[^"\\]|\\.)*)"', open(
+    os.path.join(suite, "universe", "src", "ladder.rs")).read()))
+sizes = re.findall(r"size: ([0-9.e+-]+)", open(os.path.join(suite, "universe", "src", "ladder.rs")).read())
+os.makedirs(os.path.join(out, "rung"), exist_ok=True)
+rows = []
+listing = subprocess.run([tool, "--list"], capture_output=True, text=True).stdout.splitlines()
+for i, line in enumerate(l for l in listing if l.strip()):
+    m = re.match(r"\s*(\d+)\s+(.+?)\s{2,}(.+)$", line)
+    name, size = m.group(2).strip(), m.group(3).strip()
+    png = f"/tmp/science-rung-{i + 1}.png"
+    subprocess.run([tool, "--png", str(i + 1), png, "108", "54"], check=True, capture_output=True)
+    subprocess.run(["convert", png, "-background", "black", "-flatten", "-quality", "86",
+                    os.path.join(out, "rung", f"{i + 1:02}.jpg")], check=True)
+    os.remove(png)
+    rows.append((name, sizes[i], size, texts[name]))
+write("rungs.tsv", rows)
+print(f"{len(rows)} rungs")

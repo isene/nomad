@@ -104,4 +104,73 @@ class DataTest {
         assertEquals("1337.33 K (1064.18 °C)", temperature(1337.33))
         assertEquals("", temperature(null))
     }
+
+    private fun asset(name: String) = File("src/main/assets/$name").readText()
+
+    @Test fun the_standard_model_fills_its_chart() {
+        val all = parseParticles(asset("particles.tsv"))
+        assertEquals(19, all.size)
+        assertEquals(19, all.map { it.col to it.row }.toSet().size)
+        assertTrue(all.all { it.col in 0..5 && it.row in 0..3 })
+        assertEquals(6, all.count { it.kind == "Quark" })
+        assertEquals(6, all.count { it.kind == "Lepton" })
+        val top = all.first { it.symbol == "t" }
+        assertEquals("172.57 GeV/c²", top.mass)
+        assertEquals("strong, electromagnetic, weak, gravity", top.forces)
+        assertEquals("weak, gravity", all.first { it.name == "electron neutrino" }.forces)
+        assertEquals("quark", kindOf("Quark").second)
+    }
+
+    @Test fun the_sun_sits_where_the_sun_belongs() {
+        val all = parseStars(asset("stars.tsv"))
+        assertEquals(461, all.size)
+        val sun = all.first { it.name == "Sun" }
+        assertEquals("G", sun.letter)
+        assertEquals(hrY(1.0), hrY(sun.lum!!), 0f)
+        val sirius = all.first { it.name == "Sirius" }
+        assertTrue("a hotter star is further left", hrX(sirius.teff!!) < hrX(sun.teff!!))
+        assertTrue("a brighter star is higher", hrY(sirius.lum!!) < hrY(sun.lum!!))
+        assertTrue(all.filter { it.teff != null && it.lum != null }.all { hrX(it.teff!!) in 0f..1f && hrY(it.lum!!) in 0f..1f })
+        assertEquals(rgb(255, 215, 90), starColor(5800.0))
+        assertEquals(rgb(255, 90, 60), starColor(2000.0))
+    }
+
+    @Test fun the_planets_read_as_on_the_laptop() {
+        val all = parsePlanets(asset("exoplanets.csv"))
+        assertEquals(8, all.count { it.method == Method.Home })
+        assertEquals(6309, all.size - 8)
+        assertTrue(all.all { orbitX(it.orbit) in 0f..1f && radiusY(it.plotRadius) in 0f..1f })
+        val earth = all.first { it.name == "Earth" }
+        assertEquals("Earth-sized", earth.kind)
+        assertTrue(earth.inZone)
+        assertEquals(5.513, earth.density!!, 1e-9)
+        assertEquals(1.0, earth.sunlight!!, 1e-9)
+        assertTrue(!all.first { it.name == "Venus" }.inZone)
+        assertEquals("gas giant", all.first { it.name == "Jupiter" }.kind)
+        assertEquals(Method.RadialVelocity, all.first { it.name == "11 Com b" }.method)
+        assertEquals(Method.Timing, methodOf("Pulsar Timing"))
+        assertEquals(1.008, massToRadius(1.0), 1e-9)
+    }
+
+    @Test fun every_rung_has_its_picture_and_its_place() {
+        val rungs = parseRungs(asset("rungs.tsv"))
+        assertEquals(37, rungs.size)
+        assertEquals("Human body", rungs[14].name)
+        assertEquals("1.70 m", rungs[14].sizeText)
+        for (i in rungs.indices) assertTrue(File("src/main/assets/rung/%02d.jpg".format(i + 1)).length() > 5000)
+        assertEquals(rungs.map { it.size }.sorted(), rungs.map { it.size })
+        assertTrue(rungs.all { rulerAt(it.size) in 0f..1f })
+        assertEquals(14, rungNear(rungs, rulerAt(1.7)))
+        assertEquals(0, rungNear(rungs, 0f))
+        assertEquals(36, rungNear(rungs, 1f))
+    }
+
+    @Test fun numbers_keep_three_figures() {
+        assertEquals("0.0123", short(0.012345))
+        assertEquals("4.56", short(4.5601))
+        assertEquals("78.9", short(78.91))
+        assertEquals("1230", short(1230.4))
+        assertEquals("832,000", short(832000.0))
+        assertEquals("1", short(1.0))
+    }
 }

@@ -563,26 +563,29 @@ when building the core. Same rule as the rest of Fe₂O₃.
 ### science (com.isene.science)
 
 - The laptop's science apps in one app, a tab each (Geir asked on
-  2026-11-16). 0.1.0 has Elements and Isotopes. Next: the HR diagram
-  (stars) and the exoplanets; maybe particles, the Moon and universe.
-  The sky stays in astro. Signed with the tasks key.
+  2026-11-16). 0.2.0 has Elements, Isotopes, Particles, Stars, Planets
+  and Universe. The sky and the Moon are in astro. Signed with the tasks
+  key. Left out: the 3D zoom of the laptop's particles, the evolution
+  tracks of stars, and the colour modes of exoplanets.
 - Kotlin only, like prism. `Data.kt` has the rules (families, decay
   modes, half-life wording) copied from the laptop's elements and
   isotopes apps, and touches no Android class.
-- The data is two files in `assets`, made by `tools/science-data` from
-  `~/.elements/elements.json` and `../isotopes/data/isotopes.csv`. Run
-  it again when either changes. The isotopes are read when their tab is
-  first opened.
-- The table and the chart are each one Canvas. Two fingers zoom, one
-  finger moves, a tap picks. Nothing redraws unless a finger did
-  something.
+- The data is in `assets`, made by `tools/science-data` from the files
+  and the source of the laptop apps (its head lists each one). Run it
+  again when a laptop app changes its data. The universe pictures are
+  `universe --png` at 1080 pixels square, as JPEG (3.5 MB in all).
+  `Library` reads each file when its tab is first opened.
+- The table and the chart are each one Canvas, and `Scatter` in
+  `More.kt` draws both diagrams. Two fingers zoom, one finger moves, a
+  tap picks. Nothing redraws unless a finger did something.
 - The network is used for one thing: `Wiki.kt` asks Wikipedia for an
   article when Article is tapped, and keeps it in `files/articles`.
 - A new subject is a tab with a colour of its own, a parser in
   `Data.kt` and a data file from `tools/science-data`.
 - Tests: `./gradlew :apps:science:testReleaseUnitTest`. The screen test
-  taps gold, goes to its isotopes and writes `build/table.png`,
-  `gold.png` and `chart.png` under `apps/science`.
+  taps gold, goes to its isotopes, visits the other four tabs and writes
+  a picture of each to `apps/science/build`. In that test the row of
+  tabs keeps gliding after a swipe, so it taps the last tab twice.
 
 ### mail (in gluon, package com.isene.mail, the kastrup part)
 
