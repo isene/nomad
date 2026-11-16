@@ -173,11 +173,19 @@ fun Answer(tag: String, close: () -> Unit) {
     var free by remember(tag) { mutableStateOf("") }
     val dark = isSystemInDarkTheme()
     val dim = MaterialTheme.colorScheme.onSurfaceVariant
+    // A choice opens a field for words, which pushed Send below the screen.
+    // When the choice was made at the bottom, the page stays at the bottom.
+    val scroll = rememberScrollState()
+    var stick by remember(tag) { mutableStateOf(false) }
+    LaunchedEffect(scroll.maxValue) {
+        if (stick) scroll.scrollTo(scroll.maxValue)
+        stick = false
+    }
     Scaffold { pad ->
         Column(
             // The keyboard takes its height off the column, so a field
             // with focus scrolls up above it instead of under it.
-            Modifier.padding(pad).consumeWindowInsets(pad).imePadding().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 12.dp),
+            Modifier.padding(pad).consumeWindowInsets(pad).imePadding().verticalScroll(scroll).padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -224,7 +232,10 @@ fun Answer(tag: String, close: () -> Unit) {
             val moves = s?.moves.orEmpty()
             if (moves.isNotEmpty()) HorizontalDivider(Modifier.padding(vertical = 6.dp))
             for ((n, t) in moves) Item(n, t, choice[n], notes[n].orEmpty(),
-                choose = { if (it == null) choice.remove(n) else choice[n] = it },
+                choose = {
+                    stick = it != null && choice[n] == null && scroll.value >= scroll.maxValue - 8
+                    if (it == null) choice.remove(n) else choice[n] = it
+                },
                 write = { notes[n] = it },
                 drop = {
                     choice.remove(n)

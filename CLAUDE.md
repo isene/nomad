@@ -739,6 +739,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
   at a new turn's first answer, keeping ten, newest first.
 - 0.5.2: every row shows its session's model (`model` in sessions.json),
   not only the current ones. `about()` gives a row's dim words.
+- 0.5.4: a choice made at the bottom of the answer screen keeps the
+  page at the bottom, so Send stays in sight when the field for words
+  opens (`stick` in `Answer`). `SendOnAndroidTest` taps Y there; a
+  scroll shows in a test only after `root.draw`.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`
