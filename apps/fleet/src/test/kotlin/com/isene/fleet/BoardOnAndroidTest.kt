@@ -36,6 +36,19 @@ class BoardOnAndroidTest {
     }
 
     @Test
+    fun an_open_eta_shows_as_its_time_in_the_colour_of_whose_move_it_is() {
+        val ci = parseBoard(list)!!.sessions!![0]
+        assertEquals("a dialog with an ETA is still YOURS", "YOURS" to stateColor("YOURS"), stateShown(ci, false))
+        assertEquals("14:20" to stateColor("YOURS"), stateShown(ci.copy(waits = true), false))
+        assertEquals("14:20" to stateColor("working"), stateShown(ci.copy(waits = true, state = "working", moves = emptyList()), false))
+        assertEquals("14:20" to stateColor("working"), stateShown(ci.copy(state = "working"), false))
+        assertEquals("14:20" to stateColor("CAPPED"), stateShown(ci.copy(waits = true), true))
+        assertEquals("ETA unknown", "working" to stateColor("working"), stateShown(ci.copy(waits = true, state = "working", eta = "?"), false))
+        val waiting = parseBoard("""{"stamp": 8, "t": 1, "sessions": [{"tag": "ci", "state": "working", "eta": "14:20", "waits": true}]}""")
+        assertEquals(true, waiting!!.sessions!![0].waits)
+    }
+
+    @Test
     fun the_list_is_read_and_an_unchanged_one_is_kept() {
         val a = parseBoard(list)!!
         assertEquals(7L to 1000L, a.stamp to a.t)

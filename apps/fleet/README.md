@@ -22,7 +22,9 @@ phone twin of [fleet](https://github.com/isene/fleet).
   when another message comes and goes once they are read. A tap opens the
   Claude app with "Check" typed in.
 - The laptop fleet's session list: each session's state in fleet's
-  colours, ETA, the count of its open items, and fleet's » after a
+  colours (a clock time, `13:55`, for one that has given an ETA: green,
+  orange when it also has an open item for you, red once the time has
+  passed), the count of its open items, and fleet's » after a
   session it wakes by itself. Sessions that are working or wait for you
   also show workspace, context size, model and the start of their last
   answer (your prompt while they work); the rest take one line. It is

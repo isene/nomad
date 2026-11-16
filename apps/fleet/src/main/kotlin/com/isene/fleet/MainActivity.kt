@@ -355,8 +355,8 @@ private fun Seat(s: Session, scroll: ScrollState, open: () -> Unit, hold: () -> 
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             if (s.moves.isNotEmpty()) Text("${s.moves.size} open", style = small, color = Color(0xFFFF8700))
             if (!now) Text(about(s, false), style = small, color = dim)
-            if (s.eta.isNotEmpty()) Text("ETA ${s.eta}", color = if (past(s.eta)) Color(0xFFFF0000) else dim)
-            Text(s.state, color = stateColor(s.state), fontWeight = FontWeight.Bold)
+            val (state, colour) = stateShown(s, past(s.eta))
+            Text(state, color = colour, fontWeight = FontWeight.Bold)
         }
         MessageLine(s)
         if (now) {
@@ -421,6 +421,20 @@ fun MessageLine(s: Session) {
         else -> "$who was picked up by the session." to green
     }
     Text(text, style = MaterialTheme.typography.bodySmall, color = colour)
+}
+
+/** What a row says for its state, as on the laptop. A session with an
+ *  open ETA, at work or waiting for work of its own, shows that clock
+ *  time alone: green, orange when it also has an open item for the user,
+ *  red once the time has gone by. */
+fun stateShown(s: Session, past: Boolean): Pair<String, Color> {
+    val timed = s.eta.contains(':') && (s.waits || s.state == "working")
+    return when {
+        !timed -> s.state to stateColor(s.state)
+        past -> s.eta to Color(0xFFFF0000)
+        s.waits && s.moves.isNotEmpty() -> s.eta to stateColor("YOURS")
+        else -> s.eta to stateColor("working")
+    }
 }
 
 /** fleet's colours: 196, 46, 208, 69, 60, 240 and 245 of the 256. */

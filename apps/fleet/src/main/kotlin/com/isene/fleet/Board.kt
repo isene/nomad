@@ -32,6 +32,9 @@ data class Session(
     val ask: String = "",
     val call: String = "",
     val full: String = "",
+    /** It waits at its prompt for work of its own that has an ETA; the
+     *  laptop then shows the time for a state. */
+    val waits: Boolean = false,
 )
 
 /** A session's last answer in full: HyperList with the laptop's colours. */
@@ -89,6 +92,7 @@ private fun session(e: JSONObject): Session {
         e.optJSONObject("ask")?.optString("line").orEmpty(),
         e.optJSONObject("ask")?.optString("call").orEmpty(),
         e.optJSONObject("ask")?.optString("full").orEmpty(),
+        e.optBoolean("waits"),
     )
 }
 
