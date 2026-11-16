@@ -1,0 +1,3 @@
+<resources>
+    <style name="Theme.Science" parent="android:Theme.Material.NoActionBar" />
+</resources>

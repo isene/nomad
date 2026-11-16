@@ -34,8 +34,9 @@ These come from the original mobile-architecture artifact. Do not drift.
 - **Compose for screens. Glance for widgets. WorkManager for background.**
   Widgets render through `RemoteViews`, so all-Rust UI frameworks are
   rejected. Termux-style approaches are rejected. Super-apps are
-  rejected, with one exception he asked for on 2026-10-29: gluon has
-  mail (kastrup), tock and tasks, as the laptop's gluon does.
+  rejected, with two exceptions he asked for. gluon has mail (kastrup),
+  tock and tasks, as the laptop's gluon does (2026-10-29). science has
+  the laptop's science apps as tabs (2026-11-16).
 - **Each app ships as its own APK** with its own launcher icon. Shared
   core is consumed via a Gradle dependency on the local `core` crate
   (cargo-ndk builds the per-ABI `.so` files; UniFFI generates the
@@ -559,6 +560,30 @@ when building the core. Same rule as the rest of Fe₂O₃.
   Android's own code at 360 by 700 dp with text at 130 % and fails when
   a slider or Copy falls off; it writes `build/screen.png` to look at.
 
+### science (com.isene.science)
+
+- The laptop's science apps in one app, a tab each (Geir asked on
+  2026-11-16). 0.1.0 has Elements and Isotopes. Next: the HR diagram
+  (stars) and the exoplanets; maybe particles, the Moon and universe.
+  The sky stays in astro. Signed with the tasks key.
+- Kotlin only, like prism. `Data.kt` has the rules (families, decay
+  modes, half-life wording) copied from the laptop's elements and
+  isotopes apps, and touches no Android class.
+- The data is two files in `assets`, made by `tools/science-data` from
+  `~/.elements/elements.json` and `../isotopes/data/isotopes.csv`. Run
+  it again when either changes. The isotopes are read when their tab is
+  first opened.
+- The table and the chart are each one Canvas. Two fingers zoom, one
+  finger moves, a tap picks. Nothing redraws unless a finger did
+  something.
+- The network is used for one thing: `Wiki.kt` asks Wikipedia for an
+  article when Article is tapped, and keeps it in `files/articles`.
+- A new subject is a tab with a colour of its own, a parser in
+  `Data.kt` and a data file from `tools/science-data`.
+- Tests: `./gradlew :apps:science:testReleaseUnitTest`. The screen test
+  taps gold, goes to its isotopes and writes `build/table.png`,
+  `gold.png` and `chart.png` under `apps/science`.
+
 ### mail (in gluon, package com.isene.mail, the kastrup part)
 
 - 0.17.0: Laptop drafts (menu). `DraftsRepo` reads `drafts/` of the
@@ -708,8 +733,8 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - Putting business logic in Kotlin because it's faster to prototype.
 - Hand-written JNI when UniFFI would do.
 - Pulling in heavy Compose dependencies for trivial features.
-- A super-app with internal modes instead of separate APKs (gluon is
-  the one exception).
+- A super-app with internal modes instead of separate APKs (gluon and
+  science are the two exceptions).
 - Background polling instead of WorkManager-scheduled or push-driven sync.
 - All-Rust UI experiments. Widgets require `RemoteViews`.
 - Duplicating logic between core and a shell.

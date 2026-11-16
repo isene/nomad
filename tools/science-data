@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""The data files of the science app, from the laptop's own apps.
+
+    tools/science-data
+
+- elements.tsv: the facts of each element, from the file the laptop's
+  elements app keeps (~/.elements/elements.json; run `elements` once to
+  get it), with the title of its Wikipedia page and a short summary. The
+  full article stays out: the app asks Wikipedia when one is opened.
+- isotopes.csv: the IAEA table, as the laptop's isotopes app ships it.
+"""
+import json
+import os
+import shutil
+
+here = os.path.dirname(os.path.abspath(__file__))
+out = os.path.join(here, "..", "apps", "science", "src", "main", "assets")
+src = os.path.expanduser("~/.elements/elements.json")
+
+
+def cell(v):
+    if v is None:
+        return ""
+    if isinstance(v, float):
+        return repr(v)
+    return str(v).replace("\t", " ").replace("\n", " ")
+
+
+rows = []
+for e in sorted(json.load(open(src)), key=lambda e: e["number"]):
+    ion = e.get("ionization_energies") or []
+    rows.append("\t".join(cell(v) for v in (
+        e["number"], e["symbol"], e["name"], e.get("category"), e.get("phase"),
+        e.get("atomic_mass"), e.get("density"), e.get("melt"), e.get("boil"),
+        e.get("group"), e.get("period"), e.get("block"), e["xpos"], e["ypos"],
+        " ".join(str(s) for s in e.get("shells") or []),
+        e.get("electron_configuration_semantic"), e.get("electronegativity_pauling"),
+        ion[0] if ion else None, e.get("discovered_year"),
+        (e.get("source") or "").rsplit("/wiki/", 1)[-1] or e["name"], e.get("summary"),
+    )))
+with open(os.path.join(out, "elements.tsv"), "w") as f:
+    f.write("\n".join(rows) + "\n")
+shutil.copy(os.path.join(here, "..", "..", "isotopes", "data", "isotopes.csv"), os.path.join(out, "isotopes.csv"))
+print(f"{len(rows)} elements, isotopes.csv copied")
