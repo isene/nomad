@@ -44,7 +44,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.isene.astro.viewmodel.AstroViewModel
 
-private enum class Mode { Sky, Gear }
+private enum class Mode { Sky, Moon, Gear }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -59,7 +59,7 @@ fun AstroApp(vm: AstroViewModel) {
             TopAppBar(
                 title = {
                     Column {
-                        Text(if (mode == Mode.Sky) "Sky" else "Gear")
+                        Text(mode.name)
                         Text(sky.locationLabel, style = androidx.compose.material3.MaterialTheme.typography.labelSmall)
                     }
                 },
@@ -88,6 +88,12 @@ fun AstroApp(vm: AstroViewModel) {
                     label = { Text("Sky") },
                 )
                 NavigationBarItem(
+                    selected = mode == Mode.Moon,
+                    onClick = { mode = Mode.Moon },
+                    icon = {},
+                    label = { Text("Moon") },
+                )
+                NavigationBarItem(
                     selected = mode == Mode.Gear,
                     onClick = { mode = Mode.Gear },
                     icon = {},
@@ -98,6 +104,7 @@ fun AstroApp(vm: AstroViewModel) {
     ) { pad ->
         when (mode) {
             Mode.Sky -> SkyScreen(vm, Modifier.padding(pad))
+            Mode.Moon -> MoonScreen(Modifier.padding(pad))
             Mode.Gear -> GearScreen(vm, Modifier.padding(pad))
         }
     }

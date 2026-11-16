@@ -6,7 +6,7 @@
 
 **[Download for Android (APK)](https://github.com/isene/nomad/releases/download/apk/astro.apk)** · [how to install](https://isene.org/nomad/#get)
 
-![version](https://img.shields.io/badge/version-0.1.5-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
+![version](https://img.shields.io/badge/version-0.2.0-3ddc84) ![platform](https://img.shields.io/badge/platform-Android-3ddc84) ![shell](https://img.shields.io/badge/shell-Kotlin%20%2F%20Compose-7f52ff) ![core](https://img.shields.io/badge/core-Rust%20%2F%20UniFFI-f74c00) ![license](https://img.shields.io/badge/license-Unlicense-green) ![Stay Amazing](https://img.shields.io/badge/Stay-Amazing-important)
 
 Amateur-astronomy companion — full parity with the Fe₂O₃ [astro](https://github.com/isene/astro) TUI. Part of the [nomad](../../) mobile suite.
 
@@ -24,6 +24,12 @@ Everything the desktop astro panel gives you, in your pocket at the telescope.
 - met.no weather + per-day **observing-condition** colours (good / fair / poor)
 - in-the-sky.org events, NASA APOD, and a generated starchart (Coil-loaded)
 - GPS location (`LocationManager`, no Google Play Services) + manual override
+
+**Moon mode**
+- The near side as it looks on the day shown, lit for the phase
+- A strip of the days around it; a tap moves to that day
+- A map of the near side with the features named; two fingers zoom
+- The same NASA map and IAU names as the laptop's [moon](https://github.com/isene/moon)
 
 **Gear mode**
 - Telescope / eyepiece / misc catalog with live optics maths

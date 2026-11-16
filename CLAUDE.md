@@ -560,6 +560,19 @@ when building the core. Same rule as the rest of Fe₂O₃.
   Android's own code at 360 by 700 dp with text at 130 % and fails when
   a slider or Copy falls off; it writes `build/screen.png` to look at.
 
+### astro (com.isene.astro): the Moon mode
+
+- 0.2.0 has a Moon mode between Sky and Gear (Geir asked on 2026-11-16):
+  the laptop's moon app. `data/Moon.kt` has its rules in plain Kotlin
+  (`litDisk`, `phaseName`, `until`, `named`); the phase itself comes
+  from the core's `moonPhase`.
+- `assets/moon.jpg` is the laptop's `moon/img/moon-2048.z` as a JPEG,
+  and `moon-features.tsv` is its feature list. The lit disk is made once
+  per day shown, from the map at half size.
+- Tests: `./gradlew :apps:astro:testReleaseUnitTest`. One writes
+  `apps/astro/build/moon.pgm` to look at. The screen itself has no test:
+  it needs the Rust core, which the laptop's test run does not load.
+
 ### science (com.isene.science)
 
 - The laptop's science apps in one app, a tab each (Geir asked on
