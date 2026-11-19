@@ -754,6 +754,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - 0.5.7: YOURS is green (46) and working amber (214), as in deck 0.1.77
   and fleet 0.3.107. Open items, "waits for your yes" and the ask notice
   take `stateColor("YOURS")` too.
+- 0.5.8: an item a message answered stays hidden while that message's
+  trip lives (`Answered.carried`, `shown(list, live)`), so the item and
+  the "picked up" line come back together. The old rule (the session's
+  `at` grew while not working) fired on a write that starts no turn.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`

@@ -36,7 +36,8 @@ phone twin of [fleet](https://github.com/isene/fleet).
   takes words of your own.
   Send goes out as one message, as you would type it ("3 yes", "5 no:
   not today"). The items it answers leave the screen at once. One comes
-  back only if the session's answer to it leaves it open.
+  back only if the session's answer to it leaves it open. A line you type,
+  such as "2 yes", answers item 2 the same way.
 - A session held by a permission dialog shows Allow and Deny, in the list
   and on its answer screen. Allow first shows the whole call; Deny goes at
   once. fleet on the laptop presses the key only while that call still

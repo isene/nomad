@@ -114,6 +114,23 @@ class BoardOnAndroidTest {
     }
 
     @Test
+    fun an_item_a_message_answered_comes_back_only_with_the_message_line() {
+        val a = Answered()
+        a.sent(yours(100, 2, 3, state = "idle"), setOf(2), message = true)
+        // The session wrote a line that started no turn: newer, not working.
+        assertEquals("while the message line shows", listOf(3),
+            a.shown(listOf(yours(120, 2, 3)), live = setOf("ci"))[0].moves.map { it.first })
+        assertEquals(listOf(3), a.shown(listOf(yours(130, 2, 3, state = "working")), setOf("ci"))[0].moves.map { it.first })
+        assertEquals("the line went: not closed, so it shows again", listOf(2, 3),
+            a.shown(listOf(yours(150, 2, 3)))[0].moves.map { it.first })
+
+        // Closed by the answer: gone for good, line or not.
+        a.sent(yours(200, 2, 3), setOf(2), message = true)
+        assertEquals(listOf(3), a.shown(listOf(yours(220, 3)), setOf("ci"))[0].moves.map { it.first })
+        assertEquals(listOf(3), a.shown(listOf(yours(230, 3)))[0].moves.map { it.first })
+    }
+
+    @Test
     fun a_message_goes_from_sent_to_the_laptop_to_picked_up() {
         val t = Trips()
         val ci = yours(100)

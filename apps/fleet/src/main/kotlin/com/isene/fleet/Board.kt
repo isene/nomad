@@ -136,33 +136,47 @@ fun answers(text: String): Set<Int> = text.lines().mapNotNull { line ->
     if (sentence) null else num.toIntOrNull()
 }.toSet()
 
-/** Items answered from the phone leave the list at once. They stay out of
- *  it until the session has ended a turn on the answer: by then it has
- *  closed them, or they show again, as on the laptop. */
+/** Items answered from the phone leave the list at once. Those a message
+ *  answered stay out while its line shows under the session, so both come
+ *  back together, once the session has ended a turn after it picked the
+ *  message up. A dropped item stays out until the session ends a turn.
+ *  By then the session has closed them, or they show again, as on the
+ *  laptop. */
 class Answered {
     /** By session: the numbers, and the session's last activity when it
      *  waited after the answer went (null while it works on the turn it
      *  was on, since the answer comes after that turn). */
     private val hidden = mutableMapOf<String, Pair<Set<Int>, Long?>>()
+    /** Sessions whose hidden items a message answered: they follow its trip. */
+    private val carried = mutableSetOf<String>()
 
     @Synchronized
-    fun sent(s: Session, nums: Set<Int>) {
+    fun sent(s: Session, nums: Set<Int>, message: Boolean = false) {
         hidden[s.tag] = (hidden[s.tag]?.first.orEmpty() + nums) to (if (s.state == "working") null else s.at)
+        if (message) carried += s.tag
     }
 
     /** The message did not reach the server, so its items show again. */
     @Synchronized
     fun failed(tag: String, nums: Set<Int>) {
         val (left, at) = hidden[tag] ?: return
-        if ((left - nums).isEmpty()) hidden.remove(tag) else hidden[tag] = (left - nums) to at
+        if ((left - nums).isEmpty()) {
+            hidden.remove(tag)
+            carried -= tag
+        } else hidden[tag] = (left - nums) to at
     }
 
+    /** The list with the hidden items left out. `live` names the sessions
+     *  whose last message from the phone still shows its line. */
     @Synchronized
-    fun shown(list: List<Session>): List<Session> = list.map { s ->
+    fun shown(list: List<Session>, live: Set<String> = emptySet()): List<Session> = list.map { s ->
         val (nums, at) = hidden[s.tag] ?: return@map s
         // A number the list no longer has is closed, and free for a new item.
         val open = nums.filter { n -> s.moves.any { it.first == n } }.toSet()
         val now = when {
+            // Not the session's last activity: a write that starts no turn
+            // moves it too, and the item came back before the answer.
+            s.tag in carried -> (if (s.tag in live) open else emptySet()) to at
             s.state == "working" -> open to at
             at == null -> open to s.at
             s.at > at -> emptySet<Int>() to at
@@ -170,6 +184,7 @@ class Answered {
         }
         if (now.first.isEmpty()) {
             hidden.remove(s.tag)
+            carried -= s.tag
             s
         } else {
             hidden[s.tag] = now
@@ -334,19 +349,22 @@ object Board {
                     stamp = got.stamp
                     got.sessions?.let {
                         raw = it
-                        sessions.value = answered.shown(it)
+                        if (got.link != null) tracker.seen(it, got.queue, asked, now())
+                        trips.value = tracker.all()
+                        sessions.value = answered.shown(it, live())
                         written.value = got.t
                         week.value = got.week
                         link.value = got.link
                         queue.value = got.queue
-                        if (got.link != null) tracker.seen(it, got.queue, asked, now())
-                        trips.value = tracker.all()
                     }
                 }
             } catch (_: InterruptedException) {
             }
         }
     }
+
+    /** Sessions whose last message from the phone still shows its line. */
+    private fun live() = tracker.all().filterValues { it.stage != "failed" }.keys
 
     fun stop() {
         worker?.interrupt()
@@ -361,12 +379,12 @@ object Board {
         val address = Store(ctx).address
         val app = ctx.applicationContext
         val nums = answers(text)
-        raw.find { it.tag == tag }?.takeIf { nums.isNotEmpty() }?.let {
-            answered.sent(it, nums)
-            sessions.value = answered.shown(raw)
-        }
         tracker.sending(tag, now(), text)
         trips.value = tracker.all()
+        raw.find { it.tag == tag }?.takeIf { nums.isNotEmpty() }?.let {
+            answered.sent(it, nums, message = true)
+            sessions.value = answered.shown(raw, live())
+        }
         thread(name = "send") {
             val body = post(address, messageBody(tag, text))
             val said = body?.let(::messageReply)
@@ -381,7 +399,7 @@ object Board {
                 trips.value = tracker.all()
                 if (!ok && nums.isNotEmpty()) {
                     answered.failed(tag, nums)
-                    sessions.value = answered.shown(raw)
+                    sessions.value = answered.shown(raw, live())
                 }
                 if (!ok || name == null) Toast.makeText(app, said ?: "Not sent: no answer from the server.", Toast.LENGTH_LONG).show()
                 // A fresh list at once, with the message in it.
@@ -400,14 +418,14 @@ object Board {
         val app = ctx.applicationContext
         raw.find { it.tag == tag }?.let {
             answered.sent(it, setOf(num))
-            sessions.value = answered.shown(raw)
+            sessions.value = answered.shown(raw, live())
         }
         thread(name = "drop") {
             val said = post(address, dropBody(tag, num, text))?.let(::messageReply)
             Handler(Looper.getMainLooper()).post {
                 if (said?.startsWith("Dropped") != true) {
                     answered.failed(tag, setOf(num))
-                    sessions.value = answered.shown(raw)
+                    sessions.value = answered.shown(raw, live())
                 }
                 Toast.makeText(app, said ?: "Not dropped: no answer from the server.", Toast.LENGTH_LONG).show()
             }
