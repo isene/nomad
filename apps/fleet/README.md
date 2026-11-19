@@ -10,7 +10,7 @@ phone twin of [fleet](https://github.com/isene/fleet).
   twice within a minute buzzes once.
 - The notice says which session, the first line of its answer, and the line
   that gave the ETA. A tap opens that session's answer.
-- A session held by a permission dialog for a few seconds gets an orange
+- A session held by a permission dialog for a few seconds gets a green
   notice, "waits for your yes", with what it wants to run. It buzzes with
   either of the first two switches on, even over that session's last notice.
   The list and the session's answer screen show what it waits for.
@@ -22,8 +22,8 @@ phone twin of [fleet](https://github.com/isene/fleet).
   when another message comes and goes once they are read. A tap opens the
   Claude app with "Check" typed in.
 - The laptop fleet's session list: each session's state in fleet's
-  colours (a clock time, `13:55`, for one that has given an ETA: green,
-  orange when it also has an open item for you, red once the time has
+  colours (a clock time, `13:55`, for one that has given an ETA: amber,
+  green when it also has an open item for you, red once the time has
   passed), bold only when it is your move, the count of its open items, and fleet's » after a
   session it wakes by itself. Sessions that are working or wait for you
   also show workspace, context size, model and the start of their last

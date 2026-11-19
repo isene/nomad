@@ -206,7 +206,7 @@ fun Answer(tag: String, close: () -> Unit) {
             }
             LaptopLine(always = false)
             s?.ask?.takeIf { it.isNotEmpty() }?.let {
-                Text("Waits for your yes on the laptop: $it", color = Color(0xFFFF8700), fontWeight = FontWeight.Bold)
+                Text("Waits for your yes on the laptop: $it", color = stateColor("YOURS"), fontWeight = FontWeight.Bold)
             }
             s?.let { Permission(it) }
             val shown = if (earlier) past else full
@@ -308,7 +308,7 @@ private fun Item(num: Int, text: String, pick: String?, note: String, choose: (S
     var asking by remember(text) { mutableStateOf(false) }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("$num. $text", color = Color(0xFFFF8700), modifier = Modifier.weight(1f))
+            Text("$num. $text", color = stateColor("YOURS"), modifier = Modifier.weight(1f))
             if (cmd != null) TextButton(onClick = { asking = true }) { Text("Run") }
             TextButton(onClick = drop) { Text("Drop") }
         }

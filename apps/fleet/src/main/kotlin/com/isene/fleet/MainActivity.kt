@@ -353,13 +353,13 @@ private fun Seat(s: Session, scroll: ScrollState, open: () -> Unit, hold: () -> 
             }
             Text(tag, style = if (now) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            if (s.moves.isNotEmpty()) Text("${s.moves.size} open", style = small, color = Color(0xFFFF8700))
+            if (s.moves.isNotEmpty()) Text("${s.moves.size} open", style = small, color = stateColor("YOURS"))
             if (!now) Text(about(s, false), style = small, color = dim)
             StateCell(s)
         }
         if (now) {
             Text(about(s, true), style = small, color = dim)
-            if (s.ask.isNotEmpty()) Text("Waits for your yes: ${s.ask}", style = small, color = Color(0xFFFF8700), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (s.ask.isNotEmpty()) Text("Waits for your yes: ${s.ask}", style = small, color = stateColor("YOURS"), maxLines = 2, overflow = TextOverflow.Ellipsis)
             Permission(s)
             // fleet's own wake prompt says nothing: your message shows above.
             val prompt = s.prompt.takeIf { it != WAKE }.orEmpty()
@@ -450,7 +450,7 @@ val late = Color(0xFFFF5F5F)
 
 /** What a row says for its state, as on the laptop. A session with an
  *  open ETA, at work or waiting for work of its own, shows that clock
- *  time alone: green, orange when it also has an open item for the user,
+ *  time alone: amber, green when it also has an open item for the user,
  *  red once the time has gone by. */
 fun stateShown(s: Session, past: Boolean): Pair<String, Color> {
     val timed = s.eta.contains(':') && (s.waits || s.state == "working")
@@ -462,11 +462,12 @@ fun stateShown(s: Session, past: Boolean): Pair<String, Color> {
     }
 }
 
-/** fleet's colours: 196, 46, 208, 69, 60, 240 and 245 of the 256. */
+/** fleet's colours: 196, 214, 46, 69, 60, 240 and 245 of the 256.
+ *  Green is your turn, amber is wait, red is stuck. */
 fun stateColor(state: String) = when (state) {
     "CAPPED" -> Color(0xFFFF0000)
-    "working" -> Color(0xFF00FF00)
-    "YOURS" -> Color(0xFFFF8700)
+    "working" -> Color(0xFFFFAF00)
+    "YOURS" -> Color(0xFF00FF00)
     "idle" -> Color(0xFF5F87FF)
     "off" -> Color(0xFF5F5F87)
     "older" -> Color(0xFF585858)

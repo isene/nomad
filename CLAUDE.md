@@ -751,6 +751,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
   and on the answer screen (`MessageOnAndroidTest`). Tests fork a JVM per
   class (`forkEvery = 1`): after one screen test, Compose no longer
   redraws the next test's screen, so its scrolls and state changes fail.
+- 0.5.7: YOURS is green (46) and working amber (214), as in deck 0.1.77
+  and fleet 0.3.107. Open items, "waits for your yes" and the ask notice
+  take `stateColor("YOURS")` too.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`

@@ -216,9 +216,9 @@ class Watch : Service() {
                 .setWhen(d.t * 1000)
                 .setShowWhen(true)
                 // A dialog that waits buzzes even over the session's
-                // last notice, and is orange like an open item.
+                // last notice, and is green like an open item.
                 .setOnlyAlertOnce(d.kind != "ask" && !alert)
-                .apply { if (d.kind == "ask") setColor(0xFFFF8700.toInt()) }
+                .apply { if (d.kind == "ask") setColor(0xFF00FF00.toInt()) }
                 .apply { if (alert) setColor(0xFFFF0000.toInt()) }
                 .setAutoCancel(true)
                 .setContentIntent(
