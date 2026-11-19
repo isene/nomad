@@ -202,7 +202,7 @@ fun Answer(tag: String, close: () -> Unit) {
                         }
                     }
                 }) { Text(if (earlier) "Last" else "Earlier") }
-                s?.let { Text(it.state, color = stateColor(it.state), fontWeight = FontWeight.Bold) }
+                s?.let { StateCell(it) }
             }
             LaptopLine(always = false)
             s?.let { MessageLine(it) }

@@ -209,8 +209,9 @@ fun messageName(body: String): String? = try {
 /** A message sent from this phone and how far it got: "sending", "failed",
  *  "server", "laptop" or "read". `t` is when it was sent and `at` when it
  *  reached its stage, unix seconds; `sent` is the phone's clock in ms when
- *  the server took it; `why` says why it was not sent. */
-data class Trip(val name: String, val t: Long, val stage: String, val at: Long, val sent: Long = 0, val why: String = "")
+ *  the server took it; `why` says why it was not sent; `text` is what you
+ *  wrote, shown under the session until its answer comes. */
+data class Trip(val name: String, val t: Long, val stage: String, val at: Long, val sent: Long = 0, val why: String = "", val text: String = "")
 
 /** The last message to each session, followed from Send until the session
  *  has ended a turn after it was picked up. */
@@ -221,8 +222,8 @@ class Trips {
     fun all(): Map<String, Trip> = last.toMap()
 
     @Synchronized
-    fun sending(tag: String, now: Long) {
-        last[tag] = Trip("", now, "sending", now)
+    fun sending(tag: String, now: Long, text: String = "") {
+        last[tag] = Trip("", now, "sending", now, text = text)
     }
 
     /** The server took it as the file `name`, at `ms` on the phone's clock. */
@@ -364,7 +365,7 @@ object Board {
             answered.sent(it, nums)
             sessions.value = answered.shown(raw)
         }
-        tracker.sending(tag, now())
+        tracker.sending(tag, now(), text)
         trips.value = tracker.all()
         thread(name = "send") {
             val body = post(address, messageBody(tag, text))

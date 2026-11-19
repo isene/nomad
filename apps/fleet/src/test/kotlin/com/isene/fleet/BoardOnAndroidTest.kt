@@ -42,10 +42,28 @@ class BoardOnAndroidTest {
         assertEquals("14:20" to stateColor("YOURS"), stateShown(ci.copy(waits = true), false))
         assertEquals("14:20" to stateColor("working"), stateShown(ci.copy(waits = true, state = "working", moves = emptyList()), false))
         assertEquals("14:20" to stateColor("working"), stateShown(ci.copy(state = "working"), false))
-        assertEquals("14:20" to stateColor("CAPPED"), stateShown(ci.copy(waits = true), true))
+        assertEquals("fleet's 203 once late", "14:20" to late, stateShown(ci.copy(waits = true), true))
         assertEquals("ETA unknown", "working" to stateColor("working"), stateShown(ci.copy(waits = true, state = "working", eta = "?"), false))
         val waiting = parseBoard("""{"stamp": 8, "t": 1, "sessions": [{"tag": "ci", "state": "working", "eta": "14:20", "waits": true}]}""")
         assertEquals(true, waiting!!.sessions!![0].waits)
+    }
+
+    @Test
+    fun only_your_move_is_bold_as_on_the_laptop() {
+        val ci = parseBoard(list)!!.sessions!![0]
+        assertEquals(true, yours(ci))
+        assertEquals("work of its own with an item open", true, yours(ci.copy(state = "working", waits = true)))
+        assertEquals(false, yours(ci.copy(state = "working")))
+        assertEquals(false, yours(ci.copy(state = "idle")))
+    }
+
+    @Test
+    fun a_sent_message_keeps_its_text_until_it_is_over() {
+        val t = Trips()
+        t.sending("ci", 100, "Run the suite again")
+        assertEquals("Run the suite again", t.all().getValue("ci").text)
+        t.sent("ci", "1-phone.msg", 101, 5)
+        assertEquals("server" to "Run the suite again", t.all().getValue("ci").let { it.stage to it.text })
     }
 
     @Test

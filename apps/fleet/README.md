@@ -24,7 +24,7 @@ phone twin of [fleet](https://github.com/isene/fleet).
 - The laptop fleet's session list: each session's state in fleet's
   colours (a clock time, `13:55`, for one that has given an ETA: green,
   orange when it also has an open item for you, red once the time has
-  passed), the count of its open items, and fleet's » after a
+  passed), bold only when it is your move, the count of its open items, and fleet's » after a
   session it wakes by itself. Sessions that are working or wait for you
   also show workspace, context size, model and the start of their last
   answer (your prompt while they work); the rest take one line. It is
@@ -57,6 +57,8 @@ phone twin of [fleet](https://github.com/isene/fleet).
   it, newest first, each with its time. Last goes back.
 - Hold a session to write it a message. fleet on the laptop wakes the
   session with it once the session waits at its prompt.
+- What you sent shows under the session at once, in blue after "›", the
+  way deck shows a prompt. It stays until the session's answer comes.
 - A line above the list says whether the laptop is online, or since when
   it is offline. A red line about the relay server means the phone does
   not reach it. The dot before a session is green when a message reaches

@@ -355,15 +355,16 @@ private fun Seat(s: Session, scroll: ScrollState, open: () -> Unit, hold: () -> 
                 maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             if (s.moves.isNotEmpty()) Text("${s.moves.size} open", style = small, color = Color(0xFFFF8700))
             if (!now) Text(about(s, false), style = small, color = dim)
-            val (state, colour) = stateShown(s, past(s.eta))
-            Text(state, color = colour, fontWeight = FontWeight.Bold)
+            StateCell(s)
         }
         MessageLine(s)
         if (now) {
             Text(about(s, true), style = small, color = dim)
             if (s.ask.isNotEmpty()) Text("Waits for your yes: ${s.ask}", style = small, color = Color(0xFFFF8700), maxLines = 2, overflow = TextOverflow.Ellipsis)
             Permission(s)
-            val text = if (s.state == "working" || s.answer.isEmpty()) s.prompt else s.answer.lines().joinToString("\n") { it.trim() }
+            // fleet's own wake prompt says nothing: your message shows above.
+            val prompt = s.prompt.takeIf { it != WAKE }.orEmpty()
+            val text = if (s.state == "working" || s.answer.isEmpty()) prompt else s.answer.lines().joinToString("\n") { it.trim() }
             if (text.isNotEmpty()) Text(text, style = small, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
     }
@@ -421,7 +422,30 @@ fun MessageLine(s: Session) {
         else -> "$who was picked up by the session." to green
     }
     Text(text, style = MaterialTheme.typography.bodySmall, color = colour)
+    // What you wrote, as deck shows a prompt: blue, after "›".
+    trip?.text?.takeIf { it.isNotBlank() }?.let {
+        Text("› ${it.trim()}", style = MaterialTheme.typography.bodySmall, color = xterm(39, isSystemInDarkTheme()),
+            maxLines = 3, overflow = TextOverflow.Ellipsis)
+    }
 }
+
+/** The prompt laptop fleet types to wake a session for a message. */
+private const val WAKE = "Check fleet messages"
+
+/** A row's state in fleet's colour, bold only when it is your move, as on
+ *  the laptop. */
+@Composable
+fun StateCell(s: Session) {
+    val (state, colour) = stateShown(s, past(s.eta))
+    Text(state, color = colour, fontWeight = if (yours(s)) FontWeight.Bold else null)
+}
+
+/** Your move: the answer is in, or work of its own runs while an item
+ *  waits for you. Laptop fleet's `yours()`. */
+fun yours(s: Session) = s.state == "YOURS" || s.waits && s.moves.isNotEmpty()
+
+/** fleet's colour for an ETA that has gone by: 203 of the 256. */
+val late = Color(0xFFFF5F5F)
 
 /** What a row says for its state, as on the laptop. A session with an
  *  open ETA, at work or waiting for work of its own, shows that clock
@@ -431,7 +455,7 @@ fun stateShown(s: Session, past: Boolean): Pair<String, Color> {
     val timed = s.eta.contains(':') && (s.waits || s.state == "working")
     return when {
         !timed -> s.state to stateColor(s.state)
-        past -> s.eta to Color(0xFFFF0000)
+        past -> s.eta to late
         s.waits && s.moves.isNotEmpty() -> s.eta to stateColor("YOURS")
         else -> s.eta to stateColor("working")
     }
@@ -457,7 +481,7 @@ fun clock(t: Long): String {
 }
 
 /** An ETA clock time that has gone by, as the laptop shows it in red. */
-private fun past(eta: String) = runCatching { LocalTime.parse(eta).isBefore(LocalTime.now()) }.getOrDefault(false)
+fun past(eta: String) = runCatching { LocalTime.parse(eta).isBefore(LocalTime.now()) }.getOrDefault(false)
 
 @Composable
 private fun Choice(label: String, about: String, on: Boolean, flip: (Boolean) -> Unit) {

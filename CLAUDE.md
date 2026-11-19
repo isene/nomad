@@ -743,6 +743,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
   page at the bottom, so Send stays in sight when the field for words
   opens (`stick` in `Answer`). `SendOnAndroidTest` taps Y there; a
   scroll shows in a test only after `root.draw`.
+- 0.5.5: a sent message keeps its text (`Trip.text`), shown in blue 39
+  under `MessageLine` until the trip is over; the wake prompt is hidden
+  from a row. States match laptop fleet: bold only for `yours()`, a late
+  ETA in 203 (`late`), and the answer screen uses `StateCell` too.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`
