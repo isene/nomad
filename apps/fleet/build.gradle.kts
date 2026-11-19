@@ -23,8 +23,8 @@ android {
         applicationId = "com.isene.fleet"
         minSdk = 33
         targetSdk = 35
-        versionCode = 27
-        versionName = "0.5.5"
+        versionCode = 28
+        versionName = "0.5.6"
     }
 
     signingConfigs {
@@ -61,7 +61,12 @@ android {
     packaging {
         resources { excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     }
-    testOptions { unitTests.isIncludeAndroidResources = true }
+    testOptions {
+        unitTests.isIncludeAndroidResources = true
+        // A JVM per test class: Compose keeps state from one screen test that
+        // stops the next one's screen from being drawn again.
+        unitTests.all { it.forkEvery = 1 }
+    }
 }
 
 dependencies {

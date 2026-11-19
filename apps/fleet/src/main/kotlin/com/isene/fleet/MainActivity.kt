@@ -357,7 +357,6 @@ private fun Seat(s: Session, scroll: ScrollState, open: () -> Unit, hold: () -> 
             if (!now) Text(about(s, false), style = small, color = dim)
             StateCell(s)
         }
-        MessageLine(s)
         if (now) {
             Text(about(s, true), style = small, color = dim)
             if (s.ask.isNotEmpty()) Text("Waits for your yes: ${s.ask}", style = small, color = Color(0xFFFF8700), maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -367,6 +366,8 @@ private fun Seat(s: Session, scroll: ScrollState, open: () -> Unit, hold: () -> 
             val text = if (s.state == "working" || s.answer.isEmpty()) prompt else s.answer.lines().joinToString("\n") { it.trim() }
             if (text.isNotEmpty()) Text(text, style = small, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
+        // Your message under the answer it follows.
+        MessageLine(s)
     }
 }
 
@@ -421,12 +422,12 @@ fun MessageLine(s: Session) {
             else "$who is on the laptop, waiting for the session to take it." to orange
         else -> "$who was picked up by the session." to green
     }
-    Text(text, style = MaterialTheme.typography.bodySmall, color = colour)
-    // What you wrote, as deck shows a prompt: blue, after "›".
+    // What you wrote, as deck shows a prompt: blue, after "›"; then how far it got.
     trip?.text?.takeIf { it.isNotBlank() }?.let {
         Text("› ${it.trim()}", style = MaterialTheme.typography.bodySmall, color = xterm(39, isSystemInDarkTheme()),
             maxLines = 3, overflow = TextOverflow.Ellipsis)
     }
+    Text(text, style = MaterialTheme.typography.bodySmall, color = colour)
 }
 
 /** The prompt laptop fleet types to wake a session for a message. */

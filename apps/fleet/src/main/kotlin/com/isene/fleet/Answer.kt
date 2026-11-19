@@ -205,7 +205,6 @@ fun Answer(tag: String, close: () -> Unit) {
                 s?.let { StateCell(it) }
             }
             LaptopLine(always = false)
-            s?.let { MessageLine(it) }
             s?.ask?.takeIf { it.isNotEmpty() }?.let {
                 Text("Waits for your yes on the laptop: $it", color = Color(0xFFFF8700), fontWeight = FontWeight.Bold)
             }
@@ -243,6 +242,8 @@ fun Answer(tag: String, close: () -> Unit) {
                     Board.drop(ctx, tag, n, t)
                 },
                 run = { Board.send(ctx, tag, it) })
+            // Your message after the answer and its items, in the order they came.
+            s?.let { MessageLine(it) }
             HorizontalDivider(Modifier.padding(vertical = 6.dp))
             Column(Modifier.inSight(free), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedTextField(

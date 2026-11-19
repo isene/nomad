@@ -747,6 +747,10 @@ when building the core. Same rule as the rest of Fe₂O₃.
   under `MessageLine` until the trip is over; the wake prompt is hidden
   from a row. States match laptop fleet: bold only for `yours()`, a late
   ETA in 203 (`late`), and the answer screen uses `StateCell` too.
+- 0.5.6: your message comes after the answer and its items, in the list
+  and on the answer screen (`MessageOnAndroidTest`). Tests fork a JVM per
+  class (`forkEvery = 1`): after one screen test, Compose no longer
+  redraws the next test's screen, so its scrolls and state changes fail.
 - To look at a screen without a phone: a Robolectric test with
   `@GraphicsMode(NATIVE)`, qualifiers like `w411dp-h891dp-night-xxhdpi`,
   `buildActivity(...).setup()`, then `window.decorView.drawToBitmap()`

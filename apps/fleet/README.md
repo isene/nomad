@@ -57,8 +57,9 @@ phone twin of [fleet](https://github.com/isene/fleet).
   it, newest first, each with its time. Last goes back.
 - Hold a session to write it a message. fleet on the laptop wakes the
   session with it once the session waits at its prompt.
-- What you sent shows under the session at once, in blue after "›", the
-  way deck shows a prompt. It stays until the session's answer comes.
+- What you sent shows at once under the answer it follows, in blue after
+  "›", the way deck shows a prompt. It stays until the session's answer
+  comes.
 - A line above the list says whether the laptop is online, or since when
   it is offline. A red line about the relay server means the phone does
   not reach it. The dot before a session is green when a message reaches
