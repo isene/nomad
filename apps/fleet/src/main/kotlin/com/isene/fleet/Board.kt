@@ -136,12 +136,19 @@ fun answers(text: String): Set<Int> = text.lines().mapNotNull { line ->
     if (sentence) null else num.toIntOrNull()
 }.toSet()
 
+/** The items a message closes: a line with the number and a word, as in
+ *  "3 yes" or "3 done: sent". "3: why?" is what Info sends, a question
+ *  that leaves the item open. */
+fun closes(text: String): Set<Int> = text.lines().mapNotNull { line ->
+    Regex("""^\s*(\d+) +\S""").find(line)?.groupValues?.get(1)?.toIntOrNull()
+}.toSet()
+
 /** Items answered from the phone leave the list at once. Those a message
- *  answered stay out while its line shows under the session, so both come
- *  back together, once the session has ended a turn after it picked the
- *  message up. A dropped item stays out until the session ends a turn.
- *  By then the session has closed them, or they show again, as on the
- *  laptop. */
+ *  answered stay out while its line shows under the session, until the
+ *  session has ended a turn after it picked the message up. A dropped item
+ *  stays out until the session ends a turn. By then the laptop has deleted
+ *  them; only an item the session lists again, such as one asked about
+ *  with Info, shows again. */
 class Answered {
     /** By session: the numbers, and the session's last activity when it
      *  waited after the answer went (null while it works on the turn it
@@ -374,11 +381,14 @@ object Board {
 
     /** Sends `text` to the session `tag`. A line under the session shows
      *  how far it got; a toast says why when it was not sent. The items it
-     *  answers leave the list at once. */
+     *  answers leave the list at once, and those it closes are dropped on
+     *  the laptop once it is delivered, so they do not come back. */
     fun send(ctx: Context, tag: String, text: String) {
         val address = Store(ctx).address
         val app = ctx.applicationContext
         val nums = answers(text)
+        val shut = closes(text)
+        val dropping = raw.find { it.tag == tag }?.moves.orEmpty().filter { it.first in shut }
         tracker.sending(tag, now(), text)
         trips.value = tracker.all()
         raw.find { it.tag == tag }?.takeIf { nums.isNotEmpty() }?.let {
@@ -389,6 +399,9 @@ object Board {
             val body = post(address, messageBody(tag, text))
             val said = body?.let(::messageReply)
             val name = body?.let(::messageName)
+            if (said?.startsWith("Delivered") == true) {
+                for ((num, item) in dropping) post(address, dropBody(tag, num, item))
+            }
             Handler(Looper.getMainLooper()).post {
                 val ok = said?.startsWith("Delivered") == true
                 when {

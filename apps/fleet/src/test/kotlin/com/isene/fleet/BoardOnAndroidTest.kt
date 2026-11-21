@@ -86,6 +86,14 @@ class BoardOnAndroidTest {
         assertEquals(setOf(4), answers("4: the second\n3rd time\n3.5 is more"))
     }
 
+    @Test
+    fun a_word_after_the_number_closes_the_item_and_info_leaves_it_open() {
+        val msg = reply(mapOf(1 to "yes", 2 to "", 3 to "as recommended", 4 to "done"), mapOf(2 to "why?", 4 to "sent"), "6 no")
+        assertEquals(setOf(1, 3, 4, 6), closes(msg))
+        assertEquals(setOf(1, 2, 3, 4, 6), answers(msg))
+        assertEquals(emptySet<Int>(), closes("3rd time\n3.5 is more\n  7\n! ls"))
+    }
+
     private fun yours(at: Long, vararg nums: Int, state: String = "YOURS") =
         Session("ci", state, "", null, "", "", at, null, nums.map { it to "Item $it?" })
 
