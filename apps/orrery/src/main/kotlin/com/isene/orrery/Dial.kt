@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.sp
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.floor
@@ -128,14 +129,22 @@ private fun upright(deg: Float): Float = if (deg > 90f && deg < 270f) deg + 180f
 private val ROMAN = listOf("XXIV", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI", "XII",
     "XIII", "XIV", "XV", "XVI", "XVII", "XVIII", "XIX", "XX", "XXI", "XXII", "XXIII")
 
+/** The case's outer edge. */
+private fun DrawScope.caseRadius() = size.minDimension / 2f * 0.975f
+
+/** The scale of all that lies inside the weather ring, hands included, as a share of the case. */
+private const val DIAL = 0.95f
+
 fun DrawScope.drawFace(f: Face, tm: TextMeasurer) {
-    val r = size.minDimension / 2f * 0.965f
+    val case = caseRadius()
+    val r = case * DIAL
     val c = center
-    starfield(r, c)
-    bezel(r, c)
+    starfield(case, c)
+    bezel(case, c)
+    weatherRing(f, case, c)
     minuteTrack(r, c, tm)
     skyBand(f, r, c, tm)
-    cloudRing(f, r, c)
+    drawCircle(CHANNEL, r * 0.7365f, c, style = Stroke(r * 0.016f))
     drawCircle(GOLD, r * 0.728f, c, style = Stroke(r * 0.006f))
     drawCircle(ENAMEL, r * 0.725f, c)
     beads(c, r * 0.716f, 120, r * 0.0035f, GOLD.copy(alpha = 0.55f))
@@ -244,19 +253,34 @@ private fun DrawScope.skyBand(f: Face, r: Float, c: Offset, tm: TextMeasurer) {
     drawCircle(GOLD, r * 0.745f, c, style = Stroke(r * 0.004f))
 }
 
-/** Cloud cover for the hours ahead: clear is the dark channel, overcast is pale. */
-private fun DrawScope.cloudRing(f: Face, r: Float, c: Offset) {
-    val mid = r * 0.7365f
-    val w = r * 0.016f
-    drawCircle(CHANNEL, mid, c, style = Stroke(w))
-    val day = f.day ?: return
-    if (f.clouds.isEmpty()) return
-    val brush = sweep(c, f, day) { i ->
-        val t = day.start + i * day.step
-        val cl = f.clouds.firstOrNull { t >= it.at && t < it.at + 3600 }
-        if (cl == null) CHANNEL else androidx.compose.ui.graphics.lerp(CHANNEL, Color(0xFFDCE3EE), cl.cover / 100f)
+/**
+ * The weather of the next 24 hours as an enamel stone per hour, set in
+ * gold just inside the case. The hour now is the first of the 24.
+ */
+private fun DrawScope.weatherRing(f: Face, case: Float, c: Offset) {
+    val mid = case * 0.935f
+    val w = case * 0.024f
+    drawCircle(CHANNEL, mid, c, style = Stroke(case * 0.048f))
+    val day = f.day
+    if (day != null && f.clouds.isNotEmpty()) {
+        val tl = Offset(c.x - mid, c.y - mid)
+        val box = Size(mid * 2, mid * 2)
+        val first = Instant.ofEpochSecond(day.start).atZone(f.zone).truncatedTo(ChronoUnit.HOURS).toEpochSecond()
+        for (k in 0 until 24) {
+            val t = first + k * 3600
+            // The forecast hour that covers the middle of this one.
+            val h = f.clouds.firstOrNull { t + 1800 < it.at + 3600 } ?: break
+            if (h.at > t + 1800 && k > 0) continue
+            drawArc(h.sky.colour, f.angle(t) - 90f + 0.7f, 15f - 1.4f, false, tl, box, style = Stroke(w))
+        }
+        // Enamel: darker at the rims, a glint along the middle.
+        drawCircle(Brush.radialGradient(0.923f / 0.947f to Color.Black.copy(alpha = 0.35f),
+            0.935f / 0.947f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.35f),
+            center = c, radius = case * 0.947f), mid, c, style = Stroke(w))
+        drawCircle(Color.White.copy(alpha = 0.18f), case * 0.939f, c, style = Stroke(case * 0.0025f))
     }
-    drawCircle(brush, mid, c, style = Stroke(w))
+    drawCircle(GOLD, case * 0.957f, c, style = Stroke(case * 0.003f))
+    drawCircle(GOLD, case * 0.913f, c, style = Stroke(case * 0.003f))
 }
 
 private fun DrawScope.sunIcon(at: Offset, s: Float, color: Color) {
@@ -407,31 +431,33 @@ private fun DrawScope.plaque(f: Face, r: Float, c: Offset, tm: TextMeasurer) {
     }
 }
 
-/** The hands: the sun hand for the 24 hours, the minute hand, and a second hand that sweeps eight steps a second. */
+private val STEEL_DARK = Color(0xFF4F596C)
+private val STEEL = Color(0xFFC3CCD9)
+private val STEEL_LIGHT = Color(0xFFF8FAFD)
+
+/** The hands: a broad gold sun hand for the 24 hours and a slim steel minute hand. */
 fun DrawScope.drawHands(ms: Long, zone: ZoneId) {
-    val r = size.minDimension / 2f * 0.965f
+    val r = caseRadius() * DIAL
     val c = center
     val t = Instant.ofEpochMilli(ms).atZone(zone)
-    val sec = t.second + floor(t.nano / 125_000_000.0) / 8.0
-    val hourDeg = dialAngle(t.hour + t.minute / 60.0 + sec / 3600.0)
-    val minDeg = ((t.minute + sec / 60.0) * 6.0).toFloat()
-    val secDeg = (sec * 6.0).toFloat()
+    val hourDeg = dialAngle(t.hour + t.minute / 60.0 + t.second / 3600.0)
+    val minDeg = ((t.minute + t.second / 60.0) * 6.0).toFloat()
     val shadow = Offset(r * 0.008f, r * 0.012f)
 
     val hourHand = Path().apply {
         moveTo(c.x, c.y - r * 0.775f)
-        lineTo(c.x + r * 0.016f, c.y - r * 0.52f)
-        lineTo(c.x + r * 0.011f, c.y + r * 0.10f)
-        lineTo(c.x - r * 0.011f, c.y + r * 0.10f)
-        lineTo(c.x - r * 0.016f, c.y - r * 0.52f)
+        lineTo(c.x + r * 0.024f, c.y - r * 0.52f)
+        lineTo(c.x + r * 0.015f, c.y + r * 0.10f)
+        lineTo(c.x - r * 0.015f, c.y + r * 0.10f)
+        lineTo(c.x - r * 0.024f, c.y - r * 0.52f)
         close()
     }
     val minuteHand = Path().apply {
         moveTo(c.x, c.y - r * 0.93f)
-        lineTo(c.x + r * 0.012f, c.y - r * 0.70f)
-        lineTo(c.x + r * 0.008f, c.y + r * 0.13f)
-        lineTo(c.x - r * 0.008f, c.y + r * 0.13f)
-        lineTo(c.x - r * 0.012f, c.y - r * 0.70f)
+        lineTo(c.x + r * 0.010f, c.y - r * 0.70f)
+        lineTo(c.x + r * 0.006f, c.y + r * 0.13f)
+        lineTo(c.x - r * 0.006f, c.y + r * 0.13f)
+        lineTo(c.x - r * 0.010f, c.y - r * 0.70f)
         close()
     }
 
@@ -442,7 +468,7 @@ fun DrawScope.drawHands(ms: Long, zone: ZoneId) {
             drawCircle(Color.Black.copy(alpha = 0.3f), r * 0.05f, Offset(c.x, c.y - r * 0.815f))
         }
         drawPath(hourHand, Brush.horizontalGradient(listOf(GOLD_DARK, GOLD_LIGHT, GOLD, GOLD_DARK),
-            startX = c.x - r * 0.016f, endX = c.x + r * 0.016f))
+            startX = c.x - r * 0.024f, endX = c.x + r * 0.024f))
         drawLine(GOLD_DARK, Offset(c.x, c.y - r * 0.74f), Offset(c.x, c.y + r * 0.08f), r * 0.002f)
         drawCircle(GOLD, r * 0.02f, Offset(c.x, c.y + r * 0.10f), style = Stroke(r * 0.007f))
         val sc = Offset(c.x, c.y - r * 0.815f)
@@ -462,18 +488,11 @@ fun DrawScope.drawHands(ms: Long, zone: ZoneId) {
 
     rotate(minDeg, c) {
         translate(shadow.x, shadow.y) { drawPath(minuteHand, Color.Black.copy(alpha = 0.35f)) }
-        drawPath(minuteHand, Brush.horizontalGradient(listOf(Color(0xFFBFA86A), Color(0xFFFFF3CF), Color(0xFFD9C48A)),
-            startX = c.x - r * 0.012f, endX = c.x + r * 0.012f))
-        drawLine(GOLD_DARK.copy(alpha = 0.8f), Offset(c.x, c.y - r * 0.9f), Offset(c.x, c.y + r * 0.1f), r * 0.0018f)
-    }
-
-    rotate(secDeg, c) {
-        translate(shadow.x * 1.3f, shadow.y * 1.3f) {
-            drawLine(Color.Black.copy(alpha = 0.3f), Offset(c.x, c.y + r * 0.18f), Offset(c.x, c.y - r * 0.95f), r * 0.006f)
-        }
-        drawLine(VERMILION, Offset(c.x, c.y + r * 0.18f), Offset(c.x, c.y - r * 0.95f), r * 0.006f)
-        drawCircle(VERMILION, r * 0.022f, Offset(c.x, c.y + r * 0.13f), style = Stroke(r * 0.008f))
-        drawCircle(VERMILION, r * 0.012f, Offset(c.x, c.y - r * 0.80f))
+        drawPath(minuteHand, Brush.horizontalGradient(listOf(STEEL_DARK, STEEL_LIGHT, STEEL, STEEL_DARK),
+            startX = c.x - r * 0.010f, endX = c.x + r * 0.010f))
+        // A dark edge keeps the steel clear on the pale minute ring too.
+        drawPath(minuteHand, INK.copy(alpha = 0.7f), style = Stroke(r * 0.003f))
+        drawLine(STEEL_DARK, Offset(c.x, c.y - r * 0.9f), Offset(c.x, c.y + r * 0.1f), r * 0.0018f)
     }
 
     drawCircle(brass(c), r * 0.034f, c)

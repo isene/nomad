@@ -59,4 +59,13 @@ class SkyTest {
         assertEquals(null, seen(listOf(-5.0, -5.0, -5.0, -5.0, -5.0, -5.0, -5.0), sun))
         assertEquals(0..1, seen(listOf(30.0, 30.0, 2.0), listOf(-20.0, -20.0, -20.0)))
     }
+
+    @Test fun the_ring_reads_the_weather_symbol() {
+        assertEquals(Sky.SUN, skyOf("clearsky_night", 0.0))
+        assertEquals(Sky.SUN, skyOf("fair_day", 0.0))
+        assertEquals(Sky.PARTLY, skyOf("partlycloudy_day", 0.0))
+        assertEquals(Sky.CLOUD, skyOf("cloudy", 0.0))
+        assertEquals(Sky.RAIN, skyOf("lightsnowshowers_night", 0.0))
+        assertEquals(Sky.RAIN, skyOf("cloudy", 0.3))
+    }
 }

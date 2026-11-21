@@ -131,8 +131,27 @@ fun span(seconds: Long): String {
     return if (m >= 60) "${m / 60} h ${"%02d".format(m % 60)} min" else "$m min"
 }
 
-/** Cloud cover in percent for an hour that starts at `at` (unix seconds). */
-data class Cloud(val at: Long, val cover: Int)
+/** The weather of an hour on the outer ring, in the same colours as the weather widget's ring. */
+enum class Sky(val colour: Color, val word: String) {
+    SUN(Color(0xFFF0C020), "clear"),
+    PARTLY(Color(0xFFFAFB96), "partly cloudy"),
+    CLOUD(Color(0xFF8E8E8E), "cloudy"),
+    RAIN(Color(0xFF3D9BFF), "rain or snow"),
+}
+
+/** The kind of an hour from met.no's symbol ("lightrain_night") and its rain in mm. */
+fun skyOf(symbol: String, rain: Double): Sky {
+    val base = symbol.substringBefore('_')
+    return when {
+        rain >= 0.05 || listOf("rain", "sleet", "snow", "thunder").any { it in base } -> Sky.RAIN
+        base == "cloudy" || base == "fog" -> Sky.CLOUD
+        base == "partlycloudy" -> Sky.PARTLY
+        else -> Sky.SUN
+    }
+}
+
+/** Cloud cover in percent and the kind of weather for an hour that starts at `at` (unix seconds). */
+data class Cloud(val at: Long, val cover: Int, val sky: Sky)
 
 /** Clouds from met.no, kept an hour in a file so a restart does not fetch again. */
 object Clouds {
@@ -151,7 +170,7 @@ object Clouds {
             if (kotlin.math.abs(o.getDouble("lat") - place.lat) > 0.05 ||
                 kotlin.math.abs(o.getDouble("lon") - place.lon) > 0.05) return null
             val a = o.getJSONArray("hours")
-            (0 until a.length()).map { a.getJSONObject(it).let { h -> Cloud(h.getLong("at"), h.getInt("cover")) } }
+            (0 until a.length()).map { a.getJSONObject(it).let { h -> Cloud(h.getLong("at"), h.getInt("cover"), Sky.valueOf(h.getString("sky"))) } }
         }.getOrNull()
     }
 
@@ -167,9 +186,9 @@ object Clouds {
             client.newCall(req).execute().use { r -> if (r.isSuccessful) r.body?.string() else null }
         }.getOrNull() ?: return null
         val hours = uniffi.fe2o3_mobile_core.parseWeather(body).flatMap { it.hours }
-            .mapNotNull { h -> runCatching { Cloud(Instant.parse(h.time).epochSecond, h.cloud.toInt()) }.getOrNull() }
+            .mapNotNull { h -> runCatching { Cloud(Instant.parse(h.time).epochSecond, h.cloud.toInt(), skyOf(h.symbol, h.precip)) }.getOrNull() }
         val a = JSONArray()
-        hours.forEach { a.put(JSONObject().put("at", it.at).put("cover", it.cover)) }
+        hours.forEach { a.put(JSONObject().put("at", it.at).put("cover", it.cover).put("sky", it.sky.name)) }
         runCatching { file(ctx).writeText(JSONObject().put("lat", place.lat).put("lon", place.lon).put("hours", a).toString()) }
         return hours
     }

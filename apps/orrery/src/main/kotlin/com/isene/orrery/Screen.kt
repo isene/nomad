@@ -33,7 +33,10 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -85,14 +88,14 @@ fun OrreryScreen(place: Place, askLocation: (() -> Unit)?) {
     var map by remember { mutableStateOf<Pair<IntArray, Int>?>(null) }
     var moon by remember { mutableStateOf<ImageBitmap?>(null) }
 
-    // The hands step eight times a second, and only while the screen is seen.
+    // The hands move once a second, and only while the screen is seen.
     LaunchedEffect(Unit) {
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
             while (true) {
                 val t = System.currentTimeMillis()
                 millis = t
                 if (t / 60_000 * 60 != minute) minute = t / 60_000 * 60
-                delay(125 - t % 125)
+                delay(1000 - t % 1000)
             }
         }
     }
@@ -140,7 +143,7 @@ fun OrreryScreen(place: Place, askLocation: (() -> Unit)?) {
                 Text("Use my location", style = BODY.copy(color = GOLD_LIGHT),
                     modifier = Modifier.clickable { askLocation() }.padding(vertical = 8.dp))
             }
-            Text("Sky computed on the phone. Clouds from MET Norway.", style = SMALL)
+            Text("Sky computed on the phone. Weather from MET Norway.", style = SMALL)
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -206,6 +209,16 @@ private fun Tonight(day: ClockDay, clouds: List<Cloud>, zone: ZoneId) {
         val best = night.minBy { it.cover }
         Text("Clouds about $avg % then; clearest at ${hm(best.at, zone)} (${best.cover} %).",
             style = BODY.copy(color = if (avg < 30) Color(0xFF9FD8A8) else if (avg < 70) GOLD_LIGHT else Color(0xFFB8C0D0)))
+    }
+    if (clouds.isNotEmpty()) {
+        Text(buildAnnotatedString {
+            append("Outer ring, hour by hour: ")
+            Sky.entries.forEachIndexed { i, k ->
+                if (i > 0) append(", ")
+                withStyle(SpanStyle(color = k.colour)) { append(k.word) }
+            }
+            append(".")
+        }, style = SMALL)
     }
 }
 

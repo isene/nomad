@@ -15,6 +15,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -31,6 +32,7 @@ class ScreenOnAndroidTest {
     private lateinit var root: View
 
     @Test fun the_dial_and_the_words() {
+        weather()
         root = Robolectric.buildActivity(MainActivity::class.java).setup().get().window.decorView
         // The sky is computed off the main thread; give it time to come back.
         repeat(40) {
@@ -41,6 +43,18 @@ class ScreenOnAndroidTest {
         for (head in listOf("NEXT", "TONIGHT", "MOON", "PLANETS", "AHEAD", "PLACE")) assertTrue(head, has(head))
         assertTrue(has("Oslo (the default)"))
         assertTrue(nodes().any { n -> texts(n).any { it.startsWith("Jupiter") } })
+        assertTrue(nodes().any { n -> texts(n).any { it.startsWith("Outer ring") } })
+    }
+
+    /** A made-up forecast for Oslo in the cache file, so the outer ring has weather to show. */
+    private fun weather() {
+        val hour = System.currentTimeMillis() / 3_600_000 * 3600
+        val kinds = "RRRCCCCPPPSSSSSSSSPPCCRR".map { mapOf('R' to "RAIN", 'C' to "CLOUD", 'P' to "PARTLY", 'S' to "SUN")[it] }
+        val hours = (0 until 30).joinToString(",") { k ->
+            """{"at":${hour + k * 3600},"cover":${(k * 37) % 100},"sky":"${kinds[k % kinds.size]}"}"""
+        }
+        File(RuntimeEnvironment.getApplication().filesDir, "clouds.json")
+            .writeText("""{"lat":${OSLO.lat},"lon":${OSLO.lon},"hours":[$hours]}""")
     }
 
     private fun nodes(): List<SemanticsNode> {
