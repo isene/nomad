@@ -5,6 +5,7 @@
 // Kotlin shell (OkHttp); this module only parses bodies and computes. Keeps
 // the core free of C/TLS deps so it cross-compiles cleanly.
 
+pub mod clock;
 pub mod ephem;
 pub mod events;
 pub mod gear;

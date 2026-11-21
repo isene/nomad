@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="orrery">
+  <!-- An astronomical clock: day above, night below, the sun on its hand. -->
+  <defs>
+    <radialGradient id="bg" cx="0.5" cy="0.55" r="0.55">
+      <stop offset="0" stop-color="#1c1d44"/>
+      <stop offset="0.6" stop-color="#0a0a22"/>
+      <stop offset="1" stop-color="#04041a"/>
+    </radialGradient>
+    <linearGradient id="rust" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f74c00"/>
+      <stop offset="1" stop-color="#b7410e"/>
+    </linearGradient>
+    <linearGradient id="day" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5fa6df"/>
+      <stop offset="0.6" stop-color="#f5cd7f"/>
+      <stop offset="1" stop-color="#e2704a"/>
+    </linearGradient>
+  </defs>
+  <circle cx="128" cy="128" r="118" fill="url(#bg)" stroke="url(#rust)" stroke-width="7"/>
+  <path d="M52 128 A76 76 0 0 1 204 128 Z" fill="url(#day)"/>
+  <path d="M52 128 A76 76 0 0 0 204 128 Z" fill="#0b1238"/>
+  <circle cx="128" cy="128" r="81" fill="none" stroke="#d9b45a" stroke-width="10"/>
+  <path d="M94 144 A20 20 0 0 0 94 184 A25 25 0 0 1 94 144 Z" fill="#e9e6dc"/>
+  <line x1="128" y1="128" x2="152" y2="104" stroke="#d9b45a" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="158" cy="98" r="15" fill="#ffc845"/>
+  <circle cx="158" cy="98" r="22" fill="none" stroke="#ffc845" stroke-width="4"/>
+  <circle cx="128" cy="128" r="11" fill="#d9b45a"/>
+</svg>
