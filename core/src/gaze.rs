@@ -562,6 +562,31 @@ pub fn gaze_tab_parse(text: String) -> Option<Place> {
     Some(Place { url, title, bookmark: false })
 }
 
+/// A tab open in gaze on the laptop, from the list it shares.
+#[derive(Clone, Debug, PartialEq, uniffi::Record)]
+pub struct LaptopTab {
+    pub url: String,
+    pub title: String,
+    /// The tab group's name, empty when the tab is in none.
+    pub group: String,
+    /// The group's colour as `#rrggbb`, empty when the tab is in no group.
+    pub color: String,
+}
+
+/// The laptop's open tabs from its `tabs/laptop` file: one line each,
+/// address, title, group and colour split by tabs.
+#[uniffi::export]
+pub fn gaze_laptop_tabs(text: String) -> Vec<LaptopTab> {
+    text.lines()
+        .filter_map(|l| {
+            let mut f = l.split('\t').map(str::trim);
+            let url = f.next().filter(|u| u.starts_with("http"))?.to_string();
+            let mut next = || f.next().unwrap_or("").to_string();
+            Some(LaptopTab { url, title: next(), group: next(), color: next() })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -708,5 +733,14 @@ mod tests {
         let tab = gaze_tab_parse(text).unwrap();
         assert_eq!((tab.url.as_str(), tab.title.as_str()), ("https://isene.org/", "Geir Isene"));
         assert!(gaze_tab_parse("\n".into()).is_none());
+    }
+
+    #[test]
+    fn the_laptop_tab_list_reads_with_and_without_a_group() {
+        let tabs = gaze_laptop_tabs("https://a.no/\tA\tnews\t#4a90e2\nhttps://b.no/\tB\t\t\nhttps://c.no/\n\nfile:///x\tX\n".into());
+        assert_eq!(tabs.len(), 3);
+        assert_eq!(tabs[0], LaptopTab { url: "https://a.no/".into(), title: "A".into(), group: "news".into(), color: "#4a90e2".into() });
+        assert_eq!((tabs[1].title.as_str(), tabs[1].group.as_str()), ("B", ""));
+        assert_eq!((tabs[2].title.as_str(), tabs[2].color.as_str()), ("", ""));
     }
 }

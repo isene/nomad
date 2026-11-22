@@ -64,7 +64,7 @@ import uniffi.fe2o3_mobile_core.gazeTabParse
 import uniffi.fe2o3_mobile_core.gazeTabText
 import uniffi.fe2o3_mobile_core.gazeToUri
 
-enum class Screen { Browser, Tabs, Bookmarks, Passwords, Settings }
+enum class Screen { Browser, Tabs, LaptopTabs, Bookmarks, Passwords, Settings }
 
 /** The most a page may hand over as one file. */
 private const val HANDOVER_MAX = 1L shl 30

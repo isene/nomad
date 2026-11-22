@@ -72,6 +72,7 @@ import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import uniffi.fe2o3_mobile_core.Login
+import uniffi.fe2o3_mobile_core.gazeLaptopTabs
 
 val Accent = Color(0xFFF74C00)
 val Panel = Color(0xFF14131F)
@@ -89,6 +90,7 @@ fun GazeApp(a: MainActivity) {
             when (a.screen) {
                 Screen.Browser -> {}
                 Screen.Tabs -> TabsScreen(a)
+                Screen.LaptopTabs -> LaptopTabsScreen(a)
                 Screen.Bookmarks -> BookmarksScreen(a)
                 Screen.Passwords -> PasswordsScreen(a)
                 Screen.Settings -> SettingsScreen(a)
@@ -259,6 +261,7 @@ private fun Menu(a: MainActivity) {
         (if (a.bookmarked) "Remove bookmark" else "Bookmark") to { a.toggleBookmark() },
         "Bookmarks" to { a.screen = Screen.Bookmarks },
         "Send to laptop" to { a.sendToLaptop() },
+        "Laptop tabs" to { a.screen = Screen.LaptopTabs },
         "Share" to { a.share() },
         "Ask Claude" to { a.askClaude() },
         PAGE_MENU to { page = true },
@@ -381,6 +384,30 @@ private fun TabsScreen(a: MainActivity) {
                 a.screen = Screen.Browser
                 a.newPrivateTab()
             }, modifier = Modifier.weight(1f)) { Text("+ Private tab", color = Accent) }
+        }
+    }
+}
+
+/** The tabs open in gaze on the laptop; a tap opens one here in a new tab. */
+@Composable
+private fun LaptopTabsScreen(a: MainActivity) {
+    val list = remember { gazeLaptopTabs(a.store.readText(a.store.laptopTabs)) }
+    Sheet("Laptop tabs", a) {
+        if (list.isEmpty()) Text("None yet. gaze on the laptop shares its open tabs through Syncthing.", color = Dim, modifier = Modifier.padding(12.dp))
+        LazyColumn(Modifier.weight(1f)) {
+            items(list) { t ->
+                val color = runCatching { Color(android.graphics.Color.parseColor(t.color)) }.getOrNull()
+                Column(Modifier.fillMaxWidth().clickable {
+                    a.screen = Screen.Browser
+                    a.newTab(t.url, t.title)
+                }.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                    Text(t.title.ifEmpty { shown(t.url) }, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Row {
+                        if (t.group.isNotEmpty()) Text("${t.group}  ", color = color ?: Dim, fontSize = 12.sp, maxLines = 1)
+                        Text(shown(t.url), color = Dim, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
         }
     }
 }

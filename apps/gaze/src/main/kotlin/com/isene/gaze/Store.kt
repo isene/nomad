@@ -33,6 +33,8 @@ class Store(context: Context, private val prefs: Prefs) {
     val bookmarks get() = File(sync(), "bookmarks")
     val toPhone get() = File(sync(), "tabs/to-phone")
     val toLaptop get() = File(sync(), "tabs/to-laptop")
+    /** The tabs open in gaze on the laptop, which it writes each time they change. */
+    val laptopTabs get() = File(sync(), "tabs/laptop")
 
     fun canReachSync(): Boolean = Environment.isExternalStorageManager()
 
