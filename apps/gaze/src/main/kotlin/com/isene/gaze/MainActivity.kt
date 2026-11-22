@@ -189,6 +189,8 @@ class MainActivity : ComponentActivity() {
     private var watcher: FileObserver? = null
     private var timersPaused = false
     private var bookmarksSeen = 0L
+    /** The tab list last written for the laptop. */
+    private var tabsShared: String? = null
     /** What the pages file holds, so an unchanged session is not written again. */
     private var pagesWritten: ByteArray? = null
     private var fileCallback: ValueCallback<Array<Uri>>? = null
@@ -420,6 +422,15 @@ class MainActivity : ComponentActivity() {
         }
         runCatching { store.write(store.session, text.toByteArray()) }
         savePages(kept)
+        shareTabs(kept)
+    }
+
+    /** The web pages open here, for gaze on the laptop: written only when they changed. */
+    private fun shareTabs(kept: List<Tab>) {
+        if (!store.canReachSync()) return
+        val list = kept.filter { it.url.startsWith("http") }.joinToString("") { gazeTabText(it.url, it.title) }
+        if (list == tabsShared) return
+        runCatching { store.write(store.phoneTabs, list.toByteArray()) }.onSuccess { tabsShared = list }
     }
 
     /**
