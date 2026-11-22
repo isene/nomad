@@ -116,7 +116,7 @@ private fun Browser(a: MainActivity) {
             if (tab != null && tab.url == "about:blank") StartPage(a, tab)
             PullMark(a)
         }
-        if (a.unlockOffer) Offer("This page has a login.", "Unlock passwords", { a.unlockOffer = false }) { a.askMaster = true }
+        if (a.unlockOffer) Offer("This page asks for a password.", "Unlock passwords", { a.unlockOffer = false }) { a.askMaster = true }
         a.saveOffer?.let { l ->
             val who = l.username.ifEmpty { "this login" }
             Offer("Save the password for $who?", "Save", { a.saveOffer = null }) { a.saveOffered() }

@@ -647,8 +647,15 @@ class MainActivity : ComponentActivity() {
             askMaster = false
             unlockOffer = false
             vaultVersion++
-            say(if (fresh) "A new password store: it is written with the first login you save" else "${vault.logins.size} logins")
-            current()?.let { t -> t.web?.let { if (t.url.startsWith("http")) offerLogin(t, it, t.url) } }
+            val t = current()?.takeIf { it.url.startsWith("http") }
+            // Say so when the page that asked has no saved login, or nothing seems to happen.
+            val none = t != null && vault.forSite(t.url).isEmpty()
+            say(when {
+                fresh -> "A new password store: it is written with the first login you save"
+                none -> "${vault.logins.size} logins, none for this site"
+                else -> "${vault.logins.size} logins"
+            })
+            t?.web?.let { offerLogin(t, it, t.url) }
         }
     }
 
