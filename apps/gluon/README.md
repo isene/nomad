@@ -27,7 +27,8 @@ Four tabs at the bottom:
   bright, and each task has its category's colour. Tap a message or an event to open it in its tab.
 - **Messages**: your Gmail inboxes, feeds and chats, new mail sent straight
   from the phone, a search over all of Gmail, and instant mail with a
-  notice per mail when you turn it on. See [docs/mail.md](docs/mail.md).
+  notice per mail when you turn it on. Hold a picture in a mail to save it,
+  and *Print* a mail to paper or PDF. See [docs/mail.md](docs/mail.md).
 - **Calendar**: the phone's calendars as a month and an agenda, with
   reminders and guests you invite. See [docs/tock.md](docs/tock.md).
 - **Tasks**: `~/.tasks/todo.hl` over Syncthing, with reminders for
