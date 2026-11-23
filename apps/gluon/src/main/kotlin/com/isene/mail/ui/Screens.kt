@@ -47,6 +47,15 @@ import androidx.compose.ui.viewinterop.AndroidView
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.app.DownloadManager
+import android.content.ContentValues
+import android.content.Context
+import android.os.Environment
+import android.os.Handler
+import android.os.Looper
+import android.print.PrintAttributes
+import android.print.PrintManager
+import android.provider.MediaStore
 import uniffi.fe2o3_mobile_core.mailHtml
 import androidx.compose.runtime.remember
 import androidx.compose.material3.DropdownMenuItem
@@ -304,6 +313,19 @@ fun MessageScreen(
                         }
                     }
                 }
+                // Android's print screen, where "Save as PDF" is one of the printers.
+                val ctx = LocalContext.current
+                OutlinedButton(enabled = body != null, contentPadding = tight, onClick = {
+                    val m = vm.current(mail.messageId) ?: mail
+                    val html = if (m.html.isNotBlank() || m.raw.contains("text/html", ignoreCase = true)) {
+                        mailHtml(m.raw, m.html).replace("src=\"http://", "src=\"https://", ignoreCase = true)
+                    } else null
+                    val rows = listOf(
+                        "From" to mail.from, "To" to mail.to,
+                        "Date" to if (mail.date > 0) fullFmt.format(Date(mail.date * 1000)) else "",
+                    )
+                    printMail(ctx, mail.subject.ifBlank { "Mail" }, MailOut.printHtml(mail.subject, rows, html, body ?: ""))
+                }) { Text("Print") }
             }
         },
     ) { pad ->
@@ -341,7 +363,7 @@ fun MessageScreen(
                 val hasHtml = held.html.isNotBlank() || held.raw.contains("text/html", ignoreCase = true)
                 if (pictures) {
                     val html = remember(held.raw, held.html) { mailHtml(held.raw, held.html) }
-                    MailWeb(html.replace("src=\"http://", "src=\"https://", ignoreCase = true))
+                    MailWeb(html.replace("src=\"http://", "src=\"https://", ignoreCase = true)) { msg -> vm.status(msg) }
                 } else {
                     if (hasHtml) {
                         OutlinedButton(onClick = { pictures = true }) { Text("Show pictures") }
@@ -356,16 +378,31 @@ fun MessageScreen(
 /**
  * The mail's own HTML. No JavaScript and no file access; a tapped link
  * opens in the browser. Android refuses plain http, so picture links are
- * asked for over https.
+ * asked for over https. A held picture is saved in Downloads.
  */
 @Composable
-private fun MailWeb(html: String) {
+private fun MailWeb(html: String, onStatus: (String) -> Unit) {
     AndroidView(
         factory = { c ->
             WebView(c).apply {
                 settings.javaScriptEnabled = false
                 settings.allowFileAccess = false
                 settings.allowContentAccess = false
+                setOnLongClickListener {
+                    val hit = hitTestResult
+                    when (hit.type) {
+                        WebView.HitTestResult.IMAGE_TYPE -> hit.extra?.let { onStatus(savePicture(c, it)) }
+                        // A picture inside a link: the hit holds the link, so ask for the picture.
+                        WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE -> requestImageRef(
+                            Handler(Looper.getMainLooper()) { m ->
+                                m.data.getString("url")?.let { onStatus(savePicture(c, it)) }
+                                true
+                            }.obtainMessage()
+                        )
+                        else -> return@setOnLongClickListener false
+                    }
+                    true
+                }
                 webViewClient = object : WebViewClient() {
                     override fun shouldOverrideUrlLoading(view: WebView, req: WebResourceRequest): Boolean {
                         runCatching { c.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, req.url)) }
@@ -377,6 +414,84 @@ private fun MailWeb(html: String) {
         },
         modifier = Modifier.fillMaxWidth(),
     )
+}
+
+/** Save a picture from a mail in Downloads, and say what happened. */
+private fun savePicture(ctx: Context, url: String): String {
+    val name = MailOut.pictureName(url, System.currentTimeMillis())
+    if (url.startsWith("data:")) {
+        val bytes = MailOut.dataBytes(url) ?: return "Could not save this picture"
+        val values = ContentValues().apply { put(MediaStore.Downloads.DISPLAY_NAME, name) }
+        val ok = runCatching {
+            val uri = ctx.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)!!
+            ctx.contentResolver.openOutputStream(uri)!!.use { it.write(bytes) }
+        }.isSuccess
+        return if (ok) "Saved $name in Downloads" else "Could not save this picture"
+    }
+    if (!url.startsWith("http")) return "Could not save this picture"
+    val request = DownloadManager.Request(android.net.Uri.parse(url))
+        .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
+        .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+    return if (runCatching { ctx.getSystemService(DownloadManager::class.java).enqueue(request) }.isSuccess)
+        "Saving $name in Downloads" else "Could not save this picture"
+}
+
+/** The page being printed: Android needs it alive until its print screen has the pages. */
+private var printing: WebView? = null
+
+/** Lay the mail out in a page of its own and hand it to Android's print screen. */
+private fun printMail(ctx: Context, name: String, html: String) {
+    val web = WebView(ctx)
+    web.settings.javaScriptEnabled = false
+    web.settings.allowFileAccess = false
+    web.webViewClient = object : WebViewClient() {
+        var done = false
+        override fun onPageFinished(view: WebView, url: String?) {
+            if (done) return
+            done = true
+            ctx.getSystemService(PrintManager::class.java)
+                .print(name, view.createPrintDocumentAdapter(name), PrintAttributes.Builder().build())
+        }
+    }
+    web.loadDataWithBaseURL(null, html, "text/html", "utf-8", null)
+    printing = web
+}
+
+/** The parts of saving and printing that need no phone, kept apart so tests reach them. */
+internal object MailOut {
+    private fun esc(s: String) = s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    /** The page to print: subject, the header rows that have a value, then the mail. */
+    fun printHtml(subject: String, rows: List<Pair<String, String>>, html: String?, text: String): String {
+        val head = rows.filter { it.second.isNotBlank() }
+            .joinToString("") { (k, v) -> "<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>" }
+        val content = html ?: "<pre style=\"white-space:pre-wrap;font:inherit\">${esc(text)}</pre>"
+        return "<!doctype html><meta charset=utf-8><title>${esc(subject)}</title>" +
+            "<style>body{font:14px sans-serif;color:#000;background:#fff}" +
+            "table.h{border-collapse:collapse;margin-bottom:1em}table.h th{text-align:left;padding-right:1em;color:#555}</style>" +
+            "<h2>${esc(subject)}</h2><table class=h>$head</table><hr>$content"
+    }
+
+    /** A file name for a picture: the link's own, or one made from the time and the picture's type. */
+    fun pictureName(url: String, now: Long): String {
+        if (url.startsWith("data:")) {
+            val ext = when (val type = url.removePrefix("data:").substringBefore(';').substringBefore(',')) {
+                "image/jpeg" -> "jpg"
+                "image/svg+xml" -> "svg"
+                else -> type.substringAfter("image/", "").ifEmpty { "png" }
+            }
+            return "picture-$now.$ext"
+        }
+        val own = url.substringBefore('?').substringBefore('#').substringAfterLast('/')
+            .filter { it.isLetterOrDigit() || it in "._-" }.take(80)
+        return if ('.' in own.drop(1)) own else "picture-$now.jpg"
+    }
+
+    /** The bytes of a `data:...;base64,` picture, or null for any other link. */
+    fun dataBytes(url: String): ByteArray? {
+        if (!url.startsWith("data:") || !url.substringBefore(',', "").endsWith(";base64")) return null
+        return runCatching { java.util.Base64.getMimeDecoder().decode(url.substringAfter(',')) }.getOrNull()
+    }
 }
 
 private val URL_RE = Regex("""(https?://[^\s<>"')\]]+)""")
