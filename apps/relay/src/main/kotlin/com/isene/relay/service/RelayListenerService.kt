@@ -124,13 +124,21 @@ class RelayListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val ctx = applicationContext
         val pkg = sbn.packageName
-        if (!Gateway.isAllowed(ctx, pkg)) return
+        if (!Gateway.isAllowed(ctx, pkg)) {
+            // A built-in chat app switched off in the settings: say so, or a
+            // lost message looks like a fault further down the path.
+            Gateway.PLATFORMS[pkg]?.let { logDrop(it, "off", null) }
+            return
+        }
         val platform = Gateway.platformFor(ctx, pkg) ?: return
         val n = sbn.notification ?: return
 
         // Drop group-summary rollups ("N messages from M chats") — they aren't
         // real messages, just Android's grouping placeholder. Locale-independent.
-        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) {
+            logDrop(platform, "summary", n)
+            return
+        }
 
         // Custom (user-added) apps may not follow the MessagingStyle /
         // CATEGORY_MESSAGE conventions, so we trust them more (see the filter
@@ -146,7 +154,7 @@ class RelayListenerService : NotificationListenerService() {
         val rawTitle = style?.conversationTitle?.toString()
             ?: extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)?.toString()
             ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
-            ?: return
+            ?: run { logDrop(platform, "no-title", n); return }
         // WhatsApp appends a per-notification count like " (7 messages)" to the
         // title; it changes on every repost and would split one conversation
         // into many thread_keys. Strip it so the thread stays whole.
@@ -172,7 +180,15 @@ class RelayListenerService : NotificationListenerService() {
             // No MessagingStyle: for built-in apps only accept an explicit
             // message category (filters IG likes/follows etc.). Custom apps the
             // user opted into are trusted, so we keep their notifications too.
-            if (!isCustom && n.category != Notification.CATEGORY_MESSAGE) return
+            // Discord is the exception: a DM on 2026-11-23 never reached the
+            // log, so Discord can post a message without either mark. Keep
+            // everything from it except ongoing call and voice banners.
+            val discordMsg = platform == "discord" &&
+                n.flags and Notification.FLAG_ONGOING_EVENT == 0
+            if (!isCustom && n.category != Notification.CATEGORY_MESSAGE && !discordMsg) {
+                logDrop(platform, "not-message", n)
+                return
+            }
             sender = title
             // Prefer the richest body: InboxStyle lines (some apps list the
             // actual messages there while the collapsed text stays generic),
@@ -211,7 +227,10 @@ class RelayListenerService : NotificationListenerService() {
         }
 
         // Nothing to relay: no caption and no image.
-        if (text.isBlank() && picture == null) return
+        if (text.isBlank() && picture == null) {
+            logDrop(platform, "empty", n)
+            return
+        }
 
         // Skip if we've already written this exact message (re-posted notif).
         val dkey = "$platform$title$msgTs${text.hashCode()}${if (picture != null) "img" else ""}"
@@ -398,11 +417,22 @@ class RelayListenerService : NotificationListenerService() {
         return best
     }
 
+    /** Why a notification from a chat app was not relayed, with its shape
+     *  (no message text, no names), so a lost message can be traced from the
+     *  laptop. */
+    private fun logDrop(platform: String, why: String, n: Notification?) {
+        appendImgDebug("drop platform=$platform why=$why" +
+            " cat=${n?.category ?: "null"} style=${n?.extras?.getString(Notification.EXTRA_TEMPLATE)?.substringAfterLast('$') ?: "null"}" +
+            " flags=${n?.flags ?: 0}")
+    }
+
     private fun appendImgDebug(line: String) {
         android.util.Log.i("relay-img", line)
+        // The time on each line lets the laptop match a line to a message.
+        val stamp = android.text.format.DateFormat.format("yyyy-MM-dd HH:mm:ss", System.currentTimeMillis())
         try {
             File(Gateway.inboundDir(applicationContext).parentFile, "relay-img-debug.log")
-                .appendText(line + "\n")
+                .appendText("$stamp $line\n")
         } catch (_: Exception) {}
     }
 
