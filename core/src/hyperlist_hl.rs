@@ -401,6 +401,27 @@ fn hl_line(body: &str) -> Vec<HlSpan> {
 /// `;`-segment beginning at `from`, and emit + advance `*i` past it.
 fn detect_segment_header(sb: &mut SpanBuf, work: &[char], i: &mut usize, from: usize) {
     let len = work.len();
+    // A checkbox or qualifier ahead of the header keeps its green, and the
+    // header after it is still found: in hyperlist.vim it has no brackets.
+    let mut from = from;
+    while from < len && work[from] == '[' {
+        let Some(e) = work[from..].iter().position(|c| *c == ']') else { break };
+        let s: String = work[from..=from + e].iter().collect();
+        let box_ = e == 2 && matches!(work[from + 1], 'X' | 'x' | 'O' | 'o' | '-' | ' ' | '_');
+        sb.push(s, if box_ { TokenRole::Checkbox } else { TokenRole::Qualifier });
+        from += e + 1;
+        *i = from;
+        // Spaces between two brackets, as in "[O] [2026-11-27] Name: x".
+        let mut k = from;
+        while k < len && work[k] == ' ' {
+            k += 1;
+        }
+        if k > from && k < len && work[k] == '[' {
+            sb.push(work[from..k].iter().collect(), TokenRole::Normal);
+            from = k;
+            *i = from;
+        }
+    }
     // End of this segment = next `;` or EOL.
     let mut seg_end = from;
     while seg_end < len && work[seg_end] != ';' {
@@ -649,6 +670,15 @@ mod tests {
         assert_eq!(role_of("[? OK] q", "[? OK]"), Some(TokenRole::Qualifier));
         assert_eq!(role_of("[x] done", "[x]"), Some(TokenRole::Checkbox));
         assert_eq!(role_of("[ ] todo", "[ ]"), Some(TokenRole::Checkbox));
+    }
+
+    #[test]
+    fn a_qualifier_before_a_property_stays_green() {
+        let line = "[O] [2026-11-27] AcmeCo order 7: send the invoice";
+        assert_eq!(role_of(line, "[O]"), Some(TokenRole::Checkbox));
+        assert_eq!(role_of(line, "[2026-11-27]"), Some(TokenRole::Qualifier));
+        assert_eq!(role_of(line, "AcmeCo order 7:"), Some(TokenRole::Property));
+        assert_eq!(concat(line), line);
     }
 
     #[test]
