@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Forward
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.automirrored.filled.ReplyAll
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -259,6 +260,27 @@ fun MessageScreen(
                     IconButton(enabled = ready, onClick = { onCompose(vm.compose(mail, "forward")) }) {
                         Icon(Icons.AutoMirrored.Filled.Forward, "Forward")
                     }
+                    // What is used less often, so the button row stays on the screen.
+                    val ctx = LocalContext.current
+                    Box {
+                        var more by remember { mutableStateOf(false) }
+                        IconButton(onClick = { more = true }) { Icon(Icons.Filled.MoreVert, "More") }
+                        DropdownMenu(more, { more = false }) {
+                            // Android's print screen, where "Save as PDF" is one of the printers.
+                            DropdownMenuItem(text = { Text("Print") }, enabled = body != null, onClick = {
+                                more = false
+                                val m = vm.current(mail.messageId) ?: mail
+                                val html = if (m.html.isNotBlank() || m.raw.contains("text/html", ignoreCase = true)) {
+                                    mailHtml(m.raw, m.html).replace("src=\"http://", "src=\"https://", ignoreCase = true)
+                                } else null
+                                val rows = listOf(
+                                    "From" to mail.from, "To" to mail.to,
+                                    "Date" to if (mail.date > 0) fullFmt.format(Date(mail.date * 1000)) else "",
+                                )
+                                printMail(ctx, mail.subject.ifBlank { "Mail" }, MailOut.printHtml(mail.subject, rows, html, body ?: ""))
+                            })
+                        }
+                    }
                 },
             )
         },
@@ -313,19 +335,6 @@ fun MessageScreen(
                         }
                     }
                 }
-                // Android's print screen, where "Save as PDF" is one of the printers.
-                val ctx = LocalContext.current
-                OutlinedButton(enabled = body != null, contentPadding = tight, onClick = {
-                    val m = vm.current(mail.messageId) ?: mail
-                    val html = if (m.html.isNotBlank() || m.raw.contains("text/html", ignoreCase = true)) {
-                        mailHtml(m.raw, m.html).replace("src=\"http://", "src=\"https://", ignoreCase = true)
-                    } else null
-                    val rows = listOf(
-                        "From" to mail.from, "To" to mail.to,
-                        "Date" to if (mail.date > 0) fullFmt.format(Date(mail.date * 1000)) else "",
-                    )
-                    printMail(ctx, mail.subject.ifBlank { "Mail" }, MailOut.printHtml(mail.subject, rows, html, body ?: ""))
-                }) { Text("Print") }
             }
         },
     ) { pad ->
