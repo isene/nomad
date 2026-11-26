@@ -520,7 +520,7 @@ private fun linkify(text: String): AnnotatedString = buildAnnotatedString {
         val url = m.value.trimEnd('.', ',', ';', ':', '!', '?', ')', ']', '\u00a0')
         withLink(LinkAnnotation.Url(url)) {
             withStyle(SpanStyle(color = LINK, textDecoration = TextDecoration.Underline)) {
-                append(url)
+                append(linkLabel(url))
             }
         }
         // Whatever the trim gave back is ordinary text again.
@@ -528,6 +528,18 @@ private fun linkify(text: String): AnnotatedString = buildAnnotatedString {
         at = m.range.last + 1
     }
     append(text.substring(at))
+}
+
+/**
+ * What a link shows: a URL over 60 characters as its host and "/…", the
+ * way kastrup shows it on the laptop. A tap still opens the whole URL; a
+ * tracking link no longer fills the screen.
+ */
+internal fun linkLabel(url: String): String {
+    if (url.length <= 60) return url
+    val rest = url.substringAfter("://")
+    val host = rest.substringBefore('/')
+    return if (rest.substringAfter('/', "").isEmpty()) host else "$host/…"
 }
 
 /**
