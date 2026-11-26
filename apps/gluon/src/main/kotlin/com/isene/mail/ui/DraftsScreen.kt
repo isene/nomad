@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -141,10 +142,10 @@ fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
                     Text(shown.text, fontFamily = FontFamily.Monospace, fontSize = 13.sp, modifier = Modifier.padding(top = 8.dp))
                 }
                 if (!sent) Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { confirm = true }, Modifier.weight(1f)) { Text("Send") }
-                    OutlinedButton(onClick = { askWhen = true }, Modifier.weight(1f)) { Text("Later") }
-                    OutlinedButton(onClick = { status = null; editing = shown.text }, Modifier.weight(1f)) { Text("Edit") }
-                    OutlinedButton(onClick = { confirmDelete = true }, Modifier.weight(1f)) { Text("Delete") }
+                    Button(onClick = { confirm = true }, Modifier.weight(1f), contentPadding = Tight) { OneLine("Send") }
+                    OutlinedButton(onClick = { askWhen = true }, Modifier.weight(1f), contentPadding = Tight) { OneLine("Later") }
+                    OutlinedButton(onClick = { status = null; editing = shown.text }, Modifier.weight(1f), contentPadding = Tight) { OneLine("Edit") }
+                    OutlinedButton(onClick = { confirmDelete = true }, Modifier.weight(1f), contentPadding = Tight) { OneLine("Delete") }
                 }
             } else {
                 val list = drafts
@@ -314,13 +315,13 @@ private fun WaitingEditor(w: Waiting, treeUri: String, onDone: (String) -> Unit)
             Button(
                 enabled = at != null && filled,
                 onClick = { at?.let { keep(edited(it), "Goes ${Later.stamp(it, System.currentTimeMillis())}: ${edited(it).label}") } },
-                modifier = Modifier.weight(1f),
-            ) { Text("Save") }
+                modifier = Modifier.weight(1f), contentPadding = Tight,
+            ) { OneLine("Save") }
             OutlinedButton(
                 enabled = filled,
                 onClick = { keep(edited(System.currentTimeMillis()), "Sending: ${edited(0).label}") },
-                modifier = Modifier.weight(1f),
-            ) { Text("Send now") }
+                modifier = Modifier.weight(1f), contentPadding = Tight,
+            ) { OneLine("Send now") }
             OutlinedButton(onClick = {
                 scope.launch {
                     val err = withContext(Dispatchers.IO) {
@@ -333,9 +334,16 @@ private fun WaitingEditor(w: Waiting, treeUri: String, onDone: (String) -> Unit)
                     }
                     onDone(err ?: if (mail) "Back in the drafts: ${w.label}" else "Cancelled: ${w.label}")
                 }
-            }, modifier = Modifier.weight(1f)) { Text("Cancel it") }
+            }, modifier = Modifier.weight(1f), contentPadding = Tight) { OneLine("Cancel it") }
         }
     }
 }
+
+/** Buttons side by side keep their word whole: little side padding, one
+ *  line. Material's 24 dp each side broke "Delete" at a large font. */
+private val Tight = PaddingValues(horizontal = 4.dp, vertical = 8.dp)
+
+@Composable
+private fun OneLine(s: String) = Text(s, maxLines = 1, softWrap = false)
 
 private fun stamp(t: Long): String = SimpleDateFormat("EEE HH:mm", Locale.getDefault()).format(Date(t))
