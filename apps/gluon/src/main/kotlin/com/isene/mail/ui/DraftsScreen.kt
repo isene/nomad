@@ -46,6 +46,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.isene.mail.data.Draft
 import com.isene.mail.data.DraftsRepo
+import com.isene.mail.data.Later
+import com.isene.mail.data.Waiting
+import com.isene.mail.work.LaterAlarm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,6 +64,10 @@ fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
     var drafts by remember { mutableStateOf<List<Draft>?>(null) }
     var waiting by remember { mutableIntStateOf(0) }
+    // What waits on this phone for its time (Later), and the one tapped.
+    var later by remember { mutableStateOf<List<Waiting>>(emptyList()) }
+    var picked by remember { mutableStateOf<Waiting?>(null) }
+    var askWhen by remember { mutableStateOf(false) }
     var open by remember { mutableStateOf<Draft?>(null) }
     var confirm by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -72,7 +79,8 @@ fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
         withContext(Dispatchers.IO) {
             val l = DraftsRepo.list(ctx, treeUri, if (sent) "sent" else "drafts")
             val w = if (sent) 0 else DraftsRepo.waiting(ctx, treeUri)
-            withContext(Dispatchers.Main) { drafts = l; waiting = w }
+            val lw = if (sent) emptyList() else Later.list(ctx)
+            withContext(Dispatchers.Main) { drafts = l; waiting = w; later = lw }
         }
     }
     val back = { if (editing != null) editing = null else if (open != null) open = null else onBack() }
@@ -129,6 +137,7 @@ fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
                 }
                 if (!sent) Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = { confirm = true }, Modifier.weight(1f)) { Text("Send") }
+                    OutlinedButton(onClick = { askWhen = true }, Modifier.weight(1f)) { Text("Later") }
                     OutlinedButton(onClick = { status = null; editing = shown.text }, Modifier.weight(1f)) { Text("Edit") }
                     OutlinedButton(onClick = { confirmDelete = true }, Modifier.weight(1f)) { Text("Delete") }
                 }
@@ -139,6 +148,25 @@ fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
                         "$waiting sent from here, waiting for kastrup on the laptop.",
                         Modifier.padding(horizontal = 16.dp, vertical = 4.dp), fontSize = 13.sp,
                     )
+                }
+                if (later.isNotEmpty()) {
+                    Text(
+                        "Waiting on this phone",
+                        Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary,
+                    )
+                    later.forEach { w ->
+                        Column(Modifier.fillMaxWidth().clickable { status = null; picked = w }.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Text(w.label.ifBlank { "(no text)" }, fontWeight = FontWeight.Bold, maxLines = 1)
+                            Text(
+                                listOf("⏰ " + Later.stamp(w.at, System.currentTimeMillis()), w.kind, w.to)
+                                    .filter { it.isNotEmpty() }.joinToString(" · "),
+                                fontSize = 13.sp, maxLines = 1, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (w.error.isNotEmpty()) Text("Not sent: ${w.error}", fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    HorizontalDivider()
                 }
                 when {
                     treeUri.isEmpty() -> Text("Pick the shared folder in Settings first.", Modifier.padding(16.dp))
@@ -177,6 +205,81 @@ fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
                 }) { Text("Send") }
             },
             dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
+        )
+    }
+
+    if (askWhen && shown != null) {
+        WhenDialog(
+            note = "The phone hands it to the laptop then, and the laptop sends it within a minute.",
+            onDismiss = { askWhen = false },
+        ) { at ->
+            askWhen = false
+            scope.launch {
+                val w = Waiting(
+                    Later.newId(System.currentTimeMillis()), at, Waiting.DRAFT, shown.title, shown.to,
+                    mapOf("name" to shown.name),
+                )
+                val err = withContext(Dispatchers.IO) {
+                    runCatching { Later.save(ctx, w); LaterAlarm.arm(ctx) }.exceptionOrNull()?.message
+                }
+                status = err ?: "Goes ${Later.stamp(at, System.currentTimeMillis())}: ${shown.title}"
+                if (err == null) { open = null; round++ }
+            }
+        }
+    }
+
+    picked?.let { w ->
+        val close = { picked = null }
+        AlertDialog(
+            onDismissRequest = close,
+            title = { Text(w.label.ifBlank { w.kind }, maxLines = 2) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("Goes ${Later.stamp(w.at, System.currentTimeMillis())} by ${w.kind}" + if (w.to.isEmpty()) "." else " to ${w.to}.")
+                    if (w.error.isNotEmpty()) Text("Not sent: ${w.error}", color = MaterialTheme.colorScheme.error)
+                    Text(
+                        when (w.kind) {
+                            Waiting.MAIL -> "Cancel puts it back in the drafts."
+                            Waiting.DRAFT -> "Cancel leaves the draft where it is."
+                            else -> "Cancel drops it."
+                        },
+                        fontSize = 13.sp,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    close()
+                    scope.launch {
+                        withContext(Dispatchers.IO) {
+                            Later.save(ctx, w.copy(at = System.currentTimeMillis(), error = ""))
+                            LaterAlarm.arm(ctx)
+                        }
+                        status = "Sending: ${w.label}"
+                        round++
+                    }
+                }) { Text("Send now") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        close()
+                        scope.launch {
+                            val err = withContext(Dispatchers.IO) {
+                                val back = if (w.kind != Waiting.MAIL) null else DraftsRepo.create(
+                                    ctx, treeUri, "phone_${System.currentTimeMillis() / 1000}.eml",
+                                    DraftsRepo.mailText(w.f("from"), w.f("to"), w.f("cc"), w.f("subject"), w.f("body")),
+                                )
+                                if (back == null) { Later.remove(ctx, w.id); LaterAlarm.arm(ctx) }
+                                back
+                            }
+                            status = err ?: if (w.kind == Waiting.MAIL) "Back in the drafts: ${w.label}" else "Cancelled: ${w.label}"
+                            round++
+                        }
+                    }) { Text("Cancel it") }
+                    TextButton(onClick = close) { Text("Close") }
+                }
+            },
         )
     }
 

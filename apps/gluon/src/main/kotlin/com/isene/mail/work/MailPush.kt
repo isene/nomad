@@ -226,7 +226,10 @@ class MailPushPoke : BroadcastReceiver() {
 
 /** After a restart of the phone or an update of the app. */
 class MailPushBoot : BroadcastReceiver() {
-    override fun onReceive(ctx: Context, intent: Intent) = MailPush.sync(ctx)
+    override fun onReceive(ctx: Context, intent: Intent) {
+        MailPush.sync(ctx)
+        LaterAlarm.arm(ctx) // a reboot clears alarms
+    }
 }
 
 /** A notice per new inbox mail, under one summary, as Gmail does. */

@@ -14,6 +14,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -37,6 +38,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.isene.mail.data.Later
 import com.isene.mail.viewmodel.ComposeRequest
 import com.isene.mail.viewmodel.MailViewModel
 
@@ -69,6 +71,7 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
         if (mail && changed) vm.keepDraft(from, to, cc, subject, body.text)
     }
     BackHandler(onBack = leave)
+    var askWhen by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -78,6 +81,7 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
                 },
                 title = { Text(req.title, fontSize = 16.sp) },
                 actions = {
+                    TextButton(enabled = canSend, onClick = { askWhen = true }) { Text("Later") }
                     IconButton(
                         enabled = canSend,
                         onClick = {
@@ -136,6 +140,52 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
             }
         }
     }
+
+    if (askWhen) {
+        val gateway = !mail && req.original?.messageId?.startsWith("gw_") == true
+        WhenDialog(
+            note = if (gateway) "Relay sends it only while its notification is up." else null,
+            onDismiss = { askWhen = false },
+        ) { at ->
+            askWhen = false
+            vm.later(req, from, to, cc, subject, body.text, at) { err -> if (err == null) onDone() }
+        }
+    }
+}
+
+/**
+ * Asks when a message should go, as kastrup's `S` does on the laptop:
+ * 08:00, tomorrow 9, +2h or 2026-12-24 08:00. Says the time it read.
+ */
+@Composable
+internal fun WhenDialog(note: String?, onDismiss: () -> Unit, onPick: (Long) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    val now = System.currentTimeMillis()
+    val at = Later.parseWhen(text, now)?.takeIf { it > now }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Send later") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    text, { text = it }, label = { Text("When") }, singleLine = true,
+                    placeholder = { Text("08:00, tomorrow 9, +2h") },
+                )
+                Text(
+                    when {
+                        text.isBlank() -> "The phone sends it then, by itself."
+                        at == null -> "Not a time I know"
+                        else -> "Goes ${Later.stamp(at, now)}"
+                    },
+                    fontSize = 13.sp,
+                    color = if (text.isNotBlank() && at == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                )
+                note?.let { Text(it, fontSize = 13.sp) }
+            }
+        },
+        confirmButton = { TextButton(enabled = at != null, onClick = { at?.let(onPick) }) { Text("Schedule") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 /** Which account sends. One account is a label; more is a menu. */

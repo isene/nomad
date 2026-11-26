@@ -9,7 +9,11 @@ import com.isene.mail.data.Oauth
 import com.isene.mail.data.Outbound
 import com.isene.mail.data.ReadState
 import com.isene.mail.data.Scope
+import com.isene.mail.data.Deliver
 import com.isene.mail.data.DraftsRepo
+import com.isene.mail.data.Later
+import com.isene.mail.data.Waiting
+import com.isene.mail.work.LaterAlarm
 import com.isene.mail.data.ReadStateRepo
 import com.isene.mail.data.Settings
 import com.isene.mail.data.Store
@@ -358,24 +362,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                 when {
                     req.viaMail -> {
                         val atts = if (o != null && req.kind == "forward") forwardAttachments(o) else emptyList()
-                        val g = settings.graph()?.takeIf { it.address == from.lowercase() }
-                        if (g != null) {
-                            // Microsoft 365 sends this address, as Outlook would.
-                            val t = Oauth.graphToken(g)
-                            if (t == null) "Could not get a Microsoft token for ${g.address}"
-                            else {
-                                settings.keepGraphToken(t.second)
-                                Outbound.graphMail(
-                                    t.first, from, to, cc, subject, body,
-                                    req.draft.inReplyTo, req.draft.references, atts,
-                                )
-                            }
-                        } else {
-                            val login = settings.sendAs()[from.lowercase()] ?: from
-                            val a = settings.accounts().firstOrNull { it.address.equals(login, ignoreCase = true) }
-                            if (a == null) "No account to send from — add one in Settings"
-                            else Outbound.mail(a, from, to, cc, subject, body, req.draft.inReplyTo, req.draft.references, atts)
-                        }
+                        Deliver.mail(ctx, settings, from, to, cc, subject, body, req.draft.inReplyTo, req.draft.references, atts)
                     }
                     o == null -> "Nothing to reply to here"
                     o.messageId.startsWith("gw_") ->
@@ -384,12 +371,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                     else -> "Nothing to reply to here"
                 }
             }
-            if (err == null && req.viaMail) {
-                settings.lastFrom = from.lowercase()
-                val date = java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss Z", java.util.Locale.US).format(java.util.Date())
-                val copy = DraftsRepo.sentText(from, to, cc, subject, body, Outbound.lastId, req.draft.inReplyTo, date)
-                withContext(Dispatchers.IO) { DraftsRepo.keepSent(ctx, settings.syncTreeUri, copy, settings.days) }
-            }
+            if (err == null && req.viaMail) settings.lastFrom = from.lowercase()
             _ui.value = _ui.value.copy(
                 busy = false,
                 status = err ?: when {
@@ -398,6 +380,47 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                     else -> "Posted"
                 },
             )
+            onResult(err)
+        }
+    }
+
+    /**
+     * Keep a message on this phone until [at], when LaterAlarm wakes the
+     * phone and it goes out on the same channel [send] would use.
+     */
+    fun later(
+        req: ComposeRequest, from: String, to: String, cc: String, subject: String, body: String, at: Long,
+        onResult: (String?) -> Unit,
+    ) {
+        val ctx = getApplication<Application>()
+        val o = req.original
+        viewModelScope.launch {
+            val err = withContext(Dispatchers.IO) {
+                val id = Later.newId(System.currentTimeMillis())
+                val first = body.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty().take(60)
+                val w = when {
+                    req.viaMail -> Waiting(
+                        id, at, Waiting.MAIL, subject.ifBlank { "(no subject)" }, to,
+                        mapOf(
+                            "from" to from, "to" to to, "cc" to cc, "subject" to subject, "body" to body,
+                            "inReplyTo" to req.draft.inReplyTo, "references" to req.draft.references,
+                        ),
+                    )
+                    o == null -> null
+                    o.messageId.startsWith("gw_") -> Waiting(
+                        id, at, Waiting.GATEWAY, first, req.channelLabel,
+                        mapOf("folder" to o.folder, "account" to o.account, "body" to body),
+                    )
+                    o.source == "discord" -> Waiting(
+                        id, at, Waiting.DISCORD, first, req.channelLabel, mapOf("folder" to o.folder, "body" to body),
+                    )
+                    else -> null
+                } ?: return@withContext "Nothing to reply to here"
+                val atts = if (req.viaMail && o != null && req.kind == "forward") forwardAttachments(o) else emptyList()
+                runCatching { Later.save(ctx, w, atts); LaterAlarm.arm(ctx) }.exceptionOrNull()?.let { "Could not keep it: ${it.message}" }
+            }
+            if (err == null && req.viaMail) settings.lastFrom = from.lowercase()
+            status(err ?: "Goes ${Later.stamp(at, System.currentTimeMillis())}; it waits under Laptop drafts")
             onResult(err)
         }
     }

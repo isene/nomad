@@ -95,6 +95,9 @@
             android:name="com.isene.mail.work.MailPushPoke"
             android:exported="false" />
         <receiver
+            android:name="com.isene.mail.work.LaterReceiver"
+            android:exported="false" />
+        <receiver
             android:name="com.isene.mail.work.MailPushBoot"
             android:exported="false">
             <intent-filter>
