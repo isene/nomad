@@ -83,7 +83,9 @@ fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
             withContext(Dispatchers.Main) { drafts = l; waiting = w; later = lw }
         }
     }
-    val back = { if (editing != null) editing = null else if (open != null) open = null else onBack() }
+    val back = {
+        if (picked != null) picked = null else if (editing != null) editing = null else if (open != null) open = null else onBack()
+    }
     BackHandler(onBack = back)
     val shown = open
 
@@ -95,9 +97,9 @@ fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
-                title = { Text(shown?.title ?: if (sent) "Sent" else "Laptop drafts", maxLines = 1, fontSize = 16.sp) },
+                title = { Text(picked?.label ?: shown?.title ?: if (sent) "Sent" else "Laptop drafts", maxLines = 1, fontSize = 16.sp) },
                 actions = {
-                    if (shown == null) IconButton(onClick = { round++ }) { Icon(Icons.Filled.Refresh, "Again") }
+                    if (shown == null && picked == null) IconButton(onClick = { round++ }) { Icon(Icons.Filled.Refresh, "Again") }
                 },
             )
         },
@@ -107,7 +109,10 @@ fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
                 Text(it, Modifier.padding(horizontal = 16.dp, vertical = 4.dp), color = MaterialTheme.colorScheme.primary, fontSize = 13.sp)
             }
             val text = editing
-            if (shown != null && text != null) {
+            val pw = picked
+            if (pw != null) {
+                WaitingEditor(pw, treeUri) { said -> status = said; picked = null; round++ }
+            } else if (shown != null && text != null) {
                 OutlinedTextField(
                     value = text, onValueChange = { editing = it },
                     modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
@@ -228,61 +233,6 @@ fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
         }
     }
 
-    picked?.let { w ->
-        val close = { picked = null }
-        AlertDialog(
-            onDismissRequest = close,
-            title = { Text(w.label.ifBlank { w.kind }, maxLines = 2) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text("Goes ${Later.stamp(w.at, System.currentTimeMillis())} by ${w.kind}" + if (w.to.isEmpty()) "." else " to ${w.to}.")
-                    if (w.error.isNotEmpty()) Text("Not sent: ${w.error}", color = MaterialTheme.colorScheme.error)
-                    Text(
-                        when (w.kind) {
-                            Waiting.MAIL -> "Cancel puts it back in the drafts."
-                            Waiting.DRAFT -> "Cancel leaves the draft where it is."
-                            else -> "Cancel drops it."
-                        },
-                        fontSize = 13.sp,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    close()
-                    scope.launch {
-                        withContext(Dispatchers.IO) {
-                            Later.save(ctx, w.copy(at = System.currentTimeMillis(), error = ""))
-                            LaterAlarm.arm(ctx)
-                        }
-                        status = "Sending: ${w.label}"
-                        round++
-                    }
-                }) { Text("Send now") }
-            },
-            dismissButton = {
-                Row {
-                    TextButton(onClick = {
-                        close()
-                        scope.launch {
-                            val err = withContext(Dispatchers.IO) {
-                                val back = if (w.kind != Waiting.MAIL) null else DraftsRepo.create(
-                                    ctx, treeUri, "phone_${System.currentTimeMillis() / 1000}.eml",
-                                    DraftsRepo.mailText(w.f("from"), w.f("to"), w.f("cc"), w.f("subject"), w.f("body")),
-                                )
-                                if (back == null) { Later.remove(ctx, w.id); LaterAlarm.arm(ctx) }
-                                back
-                            }
-                            status = err ?: if (w.kind == Waiting.MAIL) "Back in the drafts: ${w.label}" else "Cancelled: ${w.label}"
-                            round++
-                        }
-                    }) { Text("Cancel it") }
-                    TextButton(onClick = close) { Text("Close") }
-                }
-            },
-        )
-    }
-
     if (confirmDelete && shown != null) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
@@ -300,6 +250,91 @@ fun DraftsScreen(treeUri: String, sent: Boolean = false, onBack: () -> Unit) {
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
         )
+    }
+}
+
+/**
+ * A message waiting on this phone, open to change: its time, and for a
+ * mail or a chat reply its text. Save keeps it, Send now sends it at
+ * once, Cancel it puts a mail back in the drafts and drops a chat reply.
+ */
+@Composable
+private fun WaitingEditor(w: Waiting, treeUri: String, onDone: (String) -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val mail = w.kind == Waiting.MAIL
+    val chat = w.kind == Waiting.GATEWAY || w.kind == Waiting.DISCORD
+    var whenText by remember(w.id) { mutableStateOf(Later.typed(w.at)) }
+    var to by remember(w.id) { mutableStateOf(w.f("to")) }
+    var cc by remember(w.id) { mutableStateOf(w.f("cc")) }
+    var subject by remember(w.id) { mutableStateOf(w.f("subject")) }
+    var body by remember(w.id) { mutableStateOf(w.f("body")) }
+    val at = readWhen(whenText)
+    val filled = !mail && !chat || body.isNotBlank() && (!mail || to.isNotBlank())
+    fun edited(time: Long): Waiting = when {
+        mail -> w.copy(
+            at = time, error = "", label = subject.ifBlank { "(no subject)" }, to = to,
+            fields = w.fields + mapOf("to" to to, "cc" to cc, "subject" to subject, "body" to body),
+        )
+        chat -> w.copy(at = time, error = "", label = Later.firstLine(body), fields = w.fields + ("body" to body))
+        else -> w.copy(at = time, error = "")
+    }
+    fun keep(next: Waiting, said: String) {
+        scope.launch {
+            val err = withContext(Dispatchers.IO) {
+                runCatching { Later.save(ctx, next); LaterAlarm.arm(ctx) }.exceptionOrNull()?.message
+            }
+            onDone(err ?: said)
+        }
+    }
+    Column(
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (w.error.isNotEmpty()) Text("Not sent: ${w.error}", color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+        WhenField(whenText) { whenText = it }
+        when {
+            mail -> {
+                Text("From: ${w.f("from")}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                OutlinedTextField(to, { to = it }, label = { Text("To") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(cc, { cc = it }, label = { Text("Cc") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(subject, { subject = it }, label = { Text("Subject") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                if (w.files.isNotEmpty()) Text("📎 " + w.files.joinToString(", ") { it.first }, fontSize = 12.sp)
+            }
+            chat -> Text("A reply on ${w.to}", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            else -> Text(
+                "The laptop draft goes to send/ then. Change its text under its own entry in the list.",
+                fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (mail || chat) {
+            OutlinedTextField(body, { body = it }, label = { Text("Message") }, minLines = 6, modifier = Modifier.fillMaxWidth())
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                enabled = at != null && filled,
+                onClick = { at?.let { keep(edited(it), "Goes ${Later.stamp(it, System.currentTimeMillis())}: ${edited(it).label}") } },
+                modifier = Modifier.weight(1f),
+            ) { Text("Save") }
+            OutlinedButton(
+                enabled = filled,
+                onClick = { keep(edited(System.currentTimeMillis()), "Sending: ${edited(0).label}") },
+                modifier = Modifier.weight(1f),
+            ) { Text("Send now") }
+            OutlinedButton(onClick = {
+                scope.launch {
+                    val err = withContext(Dispatchers.IO) {
+                        val back = if (!mail) null else DraftsRepo.create(
+                            ctx, treeUri, "phone_${System.currentTimeMillis() / 1000}.eml",
+                            DraftsRepo.mailText(w.f("from"), to, cc, subject, body),
+                        )
+                        if (back == null) { Later.remove(ctx, w.id); LaterAlarm.arm(ctx) }
+                        back
+                    }
+                    onDone(err ?: if (mail) "Back in the drafts: ${w.label}" else "Cancelled: ${w.label}")
+                }
+            }, modifier = Modifier.weight(1f)) { Text("Cancel it") }
+        }
     }
 }
 

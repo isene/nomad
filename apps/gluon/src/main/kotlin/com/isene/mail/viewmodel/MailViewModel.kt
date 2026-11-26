@@ -397,7 +397,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val err = withContext(Dispatchers.IO) {
                 val id = Later.newId(System.currentTimeMillis())
-                val first = body.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty().take(60)
+                val first = Later.firstLine(body)
                 val w = when {
                     req.viaMail -> Waiting(
                         id, at, Waiting.MAIL, subject.ifBlank { "(no subject)" }, to,

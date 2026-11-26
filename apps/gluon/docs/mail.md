@@ -306,9 +306,10 @@ The drafts are the same on both sides:
 ## Send later
 
 Later, beside Send, keeps a message on the phone and sends it at the
-time you type: `08:00`, `tomorrow 9`, `+2h` or `2026-12-24 08:00`, as
-kastrup's `S` reads them. A time gone by today means tomorrow. It works
-for every kind gluon sends:
+time you type: `in 5 minutes`, `08:00`, `tomorrow 9`, `+2h` or
+`2026-12-24 08:00`. A time gone by today means tomorrow, and a number
+alone is an hour (`5` is 05:00). Below the box it says the time it read
+and how far off that is. It works for every kind gluon sends:
 
 - mail, new or a reply or a forward, with its attachments;
 - a Discord reply, and a relay reply (relay sends it only while its
@@ -320,9 +321,9 @@ The phone sends it by itself, so gluon need not be open. One exact alarm
 rings for the first message due and nothing runs in between. With no
 network then, it goes when the network is back.
 
-Laptop drafts lists what waits under "Waiting on this phone". Tap one
-for Send now or Cancel it. Cancel puts a mail back in the drafts; a
-laptop draft stays where it is. A message that fails three times, five
+Laptop drafts lists what waits under "Waiting on this phone". Tap one to
+change its time and its text, then Save, Send now or Cancel it. Cancel
+puts a mail back in the drafts; a laptop draft stays where it is. A message that fails three times, five
 minutes apart, stays there with its error and a notice.
 
 ## Sent mail

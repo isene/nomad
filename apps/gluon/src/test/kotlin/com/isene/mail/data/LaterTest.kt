@@ -39,11 +39,32 @@ class LaterTest {
     }
 
     @Test
+    fun a_span_in_words_is_a_span_and_a_bare_number_an_hour() {
+        assertEquals(now + 5 * 60_000, read("In 5 minutes"))
+        assertEquals(now + 5 * 60_000, read("in 5"))
+        assertEquals(now + 90 * 60_000, read("90 min"))
+        assertEquals(now + 2 * 3_600_000, read("in 2 hours"))
+        assertEquals(now + 10 * 60_000, read("om 10 minutter"))
+        assertEquals(now + 5 * 60_000, read("+5 minutes"))
+        assertEquals(at(27, 5), read("5"))
+    }
+
+    @Test
+    fun how_far_off_a_time_is() {
+        assertEquals("in 5 min", Later.until(now + 5 * 60_000, now))
+        assertEquals("in 13 h 30 min", Later.until(at(27, 5), now))
+        assertEquals("in 2 h", Later.until(now + 2 * 3_600_000, now))
+        assertEquals("in 3 days", Later.until(now + 3 * 86_400_000L, now))
+        assertEquals("2026-11-27 05:00", Later.typed(at(27, 5), zone))
+    }
+
+    @Test
     fun nonsense_is_no_time() {
         assertNull(read(""))
         assertNull(read("soon"))
         assertNull(read("25:00"))
         assertNull(read("+2x"))
+        assertNull(read("in a while"))
         assertNull(read("2026-13-01 08:00"))
     }
 

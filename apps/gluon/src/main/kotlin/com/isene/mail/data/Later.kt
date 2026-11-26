@@ -95,29 +95,35 @@ object Later {
         )
     }
 
+    /** Seconds in a unit as typed, in English or Norwegian; null for none. */
+    private fun unit(u: String): Long? = when (u) {
+        "m", "min", "mins", "minute", "minutes", "minutt", "minutter" -> 60L
+        "h", "hr", "hrs", "hour", "hours", "t", "time", "timer" -> 3600L
+        "d", "day", "days", "dag", "dager", "døgn" -> 86_400L
+        "w", "week", "weeks", "uke", "uker" -> 604_800L
+        else -> null
+    }
+
     /**
-     * A time as typed, the way kastrup on the laptop reads it: `+2h`,
-     * `+90m`, `+3d`; `08:00` (today if still ahead, else tomorrow);
-     * `tomorrow 08:00`, or `tomorrow` alone for 09:00; `2026-07-28 08:00`.
-     * A dot works as well as a colon (08.00), and an hour alone (8) as
-     * a whole hour. Null when it is no time.
+     * A time as typed, the way kastrup on the laptop reads it, and more:
+     * a span (`+2h`, `in 5 minutes`, `90 min`, `om 2 timer`); `08:00`
+     * (today if still ahead, else tomorrow); `tomorrow 08:00`, or
+     * `tomorrow` alone for 09:00; `2026-07-28 08:00`. A dot works as well
+     * as a colon (08.00), and an hour alone (8) is a whole hour. Null
+     * when it is no time.
      */
     fun parseWhen(input: String, now: Long, zone: ZoneId = ZoneId.systemDefault()): Long? {
         val t = input.trim().lowercase()
         if (t.isEmpty()) return null
-        if (t.startsWith("+")) {
-            val rest = t.drop(1)
-            val digits = rest.takeWhile { it.isDigit() }
-            val n = digits.toLongOrNull() ?: return null
-            val unit = when (rest.drop(digits.length).trim()) {
-                "", "m", "min", "mins", "minutes" -> 60L
-                "h", "hr", "hrs", "hours" -> 3600L
-                "d", "day", "days" -> 86_400L
-                "w", "week", "weeks" -> 604_800L
-                else -> return null
-            }
-            return now + n * unit * 1000
-        }
+        // A span: "+5", "in 5 minutes", "5 min". A number with no unit is
+        // minutes only after + or in; alone it is an hour of the day.
+        val marked = t.startsWith("+") || t.startsWith("in ") || t.startsWith("om ")
+        val span = t.removePrefix("+").removePrefix("in ").removePrefix("om ").trim()
+        val digits = span.takeWhile { it.isDigit() }
+        val rest = span.drop(digits.length).trim()
+        val secs = if (rest.isEmpty() && marked) 60L else unit(rest)
+        if (digits.isNotEmpty() && secs != null) return now + digits.toLong() * secs * 1000
+        if (marked) return null
         var date: LocalDate? = null
         var clock: String? = null
         var tomorrow = false
@@ -148,6 +154,25 @@ object Later {
         // A bare time that has gone by today means tomorrow.
         return if (date == null && !tomorrow && at <= now) at + 86_400_000 else at
     }
+
+    /** How far off [at] is, to make a misread time plain: "in 5 min",
+     *  "in 2 h 10 min", "in 3 days". */
+    fun until(at: Long, now: Long): String {
+        val min = ((at - now + 59_999) / 60_000).coerceAtLeast(0)
+        return when {
+            min < 60 -> "in $min min"
+            min < 48 * 60 -> "in ${min / 60} h" + if (min % 60 > 0) " ${min % 60} min" else ""
+            else -> "in ${(min + 720) / 1440} days"
+        }
+    }
+
+    /** [at] as the When field takes it back: "2026-12-03 08:00". */
+    fun typed(at: Long, zone: ZoneId = ZoneId.systemDefault()): String =
+        Instant.ofEpochMilli(at).atZone(zone).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+
+    /** A chat reply's label: its first line with text. */
+    fun firstLine(body: String): String =
+        body.lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty().take(60)
 
     /** "Thu 08:00" within the coming week, "2026-12-03 08:00" beyond it. */
     fun stamp(at: Long, now: Long, zone: ZoneId = ZoneId.systemDefault()): String {

@@ -153,33 +153,17 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
     }
 }
 
-/**
- * Asks when a message should go, as kastrup's `S` does on the laptop:
- * 08:00, tomorrow 9, +2h or 2026-12-24 08:00. Says the time it read.
- */
+/** Asks when a message should go, and says the time it read. */
 @Composable
 internal fun WhenDialog(note: String?, onDismiss: () -> Unit, onPick: (Long) -> Unit) {
     var text by remember { mutableStateOf("") }
-    val now = System.currentTimeMillis()
-    val at = Later.parseWhen(text, now)?.takeIf { it > now }
+    val at = readWhen(text)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Send later") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(
-                    text, { text = it }, label = { Text("When") }, singleLine = true,
-                    placeholder = { Text("08:00, tomorrow 9, +2h") },
-                )
-                Text(
-                    when {
-                        text.isBlank() -> "The phone sends it then, by itself."
-                        at == null -> "Not a time I know"
-                        else -> "Goes ${Later.stamp(at, now)}"
-                    },
-                    fontSize = 13.sp,
-                    color = if (text.isNotBlank() && at == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
-                )
+                WhenField(text) { text = it }
                 note?.let { Text(it, fontSize = 13.sp) }
             }
         },
@@ -187,6 +171,35 @@ internal fun WhenDialog(note: String?, onDismiss: () -> Unit, onPick: (Long) -> 
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
+
+/**
+ * The When box: in 5 minutes, 08:00, tomorrow 9, +2h or 2026-12-24 08:00,
+ * as kastrup's `S` reads them. Below it, the time it read and how far off
+ * that is, so a misread shows.
+ */
+@Composable
+internal fun WhenField(text: String, onText: (String) -> Unit) {
+    val now = System.currentTimeMillis()
+    val at = readWhen(text, now)
+    OutlinedTextField(
+        text, onText, label = { Text("When") }, singleLine = true,
+        placeholder = { Text("in 5 minutes, 08:00, tomorrow 9") },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    Text(
+        when {
+            text.isBlank() -> "The phone sends it then, by itself."
+            at == null -> "Not a time I know"
+            else -> "Goes ${Later.stamp(at, now)}, ${Later.until(at, now)}"
+        },
+        fontSize = 13.sp,
+        color = if (text.isNotBlank() && at == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+    )
+}
+
+/** The time in a When box, or null while it is no time ahead. */
+internal fun readWhen(text: String, now: Long = System.currentTimeMillis()): Long? =
+    Later.parseWhen(text, now)?.takeIf { it > now }
 
 /** Which account sends. One account is a label; more is a menu. */
 @Composable
