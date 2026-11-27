@@ -652,6 +652,14 @@ when building the core. Same rule as the rest of Fe₂O₃.
   (`DraftsRepo.keepSent`, kastrup `share_sent`); kastrup 0.3.119 files
   the phone's in its Sent maildir and renames them `.eml.filed`. Menu,
   Sent is `DraftsScreen(sent = true)`, read-only.
+- 0.26.0 (asked 2026-11-27): "+ Attach" on a mail (new, reply or
+  forward) opens Android's file picker (`OpenMultipleDocuments`). A tap
+  on a picked file takes it off. `Attachments.picked` reads it at send,
+  and Later reads it at once, since the leave to read ends at a restart.
+  A file that cannot be read stops the send. A kept draft drops them.
+  To and Cc suggest up to five people as they are typed, as kastrup's
+  To prompt does: senders of mail on this phone whose name or address
+  has the word after the last comma, newest first (`contactsIn`).
 
 ### fleet (com.isene.fleet)
 

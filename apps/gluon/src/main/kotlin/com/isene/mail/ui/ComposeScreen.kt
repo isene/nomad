@@ -1,6 +1,9 @@
 package com.isene.mail.ui
 
+import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,11 +36,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.isene.mail.data.Attachments
 import com.isene.mail.data.Later
 import com.isene.mail.viewmodel.ComposeRequest
 import com.isene.mail.viewmodel.MailViewModel
@@ -72,6 +77,12 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
     }
     BackHandler(onBack = leave)
     var askWhen by remember { mutableStateOf(false) }
+    // Files to send along, with the names they show under. A tap on one takes it off.
+    val ctx = LocalContext.current
+    var files by remember { mutableStateOf(listOf<Pair<Uri, String>>()) }
+    val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        files = files + uris.filter { u -> files.none { it.first == u } }.map { it to Attachments.name(ctx, it) }
+    }
 
     Scaffold(
         topBar = {
@@ -85,7 +96,7 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
                     IconButton(
                         enabled = canSend,
                         onClick = {
-                            vm.send(req, from, to, cc, subject, body.text) { err -> if (err == null) onDone() }
+                            vm.send(req, from, to, cc, subject, body.text, files.map { it.first }) { err -> if (err == null) onDone() }
                         },
                     ) { Icon(Icons.AutoMirrored.Filled.Send, "Send") }
                 },
@@ -99,17 +110,9 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
         ) {
             if (mail) {
                 FromPicker(from, remember { vm.fromAddresses() }) { from = it }
-                OutlinedTextField(
-                    to, { to = it }, label = { Text("To") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                )
+                AddressField("To", to, { to = it }, vm::contacts)
                 if (showCc) {
-                    OutlinedTextField(
-                        cc, { cc = it }, label = { Text("Cc") }, singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                    )
+                    AddressField("Cc", cc, { cc = it }, vm::contacts)
                 } else {
                     TextButton(onClick = { showCc = true }) { Text("+ Cc") }
                 }
@@ -124,6 +127,10 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
                         color = MaterialTheme.colorScheme.secondary,
                     )
                 }
+                files.forEach { f ->
+                    TextButton(onClick = { files = files - f }) { Text("📎 ${f.second}  ✕", fontSize = 12.sp) }
+                }
+                TextButton(onClick = { pick.launch(arrayOf("*/*")) }) { Text("+ Attach") }
             } else {
                 Text(
                     "To ${req.original?.from.orEmpty()} on ${req.channelLabel}",
@@ -148,7 +155,7 @@ fun ComposeScreen(vm: MailViewModel, req: ComposeRequest, onDone: () -> Unit) {
             onDismiss = { askWhen = false },
         ) { at ->
             askWhen = false
-            vm.later(req, from, to, cc, subject, body.text, at) { err -> if (err == null) onDone() }
+            vm.later(req, from, to, cc, subject, body.text, at, files.map { it.first }) { err -> if (err == null) onDone() }
         }
     }
 }
@@ -200,6 +207,31 @@ internal fun WhenField(text: String, onText: (String) -> Unit) {
 /** The time in a When box, or null while it is no time ahead. */
 internal fun readWhen(text: String, now: Long = System.currentTimeMillis()): Long? =
     Later.parseWhen(text, now)?.takeIf { it > now }
+
+/**
+ * A To or Cc box. Under it, up to five people whose name or address has
+ * the word being typed (the part after the last comma); a tap puts that
+ * one in its place.
+ */
+@Composable
+private fun AddressField(label: String, value: String, onValue: (String) -> Unit, lookup: (String) -> List<String>) {
+    var field by remember { mutableStateOf(TextFieldValue(value, TextRange(value.length))) }
+    val word = field.text.substringAfterLast(',').trim()
+    val hits = remember(word) { if (word.length < 2 || '>' in word) emptyList() else lookup(word) }
+    OutlinedTextField(
+        field, { field = it; onValue(it.text) }, label = { Text(label) }, singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+    )
+    hits.filter { !it.equals(word, ignoreCase = true) }.forEach { h ->
+        TextButton(onClick = {
+            val head = field.text.substringBeforeLast(',', "").trim()
+            val t = if (head.isEmpty()) h else "$head, $h"
+            field = TextFieldValue(t, TextRange(t.length))
+            onValue(t)
+        }) { Text(h, fontSize = 13.sp) }
+    }
+}
 
 /** Which account sends. One account is a label; more is a menu. */
 @Composable

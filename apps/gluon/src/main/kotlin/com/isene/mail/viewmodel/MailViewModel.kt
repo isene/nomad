@@ -1,6 +1,8 @@
 package com.isene.mail.viewmodel
 
 import android.app.Application
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.isene.mail.data.Attachments
@@ -337,6 +339,13 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         (settings.accounts().map { it.address.lowercase() } + settings.sendAs().keys + listOfNotNull(settings.graph()?.address))
             .distinct().sorted()
 
+    /**
+     * Who a word in the To or Cc box may be: the senders of mail on this
+     * phone whose name or address has it, newest first, one per address,
+     * as kastrup's To prompt finds them. Runs on a keystroke only.
+     */
+    fun contacts(word: String): List<String> = contactsIn(all, word)
+
     /** A new mail, from the address the last mail went from. */
     fun composeNew(): ComposeRequest = ComposeRequest(
         "new", null,
@@ -351,7 +360,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun send(
         req: ComposeRequest, from: String, to: String, cc: String, subject: String, body: String,
-        onResult: (String?) -> Unit,
+        picked: List<Uri>, onResult: (String?) -> Unit,
     ) {
         if (_ui.value.busy) return
         val ctx = getApplication<Application>()
@@ -361,8 +370,9 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
             val err = withContext(Dispatchers.IO) {
                 when {
                     req.viaMail -> {
-                        val atts = if (o != null && req.kind == "forward") forwardAttachments(o) else emptyList()
-                        Deliver.mail(ctx, settings, from, to, cc, subject, body, req.draft.inReplyTo, req.draft.references, atts)
+                        val atts = outgoing(ctx, req, picked)
+                        if (atts == null) NOT_READ
+                        else Deliver.mail(ctx, settings, from, to, cc, subject, body, req.draft.inReplyTo, req.draft.references, atts)
                     }
                     o == null -> "Nothing to reply to here"
                     o.messageId.startsWith("gw_") ->
@@ -390,7 +400,7 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun later(
         req: ComposeRequest, from: String, to: String, cc: String, subject: String, body: String, at: Long,
-        onResult: (String?) -> Unit,
+        picked: List<Uri>, onResult: (String?) -> Unit,
     ) {
         val ctx = getApplication<Application>()
         val o = req.original
@@ -416,13 +426,22 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
                     )
                     else -> null
                 } ?: return@withContext "Nothing to reply to here"
-                val atts = if (req.viaMail && o != null && req.kind == "forward") forwardAttachments(o) else emptyList()
+                // Read now: the phone may restart before it goes, and the picker's leave to read ends then.
+                val atts = if (req.viaMail) outgoing(ctx, req, picked) ?: return@withContext NOT_READ else emptyList()
                 runCatching { Later.save(ctx, w, atts); LaterAlarm.arm(ctx) }.exceptionOrNull()?.let { "Could not keep it: ${it.message}" }
             }
             if (err == null && req.viaMail) settings.lastFrom = from.lowercase()
             status(err ?: "Goes ${Later.stamp(at, System.currentTimeMillis())}; it waits under Laptop drafts")
             onResult(err)
         }
+    }
+
+    /** What a mail carries: a forward's attachments, then the files picked on the compose
+     *  screen. Null when a picked file cannot be read, so nothing goes without it. */
+    private fun outgoing(ctx: Context, req: ComposeRequest, picked: List<Uri>): List<Outbound.Attachment>? {
+        val mine = picked.map { Attachments.picked(ctx, it) ?: return null }
+        val o = req.original
+        return (if (o != null && req.kind == "forward") forwardAttachments(o) else emptyList()) + mine
     }
 
     /** The original's attachments, bytes and all, for a forward. */
@@ -682,4 +701,16 @@ class MailViewModel(app: Application) : AndroidViewModel(app) {
         // App-lifetime scope: leaving the app must not cancel the push.
         WidgetPush.now(ctx)
     }
+}
+
+private const val NOT_READ = "Could not read a picked file"
+
+/** [MailViewModel.contacts] over a given list, for the tests. */
+internal fun contactsIn(all: List<Message>, word: String): List<String> {
+    val seen = HashSet<String>()
+    val address = Regex("[^\\s<>,;\"']+@[^\\s<>,;\"']+")
+    return all.filter { it.source == "mail" && '@' in it.from && it.from.contains(word, ignoreCase = true) }
+        .sortedByDescending { it.date }
+        .filter { seen.add(address.find(it.from.lowercase())?.value ?: it.from) }
+        .take(5).map { it.from.trim() }
 }

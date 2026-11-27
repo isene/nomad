@@ -3,6 +3,7 @@ package com.isene.mail.data
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import java.io.File
 import uniffi.fe2o3_mobile_core.MailAttachment
@@ -72,6 +73,19 @@ object Attachments {
             true
         }.getOrDefault(false)
     }
+
+    /** A file the user picked to send, read whole; null when it cannot be read. */
+    fun picked(ctx: Context, uri: Uri): Outbound.Attachment? = runCatching {
+        val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+        Outbound.Attachment(name(ctx, uri), ctx.contentResolver.getType(uri) ?: "application/octet-stream", bytes)
+    }.getOrNull()
+
+    /** The name a picked file shows under, as the file picker gives it. */
+    fun name(ctx: Context, uri: Uri): String =
+        runCatching {
+            ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+                ?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+        }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/') ?: "attachment"
 
     /** Human size for a row: bytes are noise at this scale. */
     fun humanSize(bytes: ULong): String {
