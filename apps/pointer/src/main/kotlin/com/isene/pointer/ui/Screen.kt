@@ -231,6 +231,9 @@ fun PointerScreen(vm: PointerViewModel) {
             // A file inside an archive is copied out before it is shown.
             s.packed -> vm.unpack(e, hand)
             e.kind == Kind.ARCHIVE && pointerOpens(e.name) -> vm.go(e.path)
+            // A text file opens in scribe when scribe is on the phone (Geir
+            // asked on 2026-11-27). A search hit stays in the viewer, as before.
+            e.kind == Kind.TEXT && e.line == 0u && Hand.scribe(ctx, e.path) -> {}
             vm.view(e) -> {}
             else -> hand(e)
         }

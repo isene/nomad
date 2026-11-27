@@ -147,6 +147,18 @@ object Hand {
         )
     }.isSuccess
 
+    /** Open a text file in nomad's scribe, which may save to it; false when
+     *  scribe is not on the phone. scribe takes text, so every text file
+     *  goes as text/plain, a .json or .xml too. */
+    fun scribe(ctx: Context, path: String): Boolean = runCatching {
+        ctx.startActivity(
+            Intent(Intent.ACTION_EDIT)
+                .setDataAndType(uri(ctx, path), "text/plain")
+                .setPackage("com.isene.scribe")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION),
+        )
+    }.isSuccess
+
     /** Share files through the phone's share sheet. */
     fun share(ctx: Context, paths: List<String>): Boolean = runCatching {
         val uris = ArrayList(paths.map { uri(ctx, it) })

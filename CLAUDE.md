@@ -393,6 +393,9 @@ when building the core. Same rule as the rest of Fe₂O₃.
 - Tabs live in `UiState.tabs`, one back-trail each, at most eight, saved
   in `onStop`. The marks row is dragged into order (`sh.calvin.reorderable`)
   and written once, when the drag ends.
+- A tapped text file opens in nomad's scribe (`Hand.scribe`, 0.4.4), sent
+  as text/plain so a .json goes too. The viewer below is for search hits
+  and for a phone without scribe.
 - A text file is shown in Android's own `TextView` inside a `ScrollView`
   (through `AndroidView`), so text can be marked and copied. Keep it:
   Compose's `SelectionContainer` over a list of lines copies them with no
